@@ -1,0 +1,36 @@
+bpi=bananapi
+board=bpi-m2u
+chip=r40
+service=linux
+kernel=uImage
+#
+#
+
+ahello=echo Banaan Pi ${board} chip: $chip Service: $service
+
+aboot=if fatload $device $partition 0x45000000 ${bpi}/berryboot.img; then bootm 0x48000000 0x45000000 ; else bootm 0x48000000; fi
+aload_kernel=fatload $device $partition 0x48000000 ${bpi}/${board}/${service}/${kernel}
+
+uenvcmd=run ahello aload_kernel aboot
+
+#
+# from sys_config.fex
+#
+#;output_type  (0:none; 1:lcd; 2:tv; 3:hdmi; 4:vga)
+#;output_mode  (used for tv/hdmi output, 0:480i 1:576i 2:480p 3:576p 4:720p50 5:720p60 6:1080i50 7:1080i60 8:1080p24 9:1080p50 10:1080p60 11:pal 14:ntsc)
+#
+
+# ref. sys_config.fex, use default script.bin
+#bootargs=enforcing=1 earlyprintk=sunxi-uart,0x01c28000 initcall_debug=0 console=ttyS0,115200 console=tty1 board=bpi-m2u loglevel=8 root=/dev/mmcblk0p2 rw rootwait  init=/init cma=256M bootmenutimeout=10 datadev=mmcblk0p2
+bootargs=enforcing=1 initcall_debug=1 console=ttyS0,115200n8 console=tty1 no_console_suspend board=bpi-m2u loglevel=4 root=/dev/mmcblk0p2 rw rootwait  init=/init cma=256M panic=10 consoleblank=0 bootmenutimeout=10 datadev=mmcblk0p2
+
+# output HDMI 1080P (type:3 mode:10)
+#bootargs=enforcing=1 initcall_debug=0 console=ttyS0,115200n8 console=tty1 no_console_suspend board=bpi-m2u loglevel=4 root=/dev/mmcblk0p2 rw rootwait  init=/init cma=256M panic=10 consoleblank=0 bootmenutimeout=10 datadev=mmcblk0p2 disp.screen0_output_type=3 disp.screen0_output_mode=10 disp.screen1_output_type=3 disp.screen1_output_mode=10
+
+# output HDMI 720P (type:3 mode:5)
+#bootargs=enforcing=1 initcall_debug=0 console=ttyS0,115200n8 console=tty1 no_console_suspend board=bpi-m2u loglevel=4 root=/dev/mmcblk0p2 rw rootwait  init=/init cma=256M panic=10 consoleblank=0 bootmenutimeout=10 datadev=mmcblk0p2 disp.screen0_output_type=3 disp.screen0_output_mode=5 disp.screen1_output_type=3 disp.screen1_output_mode=5
+
+
+
+# output HDMI 480P (type:3 mode:2)
+#bootargs=enforcing=1 initcall_debug=0 console=ttyS0,115200n8 console=tty1 no_console_suspend board=bpi-m2u loglevel=4 root=/dev/mmcblk0p2 rw rootwait  init=/init cma=256M panic=10 consoleblank=0 bootmenutimeout=10 datadev=mmcblk0p2 disp.screen0_output_type=3 disp.screen0_output_mode=2 disp.screen1_output_type=3 disp.screen1_output_mode=2

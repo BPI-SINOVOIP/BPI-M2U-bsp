@@ -25,5 +25,5 @@ sudo dd if=$P/boot_package.fex 	of=$O bs=1k seek=16400
 sudo dd if=$P/sunxi_mbr.fex 	of=$O bs=1k seek=20480
 sudo dd if=$P/boot-resource.fex	of=$O bs=1k seek=36864
 sudo dd if=$P/env.fex 		of=$O bs=1k seek=53248
-sudo dd if=$P/boot.fex 		of=$O bs=1k seek=54272
+#sudo dd if=$P/boot.fex 		of=$O bs=1k seek=54272
 

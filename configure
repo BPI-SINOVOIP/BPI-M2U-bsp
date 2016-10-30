@@ -13,9 +13,7 @@ TARGET_PRODUCT="azalea-m2ultra"
 CUR_DIR=$PWD
 
 list_boards() {
-	ls -1 sunxi-pack/chips/sun8iw6p1/configs/*/*/*.fex |
-	sed -n -e 's|.*/\([^/]\+\)\.fex$|\1|p' | sort -V |
-        sed -e 's|.*|\t* \0 \0-android|'
+	(cd sunxi-pack/allwinner/${TARGET_PRODUCT}/configs ; ls -1d BPI* )
 }
 
 # keep the output `sh` friendly
@@ -59,7 +57,7 @@ usage() {
 
 	supported boards:
 	EOT
-	#list_boards  #DK, update later
+	list_boards  #DK, update later
 }
 
 if [ $# -eq 0 ]; then
