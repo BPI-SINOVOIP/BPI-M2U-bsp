@@ -1,0 +1,11 @@
+# Put your custom commands here that should be executed once
+# the system init finished. By default this file does nothing.
+
+#dafult headphone out,default headphone volume is 40
+amixer cset iface=MIXER,name='Headphone volume' 40
+amixer cset iface=MIXER,name='HPL Mux' 1
+amixer cset iface=MIXER,name='HPR Mux' 1
+amixer cset iface=MIXER,name='Right Output Mixer DACR Switch' 1
+amixer cset iface=MIXER,name='Left Output Mixer DACL Switch' 1
+amixer cset iface=MIXER,name='Headphone Switch' 1
+exit 0
