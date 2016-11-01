@@ -100,9 +100,9 @@ else
 fi
 
 #BPI
-if [ -f ${PACK_TOPDIR}/env.sh ] ; then
-	source ${PACK_TOPDIR}/env.sh
-fi
+#if [ -f ${PACK_TOPDIR}/env.sh ] ; then
+#	source ${PACK_TOPDIR}/env.sh
+#fi
 
 tools_file_list=(
 generic/tools/split_xxxx.fex
