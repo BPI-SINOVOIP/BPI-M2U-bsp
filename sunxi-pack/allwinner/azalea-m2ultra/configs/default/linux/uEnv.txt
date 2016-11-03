@@ -8,8 +8,8 @@ kernel=uImage
 
 ahello=echo Banaan Pi ${board} chip: $chip Service: $service
 
-aboot=if fatload $device $partition 0x45000000 ${bpi}/berryboot.img; then bootm 0x48000000 0x45000000 ; else bootm 0x48000000; fi
-aload_kernel=fatload $device $partition 0x48000000 ${bpi}/${board}/${service}/${kernel}
+aboot=if fatload $device $partition 0x48000000 ${bpi}/berryboot.img; then bootm 0x46000000 0x48000000 ; else bootm 0x46000000; fi
+aload_kernel=fatload $device $partition 0x46000000 ${bpi}/${board}/${service}/${kernel}
 
 uenvcmd=run ahello aload_kernel aboot
 
@@ -22,7 +22,7 @@ uenvcmd=run ahello aload_kernel aboot
 
 # ref. sys_config.fex, use default script.bin
 #bootargs=enforcing=1 earlyprintk=sunxi-uart,0x01c28000 initcall_debug=0 console=ttyS0,115200 console=tty1 board=bpi-m2u loglevel=8 root=/dev/mmcblk0p2 rw rootwait  init=/init cma=256M bootmenutimeout=10 datadev=mmcblk0p2
-bootargs=enforcing=1 initcall_debug=1 console=ttyS0,115200n8 console=tty1 no_console_suspend board=bpi-m2u loglevel=4 root=/dev/mmcblk0p2 rw rootwait  init=/init cma=256M panic=10 consoleblank=0 bootmenutimeout=10 datadev=mmcblk0p2
+bootargs=enforcing=1 initcall_debug=0 console=ttyS0,115200n8 console=tty1 no_console_suspend board=bpi-m2u loglevel=4 root=/dev/mmcblk0p2 rw rootwait  init=/init cma=256M panic=10 consoleblank=0 bootmenutimeout=10 datadev=mmcblk0p2
 
 # output HDMI 1080P (type:3 mode:10)
 #bootargs=enforcing=1 initcall_debug=0 console=ttyS0,115200n8 console=tty1 no_console_suspend board=bpi-m2u loglevel=4 root=/dev/mmcblk0p2 rw rootwait  init=/init cma=256M panic=10 consoleblank=0 bootmenutimeout=10 datadev=mmcblk0p2 disp.screen0_output_type=3 disp.screen0_output_mode=10 disp.screen1_output_type=3 disp.screen1_output_mode=10

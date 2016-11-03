@@ -11,6 +11,9 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 
+echo "BPI: $0 $*"
+echo "BPI: BOARD=$BOARD"
+
 
 ############################ Notice #####################################
 # a. Some config files priority is as follows:

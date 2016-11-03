@@ -6,6 +6,7 @@ TARGET_PRODUCT="azalea-m2ultra"
 BOARD=BPI_M2U_720P
 board="bpi-m2u"
 kernel="3.10.65-BPI-M2U-Kernel"
+MODE=$1
 
 
 cp_download_files()
@@ -58,7 +59,7 @@ R="${SD}/BPI-ROOT"
 list_boards() {
 	cat <<-EOT
 	NOTICE:
-	new build.sh defualt select $BOARD and pack all boards
+	new build.sh default select $BOARD and pack all boards
 	supported boards:
 	EOT
         (cd sunxi-pack/allwinner/${TARGET_PRODUCT}/configs ; ls -1d BPI* )
@@ -85,8 +86,12 @@ echo "	6. update files for SD"
 echo "	7. Clean all build."
 echo "--------------------------------------------------------------------------------"
 
-read -p "Please choose a mode(1-6): " mode
-echo
+if [ -z "$MODE" ]; then
+	read -p "Please choose a mode(1-7): " mode
+	echo
+else
+	mode=1
+fi
 
 if [ -z "$mode" ]; then
         echo -e "\033[31m No build mode choose, using Build all default   \033[0m"
