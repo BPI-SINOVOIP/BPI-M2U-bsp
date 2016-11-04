@@ -603,6 +603,7 @@ rtp_exchange_x_y_flag = 0
 ;----------------------------------------------------------------------------------
 [ctp]
 ctp_used            = 1
+ctp_name	    = "ft5x"
 ctp_twi_id          = 1
 ctp_twi_addr        = 0x38
 ctp_screen_max_x    = 800

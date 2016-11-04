@@ -195,7 +195,7 @@ support_mode= 2
 ;-------------------------------------------------------------------------------
 [key]
 display_name= "KEY"
-activated   = 0
+activated   = 1
 program     = "keytester"
 category    = 1
 run_type    = 1
@@ -257,8 +257,9 @@ music_playtime =10
 ;-------------------------------------------------------------------------------
 [tp]
 display_name= "TP"
-activated   = 0
+activated   = 1
 program     = "tptester"
+tp_name	    = "ft5x_ts"
 run_type    = 1
 category    = 1
 module_path = "/lib/modules/3.4.39/gt9xxf_ts.ko"
