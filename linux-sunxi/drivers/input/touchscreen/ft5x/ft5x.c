@@ -43,11 +43,14 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#include <mach/irqs.h>
-#include <mach/hardware.h>
+//Justin Porting 20160811 Start
+//#include <mach/irqs.h>
+//#include <mach/hardware.h>
 
 
-#define CONFIG_SUPPORT_FTS_CTP_UPG
+//#define CONFIG_SUPPORT_FTS_CTP_UPG
+
+//Justin Porting 20160811 End
 
 #define FOR_TSLIB_TEST
 //#define TOUCH_KEY_SUPPORT
@@ -1768,10 +1771,10 @@ exit_check_functionality_failed:
         
 	return err;
 }
-
-static int __devexit ft5x_ts_remove(struct i2c_client *client)
+//Justin Porting 20160811 Start
+static int ft5x_ts_remove(struct i2c_client *client)
 {
-
+//Justin Porting 20160811 End
 	struct ft5x_ts_data *ft5x_ts = i2c_get_clientdata(client);
 	ft5x_set_reg(FT5X0X_REG_PMODE, PMODE_HIBERNATE);
 	
@@ -1805,7 +1808,9 @@ MODULE_DEVICE_TABLE(i2c, ft5x_ts_id);
 static struct i2c_driver ft5x_ts_driver = {
 	.class          = I2C_CLASS_HWMON,
 	.probe		= ft5x_ts_probe,
-	.remove		= __devexit_p(ft5x_ts_remove),
+	//Justin Porting 20160811 Start
+	.remove		= ft5x_ts_remove,
+	//Justin Porting 20160811 End
 	.id_table	= ft5x_ts_id,
 	.suspend        = ft5x_ts_suspend,
 	.resume         = ft5x_ts_resume,
@@ -1862,7 +1867,11 @@ static long aw_ioctl(struct file *file, unsigned int cmd,unsigned long arg )
 	switch (cmd) {
 	case UPGRADE:
 	        dprintk(DEBUG_OTHERS_INFO,"==UPGRADE_WORK=\n");
-		fts_ctpm_fw_upgrade_with_i_file();
+//Justin Porting 20160811 Start
+#ifdef CONFIG_SUPPORT_FTS_CTP_UPG
+			fts_ctpm_fw_upgrade_with_i_file();
+#endif
+//Justin Porting 20160811 End
 		// calibrate();
 		break;
 	default:
