@@ -969,8 +969,8 @@
 			/*vqmc = "";*/
 			/*vdmc = "";*/
 	    /*sunxi-power-save-mode;*/
-			status = "disabled";
-			/*status = "okay";*/
+			/*status = "disabled";*/
+			status = "okay";
 
        };
 
@@ -1594,7 +1594,7 @@
 			nand0_p1 = <0x55aaaa55>;
 			nand0_p2 = <0x55aaaa55>;
 			nand0_p3 = <0x55aaaa55>;
-			status = "okay";
+			status = "disabled";
 		};
 
 		sunxi_thermal_sensor:thermal_sensor{
