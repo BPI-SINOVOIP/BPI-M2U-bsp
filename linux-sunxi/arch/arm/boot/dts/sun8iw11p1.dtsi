@@ -919,6 +919,47 @@
 			sunxi,spdif-controller = <&spdif>;
 			status = "okay";
 		};
+
+		sdc0: sdmmc@01c0f000 {
+			compatible = "allwinner,sunxi-mmc-v4p1x";
+			device_type = "sdc0";
+			reg = <0x0 0x01c0f000 0x0 0x1000>; /* only sdmmc0 */
+			interrupts = <GIC_SPI 32 0x0104>;  /*  */
+			clocks = <&clk_hosc>,<&clk_pll_periph1x2>,<&clk_sdmmc0_mod>,<&clk_sdmmc0_bus>,<&clk_sdmmc0_rst>;
+			clock-names = "osc24m","pll_periph","mmc","ahb","rst";
+			pinctrl-names = "default","sleep";
+			pinctrl-0 = <&sdc0_pins_a>;
+			pinctrl-1 = <&sdc0_pins_b>;
+			max-frequency = <50000000>;
+			bus-width = <4>;
+			/*cd-inverted*/
+			cd-gpios = <&pio PF 6 0 1 2 0>;
+			/* vmmc-supply = <&reg_3p3v>;*/
+			/* vqmc-supply = <&reg_3p3v>;*/
+			/* vdmc-supply = <&reg_3p3v>;*/
+			/*vmmc = "vcc-card";*/
+			/*vqmc = "";*/
+			/*vdmc = "";*/
+			/*sd-uhs-sdr50;*/
+			/*sd-uhs-ddr50;*/
+			/*cap-sdio-irq;*/
+			/*keep-power-in-suspend;*/
+			/*ignore-pm-notify;*/
+			/*sunxi-power-save-mode;*/
+			/*sunxi-dly-400k = <1 0 0 0>; */
+			/*sunxi-dly-26M  = <1 0 0 0>;*/
+			/*sunxi-dly-52M  = <1 0 0 0 1>;*/
+			/*sunxi-dly-52M-ddr4  = <1 0 0 0>;*/
+			/*sunxi-dly-52M-ddr8  = <1 0 0 0>;*/
+			/*sunxi-dly-104M  = <1 0 0 0>;*/
+			/*sunxi-dly-208M  = <1 0 0 0>;*/
+			/*sunxi-dly-104M-ddr  = <1 0 0 0>;*/
+			/*sunxi-dly-208M-ddr  = <1 0 0 0>;*/
+
+			status = "okay";
+			/*status = "disabled";*/
+		};
+
 		sdc2: sdmmc@01C11000 {
 			compatible = "allwinner,sunxi-mmc-v4p5x";
 			device_type = "sdc2";
@@ -973,47 +1014,6 @@
 			status = "okay";
 
        };
-
-		sdc0: sdmmc@01c0f000 {
-			compatible = "allwinner,sunxi-mmc-v4p1x";
-			device_type = "sdc0";
-			reg = <0x0 0x01c0f000 0x0 0x1000>; /* only sdmmc0 */
-			interrupts = <GIC_SPI 32 0x0104>;  /*  */
-			clocks = <&clk_hosc>,<&clk_pll_periph1x2>,<&clk_sdmmc0_mod>,<&clk_sdmmc0_bus>,<&clk_sdmmc0_rst>;
-			clock-names = "osc24m","pll_periph","mmc","ahb","rst";
-			pinctrl-names = "default","sleep";
-			pinctrl-0 = <&sdc0_pins_a>;
-			pinctrl-1 = <&sdc0_pins_b>;
-			max-frequency = <50000000>;
-			bus-width = <4>;
-			/*cd-inverted*/
-			cd-gpios = <&pio PF 6 0 1 2 0>;
-			/* vmmc-supply = <&reg_3p3v>;*/
-			/* vqmc-supply = <&reg_3p3v>;*/
-			/* vdmc-supply = <&reg_3p3v>;*/
-			/*vmmc = "vcc-card";*/
-			/*vqmc = "";*/
-			/*vdmc = "";*/
-			/*sd-uhs-sdr50;*/
-			/*sd-uhs-ddr50;*/
-			/*cap-sdio-irq;*/
-			/*keep-power-in-suspend;*/
-			/*ignore-pm-notify;*/
-			/*sunxi-power-save-mode;*/
-			/*sunxi-dly-400k = <1 0 0 0>; */
-			/*sunxi-dly-26M  = <1 0 0 0>;*/
-			/*sunxi-dly-52M  = <1 0 0 0 1>;*/
-			/*sunxi-dly-52M-ddr4  = <1 0 0 0>;*/
-			/*sunxi-dly-52M-ddr8  = <1 0 0 0>;*/
-			/*sunxi-dly-104M  = <1 0 0 0>;*/
-			/*sunxi-dly-208M  = <1 0 0 0>;*/
-			/*sunxi-dly-104M-ddr  = <1 0 0 0>;*/
-			/*sunxi-dly-208M-ddr  = <1 0 0 0>;*/
-
-			status = "okay";
-			/*status = "disabled";*/
-		};
-
 
 		sdc1: sdmmc@1C10000 {
 			compatible = "allwinner,sunxi-mmc-v4p1x";
