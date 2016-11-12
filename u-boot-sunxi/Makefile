@@ -1211,8 +1211,8 @@ tpl/u-boot-tpl.bin: tools prepare
 TAG_SUBDIRS := $(u-boot-dirs) include sunxi_spl
 
 FIND := find
-FINDFLAGS := -L \
--R --c++-kinds=+p --fields=+iaS --extra=+q
+FINDFLAGS := -L
+#-R --c++-kinds=+p --fields=+iaS --extra=+q
 tags ctags:
 		ctags -w -o ctags `$(FIND) $(FINDFLAGS) $(TAG_SUBDIRS) \
 						-name '*.[chS]' -print`
