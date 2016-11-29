@@ -2186,6 +2186,19 @@ int mmc_start_init(struct mmc *mmc)
 		(0 ==mmc->block_dev.dev)){
 		priv_info->card_type = CARD_TYPE_NULL;
 	}
+#ifdef BPI
+#else
+	if(mmc->cfg->host_no==0) {
+		priv_info->card_type = CARD_TYPE_SD;
+		MMCINFO("BPI: %d CARD_TYPE_SD\n", mmc->cfg->host_no);
+	}
+	else
+	if(mmc->cfg->host_no==2) {
+		priv_info->card_type = CARD_TYPE_MMC;
+		MMCINFO("BPI: %d CARD_TYPE_MMC\n", mmc->cfg->host_no);
+	}
+
+#endif
 
 	if (work_mode == WORK_MODE_BOOT)
 	{
@@ -2692,6 +2705,14 @@ int mmc_init_boot(struct mmc *mmc)
 			else
 				need_tuning = 1;
 		}
+#ifdef BPI
+#else
+		if (need_tuning)
+		{
+			need_tuning = 0;
+			MMCINFO("BPI: %s SKIP tuning procedure!\n", __FUNCTION__);
+		}
+#endif
 
 		if (need_tuning)
 		{

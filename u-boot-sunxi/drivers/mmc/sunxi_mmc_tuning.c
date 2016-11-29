@@ -1323,6 +1323,13 @@ int sunxi_switch_to_best_bus(struct mmc *mmc)
 	{
 		return 0;
 	}
+#ifdef BPI
+#else
+	if (host->mmc_no == 2) {
+		MMCINFO("BPI: %s SKIP\n", __FUNCTION__);
+		return 0;
+	}
+#endif
 	if ((work_mode == WORK_MODE_BOOT)
 		|| ((work_mode != WORK_MODE_BOOT)
 			&& (host->cfg.platform_caps.sample_mode != AUTO_SAMPLE_MODE)))
