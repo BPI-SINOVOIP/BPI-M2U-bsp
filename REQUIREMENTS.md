@@ -2,6 +2,7 @@
 #Build and Usage-Requirements
 
 Author: Daniel Andersen - http://www.Dan-And.de 
+
 Contributors: 
 
 
@@ -13,8 +14,8 @@ Kernel and mainline U-Boot repository.
 
 
 ###WARNING: 
-There are (at least for me) unknown binaries which you need to use. I haven't found any source code for it and they are provided as compiled 
-32-Bit (!) binaries only. 
+There are (at least for me) unknown binaries which you need to use. I haven't found any source code for it and they are provided as compiled 32-Bit (!) binaries only. 
+
 See: https://github.com/BPI-SINOVOIP/BPI-M2U-bsp/tree/master/out/host/bin 
 
 ```
@@ -42,6 +43,7 @@ update_uboot_fdt:   ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux), st
 ```
 
 It is required to use dragon and fsbuild, which are 32-Bit Linux executables. The other executables are 64-Bit Linux executables. You can ignore the Windows binaries (Phew!). 
+
 If you know where to get the original source-code (and what kind of licence these files have!), please get in touch with me: https://github.com/dan-and/ 
 
 
