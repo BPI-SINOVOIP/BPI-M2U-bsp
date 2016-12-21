@@ -17,6 +17,7 @@ There are (at least for me) unknown binaries which you need to use. I haven't fo
 32-Bit (!) binaries only. 
 See: https://github.com/BPI-SINOVOIP/BPI-M2U-bsp/tree/master/out/host/bin 
 
+```
 BPI-M2U-bsp/out/host/bin# file *
 AwPluginVector.dll: ELF 32-bit LSB shared object, Intel 80386, version 1 (SYSV), dynamically linked, not stripped
 config.dll:         PE32 executable (DLL) (GUI) Intel 80386, for MS Windows
@@ -38,7 +39,7 @@ update_fes1:        ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic
 update_mbr:         ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.6.15, BuildID[sha1]=23acde6f21548cc19f9e1805014bb14930655f6e, not stripped
 update_uboot:       ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux), statically linked, for GNU/Linux 2.6.24, BuildID[sha1]=600eb8f2669a19c7fa6882cdd429f24f214f8a5c, not stripped
 update_uboot_fdt:   ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux), statically linked, for GNU/Linux 2.6.24, BuildID[sha1]=6e70f48bf894fac773d7ee3b9a50d32b0bd437ba, not stripped
-
+```
 
 It is required to use dragon and fsbuild, which are 32-Bit Linux executables. The other executables are 64-Bit Linux executables. You can ignore the Windows binaries (Phew!). 
 If you know where to get the original source-code (and what kind of licence these files have!), please get in touch with me: https://github.com/dan-and/ 
@@ -50,22 +51,22 @@ It should be possible to use any kind of Linux Distribution, but I would recomme
 you 
 
 Distribution:  UBUNTU Linux 16.04: 64 Bit version only.
-
+```
 sudo apt install bc make git gcc gcc-arm-linux-gnueabihf u-boot-tools ncurses-devel
-
+```
 Due to the unsafe binary tool mentioned abouve, you are required to install 32-Bit in your 64-Bit environment. You can do it as following: 
-
+```
 sudo dpkg --add-architecture i386
 sudo apt-get update
 sudo apt-get install libc6:i386 libncurses5:i386 libstdc++6:i386
-
+```
 
 ## Build: 
-
+```
 git clone <LINK-TO-GITHUB-REPO> 
 cd BPI-M2U-bsp
 ./build.sh
-
+```
 
 ## Files: 
 
