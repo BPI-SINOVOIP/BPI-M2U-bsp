@@ -72,6 +72,6 @@ cd BPI-M2U-bsp
 
 ## Files: 
 
-You will find the results at:     out/azalea-m2ultra/
+You will find the results at:     SD/
 
 
