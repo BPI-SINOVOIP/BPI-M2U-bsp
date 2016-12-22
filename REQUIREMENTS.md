@@ -74,4 +74,12 @@ cd BPI-M2U-bsp
 
 You will find the results at:     SD/
 
-
+```
+# ls -F SD/
+100MB/
+3.10.104-BPI-M2U-Kernel.tgz
+BOOTLOADER-bpi-m2u.tgz
+BPI-BOOT/
+BPI-BOOT-bpi-m2u.tgz
+BPI-ROOT/ 
+```
