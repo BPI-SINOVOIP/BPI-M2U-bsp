@@ -16,6 +16,11 @@
 #include <fdt_support.h>
 #include <sys_config_old.h>
 
+#ifdef BPI
+#else
+void bpi_boot_init_gpio(void);
+#endif
+
 DECLARE_GLOBAL_DATA_PTR;
 
 enum _USER_MODE
@@ -130,6 +135,41 @@ static int  check_user_mode(void)
 	return NORMAL_MODE;
 }
 
+#ifdef BPI
+#else
+void bpi_boot_init_gpio()
+{
+	int gpio_nodeoffset;
+	int gpio_used=1;
+	int gpio_num=0;
+	int i;
+	char gpiobuf[64];
+	printf("BPI: %s ...\n", __FUNCTION__);
+	gpio_nodeoffset = fdt_path_offset(working_fdt,"/soc/boot_init_gpio");
+	if(gpio_nodeoffset < 0) {
+		printf("%s:%d: get nodeerror\n",__func__, __LINE__);
+		return;
+	}
+	if(fdt_getprop_u32(working_fdt,gpio_nodeoffset,"gpio_used", (uint32_t*)&gpio_used)<0) {
+		printf("can not get gpio_used \n");
+	}
+	if(gpio_used != 1)
+		return;
+	if(fdt_getprop_u32(working_fdt,gpio_nodeoffset,"gpio_num", (uint32_t*)&gpio_num)<0) {
+		printf("can not get gpio_num \n");
+	}
+	if(gpio_num <= 0)
+		return;
+	for(i=0;i<gpio_num; i++) {
+		sprintf(gpiobuf, "gpio_pin_%d", i + 1);
+		printf("set pin for %s\n",gpiobuf);
+		if(0 != fdt_set_one_gpio("/soc/boot_init_gpio", gpiobuf)) {
+			printf("set pin for %s error\n",gpiobuf);
+		}
+	}
+	return;
+}
+#endif
 
 /*
  * Read a key  when user pressed a  key 

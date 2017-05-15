@@ -873,6 +873,10 @@ static int init_func_pmubus(void)
 
 
 extern int power_source_init(void);
+#ifdef BPI
+#else
+extern int bpi_boot_init_gpio(void);
+#endif
 extern int check_update_key(void);
 extern int check_uart_input(void);
 extern int get_debugmode_flag(void);
@@ -987,6 +991,10 @@ static init_fnc_t init_sequence_f[] = {
 	smc_init,
 	init_func_pmubus,
 	power_source_init,
+#ifdef BPI
+#else
+	bpi_boot_init_gpio,
+#endif
 	check_update_key,
 	check_uart_input,
 	announce_dram_init,

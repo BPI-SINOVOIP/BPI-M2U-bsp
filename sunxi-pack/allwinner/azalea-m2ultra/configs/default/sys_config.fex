@@ -17,10 +17,11 @@ eraseflag   = 0
 [boot_init_gpio]
 used   = 1
 gpio_used       = 1
-gpio_num        = 3
+gpio_num        = 4
 gpio_pin_1	= port:PH20<1><default><default><1>
 gpio_pin_2	= port:PH21<1><default><default><1>
 gpio_pin_3	= port:PH22<1><default><default><1>
+gpio_pin_4	= port:PH23<1><default><default><1>
 
 
 ;----------------------------------------------------------------------------------
