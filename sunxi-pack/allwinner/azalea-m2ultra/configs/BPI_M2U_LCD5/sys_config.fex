@@ -51,6 +51,7 @@ charging_type = 1
 ;---------------------------------------------------------------------------------
 [key_detect_en]
 keyen_flag = 1
+version_flag = 1
 
 ;----------------------------------------------------------------------------------
 ;
@@ -604,14 +605,15 @@ rtp_exchange_x_y_flag = 0
 ;----------------------------------------------------------------------------------
 [ctp]
 ctp_used            = 1
-ctp_name	    = "ft5x"
+ctp_name            = "gt9xxnew_ts"
 ctp_twi_id          = 1
-ctp_twi_addr        = 0x38
-ctp_screen_max_x    = 800
-ctp_screen_max_y    = 400
+ctp_twi_addr        = 0x5d
+ctp_screen_max_x    = 720
+ctp_screen_max_y    = 1280
 ctp_revert_x_flag   = 0
 ctp_revert_y_flag   = 0
 ctp_exchange_x_y_flag = 0
+ctp_gesture_wakeup  = 0
 ctp_int_port        = port:PI10<6><default><default><default>
 ctp_wakeup          = port:PI11<1><default><default><1>
 ctp_power_ldo       = "vcc-3v"

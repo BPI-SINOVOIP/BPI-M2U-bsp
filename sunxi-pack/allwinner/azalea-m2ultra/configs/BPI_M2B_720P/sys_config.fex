@@ -678,13 +678,12 @@ nand0_p3 = 0x55aaaa55
 
 [boot_disp]
 output_disp = 0
-;output_disp = 1
 ; output_type: 1:LCD 2:TV 3:HDMI 4:VGA
-output_type = 1
+output_type = 3
 output_mode = 5
-;auto_hpd        = 1
+auto_hpd        = 1
 output_full     = 1
-;hdmi_mode_check = 1
+hdmi_mode_check = 1
 
 ;----------------------------------------------------------------------------------
 ;disp init configuration
@@ -707,10 +706,10 @@ output_full     = 1
 disp_init_enable         = 1
 disp_mode                = 0
 
-screen0_output_type      = 1
+screen0_output_type      = 3
 screen0_output_mode      = 5
 
-screen1_output_type      = 3
+screen1_output_type      = 1
 screen1_output_mode      = 5
 
 fb0_format               = 0
@@ -1561,6 +1560,7 @@ pmu_start				   = 0
 ;--------------------------------------------------------------------------------------------------------
 [charger0]
 compatible                 = "axp221s-charger"
+pmu_bat_unused             = 1
 pmu_chg_ic_temp            = 0
 pmu_battery_rdc            = 100
 pmu_battery_cap            = 0
