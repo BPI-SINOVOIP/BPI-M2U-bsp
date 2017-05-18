@@ -223,6 +223,12 @@ int PowerCheck(void)
 
 	//check battery
 	BatExist = pmu_bat_unused?0:axp_probe_battery_exist();
+#ifdef BPI
+#else
+	printf("BPI: axp_probe_battery_exist(%d)\n", axp_probe_battery_exist());
+	printf("BPI: BatExist(%d) pmu_bat_unused(%d)\n", BatExist, pmu_bat_unused);
+	//BatExist = 0; // force to set no battery
+#endif
 
 	//check power bus
 	PowerBus = axp_probe_power_source();

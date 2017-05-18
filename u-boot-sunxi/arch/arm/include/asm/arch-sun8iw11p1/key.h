@@ -61,4 +61,9 @@ extern int sunxi_key_read(void);
 
 extern int sunxi_key_probe(void);
 
+#ifdef BPI
+#else
+extern int bpi_board_version(void);
+#endif
+
 #endif
