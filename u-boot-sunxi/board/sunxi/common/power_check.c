@@ -227,7 +227,10 @@ int PowerCheck(void)
 #else
 	printf("BPI: axp_probe_battery_exist(%d)\n", axp_probe_battery_exist());
 	printf("BPI: BatExist(%d) pmu_bat_unused(%d)\n", BatExist, pmu_bat_unused);
-	//BatExist = 0; // force to set no battery
+        if(uboot_spare_head.boot_data.reserved[0] == 0x2e) {
+		printf("BPI: force to set no battery in BPI-M2 Berry 1.0\n");
+		BatExist = 0; // force to set no battery
+	}
 #endif
 
 	//check power bus

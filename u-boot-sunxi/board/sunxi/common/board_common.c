@@ -463,9 +463,13 @@ int update_fdt_para_for_kernel(void* dtb_base)
 			else
 			{
 				disable_node("nand0");
-#ifdef BPI
-				disable_node("mmc2"); // BPI
+#ifdef BPI_MMC
+				disable_node("mmc2");
 #else
+				if(uboot_spare_head.boot_data.reserved[0] == 0x2e) {
+					printf("BPI: disable_node mmc2 in BPI-M2 Berry 1.0\n");
+					disable_node("mmc2"); // BPI_MMC
+				}
 #endif
 				disable_node("mmc3");
 			}
