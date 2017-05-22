@@ -215,6 +215,13 @@ int PowerCheck(void)
 	nodeoffset =  fdt_path_offset(working_fdt,PMU_SCRIPT_NAME);
 	if(nodeoffset >0)
 	{
+#ifdef BPI
+#else
+		if(uboot_spare_head.boot_data.reserved[0] == 0x2e) {
+			printf("BPI-M2 Berry: force to set pmu_bat_unused = 1\n");
+			fdt_setprop_u32(working_fdt,nodeoffset, "pmu_bat_unused", 1);
+		}
+#endif
 		script_parser_fetch(PMU_SCRIPT_NAME, "power_start", (int *)&PowerStart, 1);
 		script_parser_fetch(PMU_SCRIPT_NAME, "pmu_bat_unused", (int *)&pmu_bat_unused, 1);
 	}

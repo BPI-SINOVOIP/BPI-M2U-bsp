@@ -1560,6 +1560,7 @@ pmu_start				   = 0
 ;--------------------------------------------------------------------------------------------------------
 [charger0]
 compatible                 = "axp221s-charger"
+pmu_bat_unused             = 0
 pmu_chg_ic_temp            = 0
 pmu_battery_rdc            = 100
 pmu_battery_cap            = 0
