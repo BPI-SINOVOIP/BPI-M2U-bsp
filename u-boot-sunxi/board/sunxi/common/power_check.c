@@ -217,7 +217,7 @@ int PowerCheck(void)
 	{
 #ifdef BPI
 #else
-		if(uboot_spare_head.boot_data.reserved[0] == 0x2e) {
+		if(uboot_spare_head.boot_data.reserved[0] == BPI_M2_BERRY_ID) {
 			printf("BPI-M2 Berry: force to set pmu_bat_unused = 1\n");
 			fdt_setprop_u32(working_fdt,nodeoffset, "pmu_bat_unused", 1);
 		}
@@ -234,7 +234,7 @@ int PowerCheck(void)
 #else
 	printf("BPI: axp_probe_battery_exist(%d)\n", axp_probe_battery_exist());
 	printf("BPI: BatExist(%d) pmu_bat_unused(%d)\n", BatExist, pmu_bat_unused);
-        if(uboot_spare_head.boot_data.reserved[0] == 0x2e) {
+        if(uboot_spare_head.boot_data.reserved[0] == BPI_M2_BERRY_ID) {
 		printf("BPI: force to set no battery in BPI-M2 Berry 1.0\n");
 		BatExist = 0; // force to set no battery
 	}

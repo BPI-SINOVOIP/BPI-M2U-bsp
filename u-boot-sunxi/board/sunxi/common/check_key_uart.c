@@ -194,7 +194,6 @@ int check_update_key(void)
 #else
 	key_value = bpi_board_version();  	
 	printf("bpi_board_version: [%x]\n", key_value);
-	uboot_spare_head.boot_data.reserved[0] = key_value;
 #endif
 
 	key_value = sunxi_key_read();  	

@@ -138,8 +138,9 @@ int sunxi_key_read(void)
 	{
 #ifdef BPI
 #else
-		if(version_flag && key==0x2e) { // BPI-M2 Berry 1.0
-			return -1;
+		if(version_flag) {
+			if(key>=(BPI_M2_BERRY_KEY - 2) && key<=(BPI_M2_BERRY_KEY + 2)) // BPI-M2 Berry 1.0 [0x2e]
+				return -1;
 		}
 #endif
 		printf("key pressed value=0x%x\n", key);
@@ -185,10 +186,14 @@ int bpi_board_version(void)
 		key = sunxi_key_base->data0 & 0x3f;
 	}
 	if(version_flag) {
-		if(key==0x2e)  // BPI-M2 Berry 1.0
+		if(key>=(BPI_M2_BERRY_KEY - 2) && key<=(BPI_M2_BERRY_KEY + 2)) { // BPI-M2 Berry 1.0 [0x2e]
 			printf("BPI: BPI-M2 Berry 1.0 \n");
-		else
+			uboot_spare_head.boot_data.reserved[0] = BPI_M2_BERRY_ID;
+		}
+		else {
 			printf("BPI: BPI-M2 Ultra\n");
+			uboot_spare_head.boot_data.reserved[0] = BPI_M2_ULTRA_ID;
+		}
 	}
 	return key;
 }

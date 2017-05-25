@@ -466,7 +466,7 @@ int update_fdt_para_for_kernel(void* dtb_base)
 #ifdef BPI_MMC
 				disable_node("mmc2");
 #else
-				if(uboot_spare_head.boot_data.reserved[0] == 0x2e) {
+				if(uboot_spare_head.boot_data.reserved[0] == BPI_M2_BERRY_ID) {
 					printf("BPI: disable_node mmc2 in BPI-M2 Berry 1.0\n");
 					disable_node("mmc2"); // BPI_MMC
 				}
