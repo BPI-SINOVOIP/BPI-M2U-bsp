@@ -480,6 +480,11 @@
 //#define CONFIG_CMD_LED		/* BPI */
 //#define CONFIG_CMD_SPI		/* BPI */
 
+#define	BPI_M2_BERRY_KEY	0x2e
+
+#define BPI_M2_ULTRA_ID	1		/* BPI */
+#define BPI_M2_BERRY_ID	2		/* BPI */
+
 /* net support */
 #define CONFIG_SUNXI_GMAC	/* BPI */
 #define CONFIG_CMD_DHCP		/* BPI */
