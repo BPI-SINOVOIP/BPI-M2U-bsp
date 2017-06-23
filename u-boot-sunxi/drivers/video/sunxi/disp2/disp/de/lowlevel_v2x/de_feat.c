@@ -2,6 +2,7 @@
 
 static const struct de_feat *de_cur_features;
 
+#if defined(CONFIG_ARCH_SUN50IW2P1)
 static const int sun50iw2_de_num_chns[] = {
 	/* DISP0 */
 	4,
@@ -106,7 +107,9 @@ static const struct de_feat sun50iw2_de_features = {
 	.is_support_scale = sun50iw2_de_is_support_scale,
 	.scale_line_buffer = sun50iw2_de_scale_line_buffer,
 };
+#endif
 
+#if defined(CONFIG_ARCH_SUN50IW1P1)
 static const int sun50iw1_de_num_chns[] = {
 	/* DISP0 */
 	4,
@@ -207,6 +210,7 @@ static const struct de_feat sun50iw1_de_features = {
 	.is_support_scale = sun50iw1_de_is_support_scale,
 	.scale_line_buffer = sun50iw1_de_scale_line_buffer,
 };
+#endif
 
 static const int sun8iw11_de_num_chns[] = {
 	/* DISP0 */
@@ -313,6 +317,8 @@ static const struct de_feat sun8iw11_de_features = {
 	.scale_line_buffer = sun8iw11_de_scale_line_buffer,
 };
 
+#if defined(CONFIG_ARCH_SUN8IW11P1)
+#else
 static const int default_de_num_chns[] = {
 	/* DISP0 */
 	4,
@@ -413,6 +419,7 @@ static const struct de_feat default_de_features = {
 	.is_support_scale = default_de_is_support_scale,
 	.scale_line_buffer = default_de_scale_line_buffer,
 };
+#endif
 
 int de_feat_get_num_screens(void)
 {

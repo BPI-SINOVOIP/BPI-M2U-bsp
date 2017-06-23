@@ -190,6 +190,12 @@ int check_update_key(void)
 	sunxi_key_read();
 	__msdelay(10);
 
+#ifdef BPI
+#else
+	key_value = bpi_board_version();  	
+	printf("bpi_board_version: [%x]\n", key_value);
+#endif
+
 	key_value = sunxi_key_read();  	
 	if(key_value < 0)             				
 	{

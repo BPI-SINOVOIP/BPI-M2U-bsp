@@ -605,15 +605,14 @@ rtp_exchange_x_y_flag = 0
 ;----------------------------------------------------------------------------------
 [ctp]
 ctp_used            = 1
-ctp_name            = "gt9xxnew_ts"
+ctp_name	    = "ft5x"
 ctp_twi_id          = 1
-ctp_twi_addr        = 0x5d
-ctp_screen_max_x    = 720
-ctp_screen_max_y    = 1280
+ctp_twi_addr        = 0x38
+ctp_screen_max_x    = 800
+ctp_screen_max_y    = 400
 ctp_revert_x_flag   = 0
 ctp_revert_y_flag   = 0
 ctp_exchange_x_y_flag = 0
-ctp_gesture_wakeup  = 0
 ctp_int_port        = port:PI10<6><default><default><default>
 ctp_wakeup          = port:PI11<1><default><default><1>
 ctp_power_ldo       = "vcc-3v"
@@ -679,13 +678,12 @@ nand0_p3 = 0x55aaaa55
 
 [boot_disp]
 output_disp = 0
-;output_disp = 1
 ; output_type: 1:LCD 2:TV 3:HDMI 4:VGA
-output_type = 1
+output_type = 3
 output_mode = 5
-;auto_hpd        = 1
+auto_hpd        = 1
 output_full     = 1
-;hdmi_mode_check = 1
+hdmi_mode_check = 1
 
 ;----------------------------------------------------------------------------------
 ;disp init configuration
@@ -708,11 +706,11 @@ output_full     = 1
 disp_init_enable         = 1
 disp_mode                = 0
 
-screen0_output_type      = 1
-screen0_output_mode      = 4
+screen0_output_type      = 3
+screen0_output_mode      = 5
 
-screen1_output_type      = 3
-screen1_output_mode      = 4
+screen1_output_type      = 1
+screen1_output_mode      = 5
 
 fb0_format               = 0
 fb0_width                = 0
@@ -841,25 +839,25 @@ cagc_enable             = 1
 [lcd0]
 lcd_used            = 1
 
-lcd_driver_name     = "LHR050H41_MIPI_RGB"
-lcd_backlight       = 250
+lcd_driver_name     = "S070WV20_MIPI_RGB"
+lcd_backlight       = 50
 lcd_if              = 4
-lcd_x               = 720
-lcd_y               = 1280
-lcd_width           = 62
-lcd_height          = 110
-lcd_dclk_freq       = 62
+lcd_x               = 800
+lcd_y               = 480
+lcd_width           = 86
+lcd_height          = 154
+lcd_dclk_freq       = 20
 lcd_pwm_used        = 1
 lcd_pwm_ch          = 0
-lcd_pwm_freq        = 10000
+lcd_pwm_freq        = 50000
 lcd_pwm_pol         = 1
-lcd_pwm_max_limit   = 150
-lcd_hbp             = 30
-lcd_ht              = 780
-lcd_hspw            = 20
-lcd_vbp             = 20
-lcd_vt              = 1320
-lcd_vspw            = 10
+lcd_pwm_max_limit   = 255
+lcd_hbp             = 88
+lcd_ht              = 928
+lcd_hspw            = 48
+lcd_vbp             = 32
+lcd_vt              = 525
+lcd_vspw            = 3
 
 lcd_frm		    = 0
 lcd_cmap_en	    = 0
@@ -876,12 +874,12 @@ deu_mode            = 0
 lcdgamma4iep        = 22
 smart_color         = 90
 
-lcd_bl_en          = port:PH16<1><0><2><1>
+lcd_bl_en           = port:PH16<1><0><2><1>
 lcd_power           = "vcc-3v"
-;lcd_power          = "vcc-mipi"
-lcd_gpio_0	    = port:PH17<1><0><default><1>
-lcd_gpio_1	    = port:PH18<1><0><default><1>
-;lcd_io_regluator1  = "vcc-pd"
+;lcd_power           = "vcc-mipi"
+lcd_gpio_0	    = port:PH17<1><0><2><1>
+lcd_gpio_1	    = port:PH18<1><0><2><1>
+;lcd_io_regluator1   = "vcc-pd"
 
 ;lcdd0               = port:PD00<3><0><default><default>
 ;lcdd1               = port:PD01<3><0><default><default>
@@ -910,7 +908,7 @@ lcd_gpio_1	    = port:PH18<1><0><default><1>
 ;pwm config
 ;----------------------------------------------------------------------------------
 [pwm0]
-pwm_used            = 0
+pwm_used            = 1
 pwm_positive        = port:PB2<3><0><default><default>
 
 [pwm0_suspend]
@@ -1562,7 +1560,7 @@ pmu_start				   = 0
 ;--------------------------------------------------------------------------------------------------------
 [charger0]
 compatible                 = "axp221s-charger"
-pmu_bat_unused             = 0
+pmu_bat_unused             = 1
 pmu_chg_ic_temp            = 0
 pmu_battery_rdc            = 100
 pmu_battery_cap            = 0

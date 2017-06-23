@@ -294,8 +294,9 @@ __s32 _change_ndfc_clk_v1(__u32 nand_index, __u32 dclk_src_sel, __u32 dclk)
 
 	//sclk0_ratio_m
 	sclk0_ratio_m = (sclk0_src_t/(sclk0)) - 1;
-    if( sclk0_src_t%(sclk0) )
+    if ( sclk0_src_t % (sclk0) ) {
     	sclk0_ratio_m +=1;
+    }
 
 	/////////////////////////////// close clock
 	reg_val = get_wvalue(sclk0_reg_adr);

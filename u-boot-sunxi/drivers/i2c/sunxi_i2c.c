@@ -114,7 +114,7 @@ static __s32 i2c_sendstart(void)
     i2c->srst = 1;
     i2c->ctl |= 0x20;
 
-    while((time--)&&(!(i2c->ctl & 0x08)));
+    while((time--)&&(!(i2c->ctl & 0x08)));;
 	if(time <= 0)
 	{
 		return -I2C_NOK_TOUT;
@@ -155,7 +155,7 @@ static __s32 i2c_sendRestart(void)
         tmp_val |= 0x20;
 	i2c->ctl = tmp_val;
 
-    while( (time--) && (!(i2c->ctl & 0x08)) );
+    while( (time--) && (!(i2c->ctl & 0x08)) );;
 	if(time <= 0)
 	{
 		return -I2C_NOK_TOUT;
@@ -322,7 +322,7 @@ static __s32 i2c_getdata(__u8 *data_addr, __u32 data_count)
 			for(time=0;time<100;time++);
 			time = 0xffff;
 			data_addr[i] = i2c->data;
-		    while( (time--) && (i2c->status != I2C_DATAREAD_ACK) );
+		    while( (time--) && (i2c->status != I2C_DATAREAD_ACK) );;
 			if(time <= 0)
 			{
                             return -I2C_NOK_TOUT;
@@ -343,7 +343,7 @@ static __s32 i2c_getdata(__u8 *data_addr, __u32 data_count)
 		}
 		for(time=0;time<100;time++);
 		data_addr[data_count - 1] = i2c->data;
-	    while( (time--) && (i2c->status != I2C_DATAREAD_NACK) );
+	    while( (time--) && (i2c->status != I2C_DATAREAD_NACK) );;
 		if(time <= 0)
 		{
                     return -I2C_NOK_TOUT;
