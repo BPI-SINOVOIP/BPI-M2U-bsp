@@ -13,7 +13,6 @@
  */
 
 #include <crypto/hash.h>
-#include <crypto/sha.h>
 #include <crypto/if_alg.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -80,7 +79,9 @@ static int hash_sendmsg(struct kiocb *unused, struct socket *sock,
 				goto unlock;
 			}
 
-			ahash_request_set_crypt(&ctx->req, ctx->sgl.sg, NULL, newlen);
+			ahash_request_set_crypt(&ctx->req, ctx->sgl.sg, NULL,
+						newlen);
+
 			err = af_alg_wait_for_completion(
 				crypto_ahash_update(&ctx->req),
 				&ctx->completion);
@@ -406,7 +407,6 @@ static void hash_sock_destruct(struct sock *sk)
 
 	sock_kfree_s(sk, ctx->result,
 		     crypto_ahash_digestsize(crypto_ahash_reqtfm(&ctx->req)));
-
 	sock_kfree_s(sk, ctx, ctx->len);
 	af_alg_release_parent(sk);
 }
