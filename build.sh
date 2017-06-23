@@ -5,7 +5,7 @@
 TARGET_PRODUCT="azalea-m2ultra"
 BOARD=BPI_M2U_720P
 board="bpi-m2u"
-kernel="3.10.65-BPI-M2U-Kernel"
+kernel="3.10.104-BPI-M2U-Kernel"
 MODE=$1
 
 
