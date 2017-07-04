@@ -194,7 +194,7 @@ config INPUT_KEYCOMBO
 	  module will be called keycombo.
 
 config  INPUT_SW_DEVICE
-       tristate  "i2c device detect support"
+       tristate  "input device detect support"
        depends on INPUT && I2C
        default m
        help
