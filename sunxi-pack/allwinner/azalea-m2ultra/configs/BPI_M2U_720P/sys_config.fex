@@ -454,19 +454,23 @@ uart1_dcd        = port:PA16<7><1><default><default>
 uart1_ring       = port:PA17<7><1><default><default>
 
 [uart2]
-uart2_used       = 0
+uart2_used       = 1
 uart2_port       = 2
-uart2_type       = 4
-uart2_tx         = port:PA02<4><1><default><default>
-uart2_rx         = port:PA03<4><1><default><default>
-uart2_rts        = port:PA00<4><1><default><default>
-uart2_cts        = port:PA01<4><1><default><default>
+uart2_type       = 2
+;uart2_tx         = port:PA02<4><1><default><default>
+;uart2_rx         = port:PA03<4><1><default><default>
+;uart2_rts        = port:PA00<4><1><default><default>
+;uart2_cts        = port:PA01<4><1><default><default>
+uart2_tx         = port:PI18<3><1><default><default>
+uart2_rx         = port:PI19<3><1><default><default>
 
 [uart2_suspend]
-uart2_tx         = port:PA02<7><1><default><default>
-uart2_rx         = port:PA03<7><1><default><default>
-uart2_rts        = port:PA00<7><1><default><default>
-uart2_cts        = port:PA01<7><1><default><default>
+;uart2_tx         = port:PA02<7><1><default><default>
+;uart2_rx         = port:PA03<7><1><default><default>
+;uart2_rts        = port:PA00<7><1><default><default>
+;uart2_cts        = port:PA01<7><1><default><default>
+uart2_tx         = port:PI18<7><1><default><default>
+uart2_rx         = port:PI19<7><1><default><default>
 
 [uart3]
 uart3_used       = 1
@@ -531,7 +535,7 @@ uart7_rx         = port:PA15<7><1><default><default>
 ;SPI controller configuration
 ;----------------------------------------------------------------------------------
 [spi0]
-spi0_used       = 0
+spi0_used       = 1
 spi0_cs_number  = 2
 spi0_cs_bitmap  = 3
 spi0_cs0        = port:PC23<3><1><default><default>
