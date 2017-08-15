@@ -581,10 +581,10 @@ spi3_miso       = port:PA8<3><default><default><default>
 ;reg               --- chip select
 ;optional properties: spi-cpha, spi-cpol, spi-cs-high
 ;----------------------------------------------------------------------------------
-;[spi0/spi_board0]
-;compatible        =
-;spi-max-frequency =
-;reg               =
+[spi0/spi_board0]
+compatible        = "spidev"
+spi-max-frequency = 50000000
+reg               = 0
 ;spi-cpha
 ;spi-cpol
 ;spi-cs-high
