@@ -609,7 +609,7 @@ rtp_exchange_x_y_flag = 0
 ;----------------------------------------------------------------------------------
 [ctp]
 ctp_used            = 1
-ctp_name            = "gt9xxnew_ts"
+ctp_name            = "gt9147_bpi"
 ctp_twi_id          = 1
 ctp_twi_addr        = 0x5d
 ctp_screen_max_x    = 720

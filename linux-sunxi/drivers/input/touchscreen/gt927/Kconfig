@@ -1,0 +1,9 @@
+#
+#  Touchscreen driver configuration
+#
+config  TOUCHSCREEN_GT927_TS
+       tristate  "gt927 touchscreen driver"
+       depends on INPUT && I2C
+       default m
+       help
+         gt927 touchscreen driver
