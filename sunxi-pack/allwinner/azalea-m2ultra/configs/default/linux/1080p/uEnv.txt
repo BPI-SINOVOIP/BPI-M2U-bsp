@@ -34,7 +34,7 @@ volumioarg=imgpart=/dev/mmcblk0p2 imgfile=/volumio_current.sqsh rw rootwait
 # output HDMI 1080P (type:3 mode:10)
 # output LCD7/LCD5  (type:1 mode:5)
 otype=3
-omode=5
+omode=10
 #
 ##
 #

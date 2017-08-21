@@ -21,7 +21,7 @@ rdaddr=0x49000000
 #root=/dev/ram
 root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait bootmenutimeout=10 datadev=mmcblk0p2
 console=earlyprintk=sunxi-uart,0x01c28000 console=tty1 console=ttyS0,115200n8 no_console_suspend consoleblank=0
-bootopts=enforcing=1 initcall_debug=0 loglevel=4 init=/init cma=256M panic=10
+bootopts=enforcing=1 initcall_debug=0 loglevel=4 init=/init cma=256M panic=10 touch=ft5x_ts
 volumioarg=imgpart=/dev/mmcblk0p2 imgfile=/volumio_current.sqsh rw rootwait
 #
 # from sys_config.fex
@@ -33,7 +33,7 @@ volumioarg=imgpart=/dev/mmcblk0p2 imgfile=/volumio_current.sqsh rw rootwait
 # output HDMI 720P (type:3 mode:5)
 # output HDMI 1080P (type:3 mode:10)
 # output LCD7/LCD5  (type:1 mode:5)
-otype=3
+otype=1
 omode=5
 #
 ##

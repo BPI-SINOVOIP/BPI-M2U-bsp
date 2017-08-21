@@ -19,7 +19,7 @@ rdaddr=0x49000000
 ##
 #
 #root=/dev/ram
-root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait
+root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait bootmenutimeout=10 datadev=mmcblk0p2
 console=earlyprintk=sunxi-uart,0x01c28000 console=tty1 console=ttyS0,115200n8 no_console_suspend consoleblank=0
 bootopts=enforcing=1 initcall_debug=0 loglevel=4 init=/init cma=256M panic=10
 volumioarg=imgpart=/dev/mmcblk0p2 imgfile=/volumio_current.sqsh rw rootwait
@@ -32,18 +32,19 @@ volumioarg=imgpart=/dev/mmcblk0p2 imgfile=/volumio_current.sqsh rw rootwait
 # output HDMI 480P (type:3 mode:2)
 # output HDMI 720P (type:3 mode:5)
 # output HDMI 1080P (type:3 mode:10)
+# output LCD7/LCD5  (type:1 mode:5)
 otype=3
-omode=5
+omode=2
 #
 ##
 #
-#abootargs=setenv bootargs board=${board} console=${console} root=${root} service=${service} ${bootopts} disp.screen0_output_type=${otype} disp.screen0_output_mode=${omode} disp.screen1_output_type=${otype} disp.screen1_output_mode=${omode} bootmenutimeout=10
+abootargs=setenv bootargs board=${board} console=${console} root=${root} service=${service} bpiuser=${bpiuser} ${bootopts} disp.screen0_output_type=${otype} disp.screen0_output_mode=${omode} disp.screen1_output_type=${otype} disp.screen1_output_mode=${omode}
 #
-abootargs=setenv bootargs board=${board} console=${console} ${volumioarg} service=${service} ${bootopts}
+#abootargs=setenv bootargs board=${board} console=${console} ${volumioarg} service=${service} bpiuser=${bpiuser} ${bootopts}
 #
 ##
 #
-ahello=echo Banana Pi ${board} chip: $chip Service: $service
+ahello=echo Banana Pi ${board} chip: $chip Service: $service bpiuser: ${bpiuser}
 #
 ##
 #

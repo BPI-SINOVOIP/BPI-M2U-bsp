@@ -329,6 +329,8 @@ function do_prepare()
 	# amend env copy
 	rm ${ROOT_DIR}/image/env-3*.cfg 2> /dev/null
 	cp -f ${PACK_TOPDIR}/target/allwinner/generic/configs/env-${ENV_SUFFIX}.cfg ${ROOT_DIR}/image/env.cfg 2> /dev/null
+	#BPI
+	cp -f ${PACK_TOPDIR}/target/allwinner/${PACK_BOARD}/configs/${BOARD}/env.cfg ${ROOT_DIR}/image/env.cfg 2> /dev/null
 	# If platform config files exist, we will cover the default files
 	# For example, mv out/image_linux.cfg out/image.cfg
 	cd ${ROOT_DIR}
