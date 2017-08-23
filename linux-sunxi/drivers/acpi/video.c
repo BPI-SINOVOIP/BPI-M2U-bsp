@@ -1263,6 +1263,9 @@ static int acpi_video_device_enumerate(struct acpi_video_bus *video)
 	union acpi_object *dod = NULL;
 	union acpi_object *obj;
 
+	if (!video->cap._DOD)
+		return AE_NOT_EXIST;
+
 	status = acpi_evaluate_object(video->device->handle, "_DOD", NULL, &buffer);
 	if (!ACPI_SUCCESS(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _DOD"));
@@ -1953,6 +1956,17 @@ EXPORT_SYMBOL(acpi_video_unregister);
 
 static int __init acpi_video_init(void)
 {
+	/*
+	 * Let the module load even if ACPI is disabled (e.g. due to
+	 * a broken BIOS) so that i915.ko can still be loaded on such
+	 * old systems without an AcpiOpRegion.
+	 *
+	 * acpi_video_register() will report -ENODEV later as well due
+	 * to acpi_disabled when i915.ko tries to register itself afterwards.
+	 */
+	if (acpi_disabled)
+		return 0;
+
 	dmi_check_system(video_dmi_table);
 
 	if (intel_opregion_present())

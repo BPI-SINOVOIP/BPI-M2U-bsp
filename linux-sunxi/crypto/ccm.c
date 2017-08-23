@@ -364,7 +364,7 @@ static void crypto_ccm_decrypt_done(struct crypto_async_request *areq,
 
 	if (!err) {
 		err = crypto_ccm_auth(req, req->dst, cryptlen);
-		if (!err && memcmp(pctx->auth_tag, pctx->odata, authsize))
+		if (!err && crypto_memneq(pctx->auth_tag, pctx->odata, authsize))
 			err = -EBADMSG;
 	}
 	aead_request_complete(req, err);
@@ -423,7 +423,7 @@ static int crypto_ccm_decrypt(struct aead_request *req)
 		return err;
 
 	/* verify */
-	if (memcmp(authtag, odata, authsize))
+	if (crypto_memneq(authtag, odata, authsize))
 		return -EBADMSG;
 
 	return err;
@@ -879,5 +879,6 @@ module_exit(crypto_ccm_module_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Counter with CBC MAC");
-MODULE_ALIAS("ccm_base");
-MODULE_ALIAS("rfc4309");
+MODULE_ALIAS_CRYPTO("ccm_base");
+MODULE_ALIAS_CRYPTO("rfc4309");
+MODULE_ALIAS_CRYPTO("ccm");

@@ -114,7 +114,7 @@ int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
 	struct vmbus_channel_msginfo *open_info = NULL;
 	void *in, *out;
 	unsigned long flags;
-	int ret, t, err = 0;
+	int ret, err = 0;
 
 	newchannel->onchannel_callback = onchannelcallback;
 	newchannel->channel_callback_context = context;
@@ -169,7 +169,7 @@ int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
 			   GFP_KERNEL);
 	if (!open_info) {
 		err = -ENOMEM;
-		goto error0;
+		goto error_gpadl;
 	}
 
 	init_completion(&open_info->waitevent);
@@ -185,7 +185,7 @@ int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
 
 	if (userdatalen > MAX_USER_DEFINED_BYTES) {
 		err = -EINVAL;
-		goto error0;
+		goto error_gpadl;
 	}
 
 	if (userdatalen)
@@ -204,11 +204,7 @@ int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
 		goto error1;
 	}
 
-	t = wait_for_completion_timeout(&open_info->waitevent, 5*HZ);
-	if (t == 0) {
-		err = -ETIMEDOUT;
-		goto error1;
-	}
+	wait_for_completion(&open_info->waitevent);
 
 
 	if (open_info->response.open_result.status)
@@ -225,6 +221,9 @@ error1:
 	spin_lock_irqsave(&vmbus_connection.channelmsg_lock, flags);
 	list_del(&open_info->msglistentry);
 	spin_unlock_irqrestore(&vmbus_connection.channelmsg_lock, flags);
+
+error_gpadl:
+	vmbus_teardown_gpadl(newchannel, newchannel->ringbuffer_gpadlhandle);
 
 error0:
 	free_pages((unsigned long)out,
@@ -388,7 +387,7 @@ int vmbus_establish_gpadl(struct vmbus_channel *channel, void *kbuffer,
 	struct vmbus_channel_gpadl_header *gpadlmsg;
 	struct vmbus_channel_gpadl_body *gpadl_body;
 	struct vmbus_channel_msginfo *msginfo = NULL;
-	struct vmbus_channel_msginfo *submsginfo;
+	struct vmbus_channel_msginfo *submsginfo, *tmp;
 	u32 msgcount;
 	struct list_head *curr;
 	u32 next_gpadl_handle;
@@ -449,6 +448,13 @@ cleanup:
 	spin_lock_irqsave(&vmbus_connection.channelmsg_lock, flags);
 	list_del(&msginfo->msglistentry);
 	spin_unlock_irqrestore(&vmbus_connection.channelmsg_lock, flags);
+
+	if (msgcount > 1) {
+		list_for_each_entry_safe(submsginfo, tmp, &msginfo->submsglist,
+			 msglistentry) {
+			kfree(submsginfo);
+		}
+	}
 
 	kfree(msginfo);
 	return ret;

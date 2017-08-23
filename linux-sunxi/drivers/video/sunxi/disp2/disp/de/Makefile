@@ -14,5 +14,7 @@ ifeq ($(CONFIG_ARCH_SUN50IW2),y)
 sub_dir = lowlevel_v2x
 endif
 
--include $(obj)/de/$(sub_dir)/Makefile
-
+-include $(obj)/de/lowlevel_sun50iw1/Makefile
+-include $(obj)/de/lowlevel_sun8iw10/Makefile
+-include $(obj)/de/lowlevel_sun8iw11/Makefile
+-include $(obj)/de/lowlevel_v2x/Makefile
