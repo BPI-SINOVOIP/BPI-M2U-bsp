@@ -84,6 +84,10 @@ static void EnterAndroidChargeMode(void)
 static void EnterNormalBootMode(void)
 {
 	printf("sunxi_bmp_logo_display\n");
+
+	/* bpi, fix hdmi splash screen */
+	writel(0x00000000, (void __iomem *)0x1c73088);
+	
 	sunxi_bmp_display("bootlogo.bmp");
 }
 
