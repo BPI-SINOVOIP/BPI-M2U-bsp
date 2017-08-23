@@ -64,14 +64,14 @@ version_flag = 1
 ;----------------------------------------------------------------------------------
 [power_sply]
 dcdc1_vol                  = 1003300
-dcdc2_vol                  = 1001280
-dcdc3_vol                  = 1001150
-dcdc4_vol                  = 1160
+dcdc2_vol                  = 1001160
+dcdc3_vol                  = 1001100
+dcdc4_vol                  = 1100
 aldo1_vol                  = 2800
 aldo2_vol                  = 1001500
 aldo3_vol                  = 1003000
 dc1sw_vol                  = 3000
-dc5ldo_vol                 = 1200
+dc5ldo_vol                 = 1100
 dldo1_vol                  = 3300
 dldo2_vol                  = 3300
 dldo3_vol                  = 3300
@@ -281,7 +281,7 @@ pll12           = 297
 ;
 ;*****************************************************************************
 [dram_para]
-dram_clk			= 576
+dram_clk			= 648
 dram_type			= 7
 dram_zq			= 0x3b3bfb
 dram_odt_en   = 0x31
