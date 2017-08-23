@@ -3,9 +3,9 @@
 # Build script for BPI-M2U-BSP 2016.09.10
 
 TARGET_PRODUCT="azalea-m2ultra"
-BOARD=BPI_M2U_720P
+BOARD=BPI_M2U_LCD5
 board="bpi-m2u"
-kernel="3.10.104-BPI-M2U-Kernel"
+kernel="3.10.107-BPI-M2U-Kernel"
 MODE=$1
 
 
