@@ -862,8 +862,8 @@ static void geth_chip_hwaddr(u8 *addr)
 		goto out;
 	}
 
-	sg_init_one(&sg, chipid, sizeof(chipid) - 1);
-	ret = crypto_hash_update(&desc, &sg, sizeof(chipid) - 1);
+	sg_init_one(&sg, chipid, sizeof(chipid));
+	ret = crypto_hash_update(&desc, &sg, sizeof(chipid));
 	if (ret < 0) {
 		pr_err("crypto_hash_update() failed for id\n");
 		goto out;

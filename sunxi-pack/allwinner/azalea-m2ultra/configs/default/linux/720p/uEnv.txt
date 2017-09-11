@@ -38,7 +38,7 @@ omode=5
 #
 ##
 #
-abootargs=setenv bootargs board=${board} console=${console} root=${root} service=${service} bpiuser=${bpiuser} ${bootopts} disp.screen0_output_type=${otype} disp.screen0_output_mode=${omode} disp.screen1_output_type=${otype} disp.screen1_output_mode=${omode}
+abootargs=setenv bootargs board=${board} console=${console} root=${root} service=${service} bpiuser=${bpiuser} mac_addr=${mac_addr} ${bootopts} disp.screen0_output_type=${otype} disp.screen0_output_mode=${omode} disp.screen1_output_type=${otype} disp.screen1_output_mode=${omode}
 #
 #abootargs=setenv bootargs board=${board} console=${console} ${volumioarg} service=${service} bpiuser=${bpiuser} ${bootopts}
 #
