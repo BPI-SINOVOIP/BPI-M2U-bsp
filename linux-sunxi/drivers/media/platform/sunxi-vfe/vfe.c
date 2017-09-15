@@ -2128,6 +2128,9 @@ static int internal_s_input(struct vfe_dev *dev, unsigned int i)
 	}
 
 	bsp_csi_disable(dev->csi_sel);
+
+	vfe_print("internal_s_input is_isp_used=%d\n", dev->is_isp_used);
+	
 	if(dev->is_isp_used) {
 		vfe_ctrl_para_reset(dev);
 		bsp_isp_disable();
@@ -2897,6 +2900,8 @@ static int vfe_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 	struct v4l2_control c;
 	c.id = ctrl->id;
 
+	vfe_print("vfe_g_volatile_ctrl, name: %s id: %x\n", ctrl->name, ctrl->id);
+
 	if(dev->is_isp_used && dev->is_bayer_raw) {
 		switch (ctrl->id) {
 		case V4L2_CID_EXPOSURE:
@@ -2992,7 +2997,9 @@ static int vfe_s_ctrl(struct v4l2_ctrl *ctrl)
 	struct v4l2_control c;
 	c.id = ctrl->id;
 	c.value = ctrl->val;
-	vfe_dbg(0,"s_ctrl: %s, set value: 0x%x\n",ctrl->name,ctrl->val);
+	
+	vfe_print("s_ctrl: %s, set value: 0x%x\n", ctrl->name,ctrl->val);
+	
 	if(dev->is_isp_used && dev->is_bayer_raw) {
 		switch (ctrl->id) {
 		case V4L2_CID_BRIGHTNESS:
@@ -4132,8 +4139,8 @@ static int vfe_init_controls(struct v4l2_ctrl_handler *hdl)
 	v4l2_ctrl_new_std_menu(hdl, &vfe_ctrl_ops,V4L2_CID_FLASH_LED_MODE,
 		V4L2_FLASH_LED_MODE_RED_EYE, 0, V4L2_FLASH_LED_MODE_NONE);
 
-	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops, V4L2_CID_HFLIP, 0, 1, 1, 1);
-	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops, V4L2_CID_VFLIP, 0, 1, 1, 0);
+	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops, V4L2_CID_HFLIP, 0, 1, 1, 0);
+	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops, V4L2_CID_VFLIP, 0, 1, 1, 1);
 
 	for (i = 0; i < ARRAY_SIZE(custom_ctrls); i ++)
 		v4l2_ctrl_new_custom(hdl, &custom_ctrls[i], NULL);

@@ -473,8 +473,8 @@ static struct regval_list sensor_qsxga_7FPS_regs[] = {
     {0x3008,0x42},
 
     //pll and clock setting
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     {0x3034, 0x18},
     {0x3035, 0x21},
@@ -556,8 +556,8 @@ static struct regval_list sensor_qsxga_15FPS_regs[] = {
     {0x3008,0x42},
 
     //pll and clock setting
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     {0x3034, 0x1a},
     {0x3035, 0x21},
@@ -638,8 +638,8 @@ static struct regval_list sensor_qxga_7FPS_regs[] = {
     //power down
     {0x3008,0x42},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     //pll and clock setting
     {0x3034, 0x18},
@@ -719,8 +719,8 @@ static struct regval_list sensor_qxga_15FPS_regs[] = {
     //power down
     {0x3008,0x42},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     //pll and clock setting
     {0x3034, 0x1a},
@@ -808,8 +808,8 @@ static struct regval_list sensor_1080p_120FPS_regs[] = {
     //power down
     {0x3008, 0x42},
 
-	{0x3820, 0x40},
-    {0x3821, 0x06},
+	//{0x3820, 0x40},
+    //{0x3821, 0x06},
     {0x3800, 0x00},
     {0x3801, 0x00},
 	{0x3802, 0x00},
@@ -947,8 +947,8 @@ static struct regval_list sensor_1080p_60FPS_regs[] = {
     //power down
     {0x3008, 0x42},
 
-	{0x3820, 0x40},
-    {0x3821, 0x06},
+	//{0x3820, 0x40},
+    //{0x3821, 0x06},
     {0x3800, 0x00},
     {0x3801, 0x00},
 	{0x3802, 0x00},
@@ -1077,8 +1077,8 @@ static struct regval_list sensor_1080p_30FPS_regs[] = {
     //power down
     {0x3008, 0x42},
 
-	{0x3820, 0x40},
-    {0x3821, 0x06},
+	//{0x3820, 0x40},
+    //{0x3821, 0x06},
     {0x3800, 0x00},
     {0x3801, 0x00},
 	{0x3802, 0x00},
@@ -1203,8 +1203,8 @@ static struct regval_list sensor_1080p_15FPS_regs[] = {
     {0x5306, 0x10},
     {0x5307, 0x20},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     {0x3800, 0x01},
     {0x3801, 0x50},
@@ -1308,8 +1308,8 @@ static struct regval_list sensor_1080p_7FPS_regs[] = {
     {0x5306, 0x10},
     {0x5307, 0x20},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     {0x3800, 0x01},
     {0x3801, 0x50},
@@ -1393,8 +1393,8 @@ static struct regval_list sensor_uxga_7FPS_regs[] = {
     //power down
     {0x3008,0x42},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     //pll and clock setting
     {0x3034, 0x18},
@@ -1476,8 +1476,8 @@ static struct regval_list sensor_uxga_15FPS_regs[] = {
     //power down
     {0x3008,0x42},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     //pll and clock setting
     {0x3034, 0x18},
@@ -1558,8 +1558,8 @@ static struct regval_list sensor_uxga_30FPS_regs[] = {
     //power down
     {0x3008,0x42},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     //pll and clock setting
     {0x3034, 0x18},
@@ -1642,8 +1642,8 @@ static struct regval_list sensor_sxga_7FPS_regs[] = {
     //power down
     {0x3008,0x42},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     //pll and clock setting
     {0x3034, 0x18},
@@ -1726,8 +1726,8 @@ static struct regval_list sensor_sxga_15FPS_regs[] = {
     //power down
     {0x3008,0x42},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     //pll and clock setting
     {0x3034, 0x18},
@@ -1809,8 +1809,8 @@ static struct regval_list sensor_sxga_30FPS_regs[] = {
     //power down
     {0x3008,0x42},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     //pll and clock setting
     {0x3034, 0x18},
@@ -1895,8 +1895,8 @@ static struct regval_list sensor_xga_7FPS_regs[] = {
     //power down
     {0x3008,0x42},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     //pll and clock setting
     {0x3034, 0x18},
@@ -1978,8 +1978,8 @@ static struct regval_list sensor_xga_15FPS_regs[] = {
     //power down
     {0x3008,0x42},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     //pll and clock setting
     {0x3034, 0x18},
@@ -2061,8 +2061,8 @@ static struct regval_list sensor_xga_30FPS_regs[] = {
     //power down
     {0x3008,0x42},
 
-    {0x3820, 0x40},
-    {0x3821, 0x06},
+    //{0x3820, 0x40},
+    //{0x3821, 0x06},
 
     //pll and clock setting
     {0x3034, 0x18},
@@ -2159,8 +2159,8 @@ static struct regval_list sensor_720p_7FPS_regs[] = {
 
 
     {0x3c07, 0x07},
-	{0x3820, 0x41},
-    {0x3821, 0x07},
+	//{0x3820, 0x41},
+    //{0x3821, 0x07},
     {0x3814, 0x31},
 	{0x3815, 0x31},
     {0x3800, 0x00},
@@ -2211,8 +2211,8 @@ static struct regval_list sensor_720p_15FPS_regs[] = {
     // power down
     {0x3008,0x42},
 
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
 
     //  //pll and clock setting
     {0x3034, 0x18},
@@ -2303,8 +2303,8 @@ static struct regval_list sensor_720p_30FPS_regs[] = {
     // power down
     {0x3008,0x42},
 
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
 
     //  //pll and clock setting
     {0x3034, 0x1a},
@@ -2396,8 +2396,8 @@ static struct regval_list sensor_svga_30FPS_regs[] = {
     //power down
     {0x3008, 0x42},
 
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
 
     // pll and clock setting
     {0x3034, 0x1a},
@@ -2476,8 +2476,8 @@ static struct regval_list sensor_svga_15FPS_regs[] = {
     //power down
     {0x3008, 0x42},
 
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
 
     // pll and clock setting
     {0x3034, 0x1a},
@@ -2556,8 +2556,8 @@ static struct regval_list sensor_svga_7FPS_regs[] = {
     //power down
     {0x3008, 0x42},
 
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
 
     // pll and clock setting
     {0x3034, 0x1a},
@@ -2639,8 +2639,8 @@ static struct regval_list sensor_vga_15FPS_regs[] = {
     //power down
     {0x3008, 0x42},
 
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
     //  //pll and clock setting
   	{0x3034, 0x1a},
     {0x3035, 0x21},
@@ -2725,8 +2725,8 @@ static struct regval_list sensor_vga_60FPS_regs[] = {
     //power down
     {0x3008, 0x42},
 
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
 
     {0x3503, 0x00},             //AEC enable
     {0x3814, 0x71},
@@ -2787,8 +2787,8 @@ static struct regval_list sensor_vga_30FPS_regs[] = {
     //power down
     {0x3008, 0x42},
 
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
     //  //pll and clock setting
     {0x3034, 0x1a},
     {0x3035, 0x11},
@@ -2877,8 +2877,8 @@ static struct regval_list sensor_qvga_30FPS_regs[] = {
     {0x3008, 0x42},
 
     {0x3c07, 0x08},
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
 	{0x3814, 0x31},
     {0x3815, 0x31},
     {0x3800, 0x00},
@@ -2935,8 +2935,8 @@ static struct regval_list sensor_qcif_30FPS_regs[] = {
     {0x3008, 0x42},
 
     {0x3c07, 0x08},
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
 	{0x3814, 0x31},
     {0x3815, 0x31},
     {0x3800, 0x00},
@@ -2992,8 +2992,8 @@ static struct regval_list sensor_qcif_60FPS_regs[] = {
     {0x3008, 0x42},
 
     {0x3c07, 0x08},
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
 	{0x3814, 0x31},
     {0x3815, 0x31},
     {0x3800, 0x00},
@@ -3049,8 +3049,8 @@ static struct regval_list sensor_qcif_15FPS_regs[] = {
     {0x3008, 0x42},
 
     {0x3c07, 0x08},
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
 	{0x3814, 0x31},
     {0x3815, 0x31},
     {0x3800, 0x00},
@@ -3106,8 +3106,8 @@ static struct regval_list sensor_qcif_7FPS_regs[] = {
     {0x3008, 0x42},
 
     {0x3c07, 0x08},
-    {0x3820, 0x41},
-    {0x3821, 0x07},
+    //{0x3820, 0x41},
+    //{0x3821, 0x07},
 	{0x3814, 0x31},
     {0x3815, 0x31},
     {0x3800, 0x00},
@@ -5996,7 +5996,7 @@ static int sensor_init(struct v4l2_subdev *sd, u32 val)
     info->saturation = 0;
     info->hue = 0;
 	info->sharpness = 0;
-    info->hflip = 1;
+    info->hflip = 0;
     info->vflip = 0;
     info->gain = 0;
     info->autogain = 1;
@@ -7425,6 +7425,7 @@ static int sensor_queryctrl(struct v4l2_subdev *sd, struct v4l2_queryctrl *qc)
       case V4L2_CID_HUE:
           return v4l2_ctrl_query_fill(qc, -180, 180, 5, 0);
       case V4L2_CID_VFLIP:
+	  	  return v4l2_ctrl_query_fill(qc, 0, 1, 1, 1);
       case V4L2_CID_HFLIP:
           return v4l2_ctrl_query_fill(qc, 0, 1, 1, 0);
       case V4L2_CID_GAIN:
