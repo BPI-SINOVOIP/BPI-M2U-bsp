@@ -2990,11 +2990,9 @@ static int vfe_s_ctrl(struct v4l2_ctrl *ctrl)
 	int ret = 0;
 	struct actuator_ctrl_word_t vcm_ctrl;
 	struct v4l2_control c;
-	unsigned long flags = 0;
 	c.id = ctrl->id;
 	c.value = ctrl->val;
 	vfe_dbg(0,"s_ctrl: %s, set value: 0x%x\n",ctrl->name,ctrl->val);
-	spin_lock_irqsave(&dev->slock, flags);
 	if(dev->is_isp_used && dev->is_bayer_raw) {
 		switch (ctrl->id) {
 		case V4L2_CID_BRIGHTNESS:
@@ -3017,17 +3015,15 @@ static int vfe_s_ctrl(struct v4l2_ctrl *ctrl)
 			dev->ctrl_para.auto_wb = ctrl->val;
 			break;
 		case V4L2_CID_EXPOSURE:
-			ret = v4l2_subdev_call(dev->sd, core, s_ctrl, &c);
-			break;
+			return v4l2_subdev_call(dev->sd,core,s_ctrl,&c);
 		case V4L2_CID_AUTOGAIN:
 			if(ctrl->val == 0)
 				bsp_isp_s_exposure(dev->isp_gen_set_pt, ISO_MANUAL);
 			else
 				bsp_isp_s_exposure(dev->isp_gen_set_pt, ISO_AUTO);
 			break;
-		case V4L2_CID_GAIN:
-			ret = v4l2_subdev_call(dev->sd, core, s_ctrl, &c);
-			break;
+		case V4L2_CID_GAIN: 
+			return v4l2_subdev_call(dev->sd,core,s_ctrl,&c);	
 		case V4L2_CID_POWER_LINE_FREQUENCY:
 			bsp_isp_s_power_line_frequency(dev->isp_gen_set_pt, vfe_v4l2_isp(VFE_POWER_LINE_FREQUENCY,ctrl->val, V4L2_TO_ISP));
 			break;
@@ -3101,8 +3097,7 @@ static int vfe_s_ctrl(struct v4l2_ctrl *ctrl)
 			bsp_isp_s_iso_sensitivity_auto(dev->isp_gen_set_pt, vfe_v4l2_isp(VFE_ISO,ctrl->val, V4L2_TO_ISP));
 			break;
 		case V4L2_CID_EXPOSURE_METERING:
-			ret = -EINVAL;
-			break;
+			return -EINVAL;
 		case V4L2_CID_SCENE_MODE:
 			bsp_isp_s_scene_mode(dev->isp_gen_set_pt, vfe_v4l2_isp(VFE_SCENE,ctrl->val, V4L2_TO_ISP));
 			break;
@@ -3157,9 +3152,9 @@ static int vfe_s_ctrl(struct v4l2_ctrl *ctrl)
 			}
 			break;
 		case V4L2_CID_AUTO_FOCUS_INIT:
-			break;
+			return 0;
 		case V4L2_CID_AUTO_FOCUS_RELEASE:
-			break;
+			return 0;
 		case V4L2_CID_GSENSOR_ROTATION:
 			bsp_isp_s_gsensor_rotation(dev->isp_gen_set_pt, ctrl->val);
 			dev->ctrl_para.gsensor_rot = ctrl->val;
@@ -3177,11 +3172,9 @@ static int vfe_s_ctrl(struct v4l2_ctrl *ctrl)
 			bsp_isp_s_b_gain(dev->isp_gen_set_pt, ctrl->val);
 			break;
 		default:
-			ret = -EINVAL;
-			break;
+			return -EINVAL;
 		}
-		if (ret < 0)
-			vfe_warn("v4l2 isp s_ctrl fail!\n");
+		return 0;
 	} else {
 		switch (ctrl->id) {
 		case V4L2_CID_FOCUS_ABSOLUTE:
@@ -3211,7 +3204,6 @@ static int vfe_s_ctrl(struct v4l2_ctrl *ctrl)
 		if (ret < 0)
 			vfe_warn("v4l2 sub device s_ctrl fail!(ret=%d)\n", ret);
 	}
-	spin_unlock_irqrestore(&dev->slock, flags);
 	return ret;
 }
 #ifdef CONFIG_COMPAT
