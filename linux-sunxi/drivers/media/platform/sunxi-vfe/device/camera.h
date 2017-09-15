@@ -69,6 +69,8 @@ struct sensor_info {
   int                                   contrast;
   int                                   saturation;
   int                                   hue;
+  int 									sharpness;
+  int									framerate;
   unsigned int                          hflip;
   unsigned int                          vflip;
   unsigned int                          gain;

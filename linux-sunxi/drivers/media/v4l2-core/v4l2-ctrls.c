@@ -26,6 +26,7 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-dev.h>
+#include <media/sunxi_camera.h>
 
 #define has_op(master, op) \
 	(master->ops && master->ops->op)
@@ -808,6 +809,9 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_FM_RX_CLASS:		return "FM Radio Receiver Controls";
 	case V4L2_CID_TUNE_DEEMPHASIS:		return "De-Emphasis";
 	case V4L2_CID_RDS_RECEPTION:		return "RDS Reception";
+
+	/* custom controls */
+	case V4L2_CID_FRAME_RATE:			return "Framerate control";
 	default:
 		return NULL;
 	}

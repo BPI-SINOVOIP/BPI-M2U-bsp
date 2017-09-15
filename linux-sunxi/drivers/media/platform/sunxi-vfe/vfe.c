@@ -3209,7 +3209,7 @@ static int vfe_s_ctrl(struct v4l2_ctrl *ctrl)
 			break;
 		}
 		if (ret < 0)
-			vfe_warn("v4l2 sensor s_ctrl fail!\n");
+			vfe_warn("v4l2 sub device s_ctrl fail!(ret=%d)\n", ret);
 	}
 	spin_unlock_irqrestore(&dev->slock, flags);
 	return ret;
@@ -3942,6 +3942,17 @@ static struct v4l2_subdev *vfe_sensor_register_check(struct vfe_dev *dev,struct 
 static const struct v4l2_ctrl_config custom_ctrls[] =
 {
 	{
+		.ops	= &vfe_ctrl_ops,
+		.id		= V4L2_CID_FRAME_RATE,
+		.type	= V4L2_CTRL_TYPE_INTEGER,
+		.name	= "Framerate control",
+		.min	= FRAME_RATE_AUTO,
+		.max	= FRAME_RATE_30,
+		.step	= 1,
+		.def	= FRAME_RATE_AUTO,
+		.flags	= V4L2_CTRL_FLAG_VOLATILE,
+	},
+	{
 		.ops = &vfe_ctrl_ops,
 		.id = V4L2_CID_HOR_VISUAL_ANGLE,
 		.name = "Horizontal Visual Angle",
@@ -4089,7 +4100,7 @@ static int vfe_init_controls(struct v4l2_ctrl_handler *hdl)
 		V4L2_CID_POWER_LINE_FREQUENCY_AUTO, 0, V4L2_CID_POWER_LINE_FREQUENCY_AUTO);
 	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops,V4L2_CID_HUE_AUTO, 0, 1, 1, 1);
 	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops,V4L2_CID_WHITE_BALANCE_TEMPERATURE, 2800, 10000, 1, 6500);
-	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops,V4L2_CID_SHARPNESS, -32, 32, 1, 0);
+	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops,V4L2_CID_SHARPNESS, 0, 200, 100, 0);
 	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops,V4L2_CID_CHROMA_AGC, 0, 1, 1, 1);
 	v4l2_ctrl_new_std_menu(hdl, &vfe_ctrl_ops,V4L2_CID_COLORFX,
 		V4L2_COLORFX_SET_CBCR, 0, V4L2_COLORFX_NONE);
@@ -4116,18 +4127,21 @@ static int vfe_init_controls(struct v4l2_ctrl_handler *hdl)
 		V4L2_ISO_SENSITIVITY_AUTO, 0, V4L2_ISO_SENSITIVITY_AUTO);
 	v4l2_ctrl_new_std_menu(hdl, &vfe_ctrl_ops,V4L2_CID_SCENE_MODE,
 		V4L2_SCENE_MODE_TEXT, 0, V4L2_SCENE_MODE_NONE);
-	ctrl = v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops,V4L2_CID_3A_LOCK, 0, 7, 0, 0);
+	ctrl = v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops,V4L2_CID_3A_LOCK, 0, 4, 0, 0);
 	if (ctrl != NULL)
 		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
 	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops,V4L2_CID_AUTO_FOCUS_START,0, 0, 0, 0);
 	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops,V4L2_CID_AUTO_FOCUS_STOP,0, 0, 0, 0);
-	ctrl = v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops,V4L2_CID_AUTO_FOCUS_STATUS,0, 7, 0, 0);
+	ctrl = v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops,V4L2_CID_AUTO_FOCUS_STATUS,0, 4, 0, 0);
 	if (ctrl != NULL)
 		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
 	v4l2_ctrl_new_std_menu(hdl, &vfe_ctrl_ops,V4L2_CID_AUTO_FOCUS_RANGE,
 		V4L2_AUTO_FOCUS_RANGE_INFINITY, 0, V4L2_AUTO_FOCUS_RANGE_AUTO);
 	v4l2_ctrl_new_std_menu(hdl, &vfe_ctrl_ops,V4L2_CID_FLASH_LED_MODE,
 		V4L2_FLASH_LED_MODE_RED_EYE, 0, V4L2_FLASH_LED_MODE_NONE);
+
+	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops, V4L2_CID_HFLIP, 0, 1, 1, 1);
+	v4l2_ctrl_new_std(hdl, &vfe_ctrl_ops, V4L2_CID_VFLIP, 0, 1, 1, 0);
 
 	for (i = 0; i < ARRAY_SIZE(custom_ctrls); i ++)
 		v4l2_ctrl_new_custom(hdl, &custom_ctrls[i], NULL);
