@@ -49,10 +49,9 @@ kernel: $(K_DOT_CONFIG)
 	$(Q)$(MAKE) -C linux-sunxi ARCH=arm CROSS_COMPILE=${K_CROSS_COMPILE} -j$J INSTALL_MOD_PATH=output uImage dtbs
 	$(Q)$(MAKE) -C linux-sunxi ARCH=arm CROSS_COMPILE=${K_CROSS_COMPILE} -j$J INSTALL_MOD_PATH=output modules
 	$(Q)$(MAKE) -C linux-sunxi/modules/gpu/mali400/kernel_mode/driver/src/devicedrv/mali CROSS_COMPILE=$(K_CROSS_COMPILE) ARCH=arm TARGET_PLATFORM="" KDIR=${LICHEE_KDIR} LICHEE_KDIR=${LICHEE_KDIR} USING_DT=1 BUILD=release USING_UMP=0
-#	$(Q)$(MAKE) -C linux-sunxi/modules/gpu CROSS_COMPILE=$(K_CROSS_COMPILE) ARCH=arm TARGET_PLATFORM="" KDIR=${LICHEE_KDIR}  LICHEE_KDIR=${LICHEE_KDIR} USING_DT=1 BUILD=release USING_UMP=1 install V=1
-#	$(Q)$(MAKE) -C linux-sunxi/modules/mali CROSS_COMPILE=$(K_CROSS_COMPILE) ARCH=arm TARGET_PLATFORM="" KDIR=${LICHEE_KDIR}  LICHEE_KDIR=${LICHEE_KDIR} USING_DT=1 BUILD=release USING_UMP=1 install V=1
 	$(Q)$(MAKE) -C linux-sunxi ARCH=arm CROSS_COMPILE=${K_CROSS_COMPILE} -j$J INSTALL_MOD_PATH=output modules_install
 #	$(Q)$(MAKE) -C linux-sunxi ARCH=arm CROSS_COMPILE=${K_CROSS_COMPILE} -j$J headers_install
+	$(Q)scripts/install_kernel_headers.sh
 
 kernel-clean:
 #	$(Q)$(MAKE) -C linux-sunxi/modules/gpu CROSS_COMPILE=$(K_CROSS_COMPILE) ARCH=arm LICHEE_KDIR=${LICHEE_KDIR} clean

@@ -6,6 +6,7 @@ TARGET_PRODUCT="azalea-m2ultra"
 BOARD=BPI_M2U_LCD5
 board="bpi-m2u"
 kernel="3.10.107-BPI-M2U-Kernel"
+header="linux-headers-3.10.107-BPI-M2U-Kernel"
 MODE=$1
 
 
@@ -46,11 +47,16 @@ R="${SD}/BPI-ROOT"
 	rm -rf $R/lib/modules
 	mkdir -p $R/lib/modules
 	cp -a $T/linux-sunxi/output/lib/modules/${kernel} $R/lib/modules
+
+	rm -rf $R/usr/src
+  	mkdir -p $R/usr/src
+  	cp -a $T/linux-sunxi/output/usr/src/${header} $R/usr/src/
 	#
 	## create files for bpi-tools & bpi-migrate
 	#
 	(cd $B ; tar czvf $SD/BPI-BOOT-${board}.tgz .)
 	(cd $R ; tar czvf $SD/${kernel}.tgz lib/modules)
+	(cd $R ; tar czvf $SD/${header}.tgz usr/src)
 	(cd $R ; tar czvf $SD/BOOTLOADER-${board}.tgz usr/lib/u-boot/bananapi)
 
 	return #SKIP
