@@ -16,12 +16,15 @@ PACK_ROOT="$TOPDIR/sunxi-pack"
 #PLATFORM="dragonboard"
 PLATFORM="tina"
 
+# change sd to emmc if board bootup with emmc and sdcard is used as storage.
+STORAGE="sd"
+
 pack_bootloader()
 {
   BOARD=$1
   (
   echo "MACH=$MACH, PLATFORM=$PLATFORM, TARGET_PRODUCT=${TARGET_PRODUCT} BOARD=$BOARD"
-  scripts/pack_img.sh -c ${MACH} -p ${PLATFORM} -b ${TARGET_PRODUCT} -d uart0 -s none -s none -t $TOPDIR
+  scripts/pack_img.sh -c ${MACH} -p ${PLATFORM} -b ${TARGET_PRODUCT} -d uart0 -s none -s none -t $TOPDIR -r ${STORAGE}
   )
   $TOPDIR/scripts/bootloader.sh $BOARD
 }

@@ -63,6 +63,7 @@ DEFINE_string 'secure' 'none' 'pack secure boot with -v arg' 'v'
 DEFINE_string 'mode' 'normal' 'pack dump firmware' 'm'
 DEFINE_string 'function' 'android' 'pack private firmware' 'f'
 DEFINE_string 'topdir' 'none' 'sdk top dir' 't'
+DEFINE_string 'storage' 'none' 'storage type, emmc or sd' 'r'
 
 # parse the command-line
 FLAGS "$@" || exit $?
@@ -78,6 +79,7 @@ PACK_SECURE=${FLAGS_secure}
 PACK_MODE=${FLAGS_mode}
 PACK_FUNC=${FLAGS_function}
 PACK_TOPDIR=${FLAGS_topdir}
+PACK_STORAGE=${FLAGS_storage}
 
 ROOT_DIR=${PACK_TOPDIR}/out/${PACK_BOARD}
 OTA_TEST_NAME="ota_test"
@@ -451,11 +453,24 @@ function do_ini_to_dts()
 		pack_error "Script_to_dts: Can not find dtc compiler.\n"
 		exit 1
 	fi
+
+
 	if [ ! -f $DTC_DEP_FILE ]; then
-		printf "Script_to_dts: Can not find [%s-%s.dts]. Will use common dts file instead.\n" ${PACK_CHIP} ${PACK_BOARD}
-		DTC_DEP_FILE=${PACK_TOPDIR}/lichee/$PACK_KERN/arch/$ARCH/boot/dts/.${PACK_CHIP}-soc.dtb.d.dtc.tmp
+	    printf "Script_to_dts: Can not find [%s-%s.dts]. Will use common dts file instead.\n" ${PACK_CHIP} ${PACK_BOARD}
+	    printf "package_STORAGE=%s\n" ${PACK_STORAGE}
+
+	    if [ "x${PACK_STORAGE}" = "xsd" ]; then
+		DTC_SRC_FILE=${PACK_TOPDIR}/lichee/$PACK_KERN/arch/$ARCH/boot/dts/.${PACK_CHIP}-soc-sd.dtb.dts
+		DTC_DEP_FILE=${PACK_TOPDIR}/lichee/$PACK_KERN/arch/$ARCH/boot/dts/.${PACK_CHIP}-soc-sd.dtb.d.dtc.tmp
+	    elif [ "x${PACK_STORAGE}" = "xemmc" ]; then
+		DTC_SRC_FILE=${PACK_TOPDIR}/lichee/$PACK_KERN/arch/$ARCH/boot/dts/.${PACK_CHIP}-soc-emmc.dtb.dts
+		DTC_DEP_FILE=${PACK_TOPDIR}/lichee/$PACK_KERN/arch/$ARCH/boot/dts/.${PACK_CHIP}-soc-emmc.dtb.d.dtc.tmp
+	    else
 		DTC_SRC_FILE=${PACK_TOPDIR}/lichee/$PACK_KERN/arch/$ARCH/boot/dts/.${PACK_CHIP}-soc.dtb.dts
+		DTC_DEP_FILE=${PACK_TOPDIR}/lichee/$PACK_KERN/arch/$ARCH/boot/dts/.${PACK_CHIP}-soc.dtb.d.dtc.tmp
+	    fi
 	fi
+
 	$DTC_COMPILER -O dtb -o ${ROOT_DIR}/image/sunxi.dtb	\
 		-b 0			\
 		-i $DTC_SRC_PATH	\
