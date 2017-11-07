@@ -5,8 +5,8 @@
 TARGET_PRODUCT="azalea-m2ultra"
 BOARD=BPI_M2U_LCD5
 board="bpi-m2u"
-kernel="3.10.107-BPI-M2U-Kernel"
-header="linux-headers-3.10.107-BPI-M2U-Kernel"
+kernel="3.10.108-BPI-M2U-Kernel"
+header="linux-headers-3.10.108-BPI-M2U-Kernel"
 MODE=$1
 
 
