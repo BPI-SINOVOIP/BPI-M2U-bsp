@@ -1774,7 +1774,7 @@ static s32 gtp_init_panel(struct goodix_ts_data *ts)
 		} else if (!strcmp(config_info.name,"gt9147_bpi")){
             sensor_id = 4;
             dprintk(DEBUG_INIT,"gt9xx:sensor_id = %d\n",sensor_id);
-		} else if (!strcmp(config_info.name,"gt9271_p2")){
+		} else if (!strcmp(config_info.name,"bpi_lcd7_gt")){
             sensor_id = 5;
             dprintk(DEBUG_INIT,"gt9xx:sensor_id = %d\n",sensor_id);
 		 } else {		    
