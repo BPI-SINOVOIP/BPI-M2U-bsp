@@ -8,10 +8,7 @@
 #include <linux/semaphore.h>
 #include <linux/mutex.h>
 #include <linux/interrupt.h>
-//Justin Porting 20160811 Start
-//#include <mach/irqs.h>
 #include <asm/irq.h>
-//Justin Porting 20160811 End
 
 #include <linux/syscalls.h>
 #include <asm/unistd.h>

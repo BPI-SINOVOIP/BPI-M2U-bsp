@@ -67,15 +67,9 @@
 //#define GTP_POWER_CTRL_SLEEP  1
 //#endif
 
-#if 1 //def BPI
 #define GTP_DEBUG_ON          0
 #define GTP_DEBUG_ARRAY_ON    0
 #define GTP_DEBUG_FUNC_ON     0
-#else
-#define GTP_DEBUG_ON          1
-#define GTP_DEBUG_ARRAY_ON    1
-#define GTP_DEBUG_FUNC_ON     1
-#endif
 
 #if GTP_COMPATIBLE_MODE
 typedef enum
@@ -306,7 +300,7 @@ extern void gtp_set_io_int(void);
 	0xFF,0xFF,0xFF,0xFF,0xC8,0x01}
 
 // TODO: define your config for Sensor_ID == 5 here, if needed
-/* BPI, bpi_lcd7_gt TP NEW LCD7" */
+/* bpi, gt911 TP LCD7" */
 #define CTP_CFG_GROUP6 {\
 	0x50,0x20,0x03,0xE0,0x01,0x05,0x0D,0x00,0x01,0x08,\
 	0x28,0x05,0x50,0x32,0x03,0x05,0x00,0x00,0x00,0x00,\

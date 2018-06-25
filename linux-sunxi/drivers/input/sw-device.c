@@ -5,10 +5,10 @@
 
 #include "sw-device.h"
 
-static int ctp_mask = 0x0;
-static u32 debug_mask = 0x0;
-#define dprintk(level_mask, fmt, arg...)	if (unlikely(debug_mask & level_mask)) \
-	printk(KERN_DEBUG fmt , ## arg)
+static int ctp_mask = 0x1;
+static u32 debug_mask = 0;
+#define dprintk(level_mask, fmt, arg...)	/*if (unlikely(debug_mask & level_mask))*/ \
+	printk(KERN_INFO fmt , ## arg)
 
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 module_param_named(ctp_mask, ctp_mask, int , S_IRUGO | S_IWUSR | S_IWGRP);
@@ -32,6 +32,7 @@ static struct sw_device_info gsensors[] = {
         {  "fxos8700", 0, {0x1c, 0x1d, 0x1e, 0x1f}, 0x0d, {0xc7          }, 0},
         {   "lsm303d", 0, {0x1e, 0x1d            }, 0x0f, {0x49          }, 0},    
         {   "sc7a30",  0, {0x1D                  }, 0x2A, {0x00          }, 0},
+		{   "mir3da",  0, {0x26, 0x27            }, 0x00, {0x00          }, 0},
 };
 /*ctp info*/
 static struct sw_device_info ctps[] = {
@@ -102,7 +103,7 @@ static struct para_name g_name = {
         "gsensor",
         "gsensor_used",
         "gsensor_list",
-        "gsensor_list__used",
+        "gsensor_list_used",
         "gsensor_twi_id",
         GSENSOR_DETECTING_FLAG,
 };
@@ -127,6 +128,8 @@ static struct para_power c_power = {
 };
 	
 static struct sw_device_getted_flag  device_getted_flag;
+static int dev_count = 0;
+static int detect_end_flag= 0;
 	
 static struct para_name *all_device_name[] = {&g_name,&c_name,&ls_name,&gyr_name,&compass_name};
 #define	ALL_DEVICE_NAME_SIZE	(sizeof(all_device_name)/sizeof(all_device_name[0]))
@@ -135,7 +138,7 @@ static struct node_pointer all_device_np[2*ALL_DEVICE_NAME_SIZE];
 #define ALL_DEVICE_NP_SIZE		(sizeof(all_device_np)/sizeof(all_device_np[0]))
 
 	
-static struct sw_device_name d_name = {"", "", "", "", "", 0, 0, 0, 0, 0};
+static struct sw_device_name d_name = {"", "", "", "", "",0,0, 0, 0, 0};
 static void sw_devices_events(struct work_struct *work);
 static struct workqueue_struct *sw_wq;
 static DECLARE_WORK(sw_work, sw_devices_events);
@@ -481,7 +484,8 @@ static int sw_sysconfig_get_para(struct sw_device *sw)
                   get_detect_list(sw);
                   ret = 0;
                 } else {
-                  ret = -1;
+                        printk("get detect_used fail!\n ");
+                        ret = -1;
                 }
 	
 	}else{
@@ -636,16 +640,17 @@ static int sw_device_detect_start(struct sw_device *sw)
 {        
         char tmp[FILE_LENGTH];
         int ret =-1;
-       
+
         /*step1: Get sysconfig.fex profile information*/
         memset(&tmp, 0, sizeof(tmp));
         if(sw_sysconfig_get_para(sw) < 0) {
+		dev_count ++;
                 printk("get sysconfig para erro!\n");
                 return -1;
         }
         
         if(sw->detect_used) {
-                
+                dev_count ++;
                 /*step 2: The i2c address detection equipment, find the device used at present.*/                
                 ret = sw_i2c_detect(sw);
                 if (ret < 0)
@@ -668,17 +673,17 @@ static int sw_device_detect_start(struct sw_device *sw)
 	                        d_name.g_addr = sw->response_addr;
 	                        device_getted_flag.g_getted_flag = 1;
 	                        break;
-                        case 2:
+			case 2:
 	                        strcpy(d_name.c_name, sw->device_name);
 	                        d_name.c_addr = sw->response_addr;
 	                        device_getted_flag.c_getted_flag = 1;
 	                        break;
-                       	case 3:
+			case 3:
 	                        strcpy(d_name.ls_name, sw->device_name);
 	                        d_name.ls_addr = sw->response_addr;
 	                        device_getted_flag.ls_getted_flag = 1;
 	                        break;
-                        case 4:
+			case 4:
 	                        strcpy(d_name.gy_name, sw->device_name);
 	                        d_name.gy_addr = sw->response_addr;
 	                        device_getted_flag.gy_getted_flag = 1;
@@ -689,7 +694,7 @@ static int sw_device_detect_start(struct sw_device *sw)
 	                        device_getted_flag.compass_getted_flag = 1;
 	                        break;
 			default:
-	                  	printk("Unknown devices have been detected !\n");
+	                        printk("Unknown devices have been detected !\n");
 		}
         }    
         
@@ -786,34 +791,45 @@ static void sw_devices_events(struct work_struct *work)
         if(ctp_mask != 1) {
                 device_number = (sizeof(gsensors)) / (sizeof(gsensors[0]));
                 ret = sw_register_device_detect(gsensors, &g_name, device_number);
-                if(ret < 0)
-                        printk("gsensor detect fail!\n");
+                if(ret < 0){
+					dev_count --;
+					printk("gsensors detect fail!\n");
+                }
 
                 device_number = (sizeof(lsensors)) / (sizeof(lsensors[0]));
                 ret = sw_register_device_detect(lsensors, &ls_name, device_number);
-                if(ret < 0)
-                        printk("lsensor detect fail!\n");
+                if(ret < 0){
+					dev_count --;
+					printk("lsensors detect fail!\n");
+                }
 
                 device_number = (sizeof(gyr_sensors)) / (sizeof(gyr_sensors[0]));
                 ret = sw_register_device_detect(gyr_sensors, &gyr_name, device_number);
-                if(ret < 0)
-                        printk("gyr detect fail!\n");
+                if(ret < 0){
+					dev_count --;
+					printk("gyr_sensors detect fail!\n");
+                }
 
-								device_number = (sizeof(compass_sensors)) / (sizeof(compass_sensors[0]));
+                device_number = (sizeof(compass_sensors)) / (sizeof(compass_sensors[0]));
                 ret = sw_register_device_detect(compass_sensors, &compass_name, device_number);
-                if(ret < 0)
-                        printk("compass detect fail!\n");
+                if(ret < 0){
+					dev_count --;
+					printk("compass_sensors detect fail!\n");
+                }
         }
         
         device_number = (sizeof(ctps)) / (sizeof(ctps[0]));
         ctp_wakeup(c_power.reset_pin, 20);
         msleep(50);
-        ret = sw_register_device_detect(ctps, &c_name, device_number);        
-        if(ret < 0)
-                printk("ctp detect fail!\n"); 
+        ret = sw_register_device_detect(ctps, &c_name, device_number);
+        if(ret < 0){
+			dev_count --;
+			printk("ctp detect fail!\n");
+         }
         
         sw_devices_power_free(&c_power);
-        dprintk(DEBUG_INIT, "[sw_device]:%s end!\n", __func__);       
+        detect_end_flag = 1;
+        dprintk(DEBUG_INIT, "[sw_device]:%s end! Totally %d devices uesed\n", __func__, dev_count);
 }	
 
 static ssize_t sw_device_gsensor_show(struct device *dev,
@@ -864,27 +880,36 @@ static ssize_t sw_device_devlist_show(struct device *dev,
          	dprintk(DEBUG_INIT, "[sw_device]:%s: asensor_name:%s\n", __func__, d_name.g_name);
 		cnt += sprintf(buf + cnt,"accelsensor_name:\"%s\"\n" ,d_name.g_name);
           }
-          
-         if (device_getted_flag.ls_getted_flag == 1){
+
+          if (device_getted_flag.ls_getted_flag == 1){
 		dprintk(DEBUG_INIT, "[sw_device]:%s: lsensor_name:%s\n", __func__, d_name.ls_name);
 		cnt += sprintf(buf + cnt,"lsensor_name:\"%s\"\n" ,d_name.ls_name);
           }
-            
-         if (device_getted_flag.gy_getted_flag == 1){
+
+          if (device_getted_flag.gy_getted_flag == 1){
 		dprintk(DEBUG_INIT, "[sw_device]:%s: gyrsensor_name:%s\n", __func__, d_name.gy_name);
 		cnt += sprintf(buf + cnt,"gyrsensor_name:\"%s\"\n" ,d_name.gy_name);
           }
-          
-         if (device_getted_flag.compass_getted_flag == 1){
+
+          if (device_getted_flag.compass_getted_flag == 1){
 		dprintk(DEBUG_INIT, "[sw_device]:%s: compass_name:%s\n", __func__, d_name.compass_name);
 		cnt += sprintf(buf + cnt,"compass_name:\"%s\"\n" ,d_name.compass_name);
           }
 
-	 if (device_getted_flag.c_getted_flag == 1){
+          if (device_getted_flag.c_getted_flag == 1){
 		dprintk(DEBUG_INIT, "[sw_device]:%s: ctp_name:%s\n", __func__, d_name.c_name);
 		cnt += sprintf(buf + cnt,"ctp_name:\"%s\"\n" ,d_name.c_name);
           }
-                  
+
+		if (detect_end_flag == 1){
+			if (dev_count == 0){
+				printk("[sw_device]:no sw_devices!!! \n");
+				cnt += sprintf(buf + cnt,"no_device\n");
+			}
+			printk("[sw_device]%s:sw_devices detected end ! \nTotally %d devices uesed!\n", __func__, dev_count);
+			cnt += sprintf(buf + cnt,"end_of_list\n");
+		}
+
         return cnt;
 
 }
@@ -935,16 +960,16 @@ static int sw_input_remove(struct platform_device *pdev)
 
 /*TODO: change the node name to real one in DTS*/
 static const struct of_device_id sw_input_match[] = {
-	{.compatible = "allwinner,sun50i-ctp-para", },		
-	{.compatible = "allwinner,sun50i-ctp-list", },		
-	{.compatible = "allwinner,sun50i-gsensor-para", },		
-	{.compatible = "allwinner,sun50i-gsensor-list-para", },		
-	{.compatible = "allwinner,sun50i-compass-para", },		
-	{.compatible = "allwinner,sun50i-compass-list-para", },		
-	{.compatible = "allwinner,sun50i-lsensors-para", },		
-	{.compatible = "allwinner,sun50i-lsensors-list-para", },	
-	{.compatible = "allwinner,sun50i-gyr_sensors-para", },		
-	{.compatible = "allwinner,sun50i-gyr_sensors-list-para", },
+	{.compatible = "allwinner,sunxi-ctp-para", },		
+	{.compatible = "allwinner,sunxi-ctp-list", },		
+	{.compatible = "allwinner,sunxi-gsensor-para", },		
+	{.compatible = "allwinner,sunxi-gsensor-list-para", },		
+	{.compatible = "allwinner,sunxi-compass-para", },		
+	{.compatible = "allwinner,sunxi-compass-list-para", },		
+	{.compatible = "allwinner,sunxi-lsensors-para", },		
+	{.compatible = "allwinner,sunxi-lsensors-list-para", },	
+	{.compatible = "allwinner,sunxi-gyr_sensors-para", },		
+	{.compatible = "allwinner,sunxi-gyr_sensors-list-para", },
 	{},
 };
 
@@ -959,9 +984,6 @@ static struct platform_driver sw_input_platform_driver = {
 		.of_match_table = sw_input_match,
 	},
 };
-
-
-
 
 static struct attribute *sw_device_attributes[] = {
         &dev_attr_gsensor.attr,

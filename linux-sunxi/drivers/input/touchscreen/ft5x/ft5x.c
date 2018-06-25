@@ -43,15 +43,6 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-//Justin Porting 20160811 Start
-//#include <mach/irqs.h>
-//#include <mach/hardware.h>
-
-
-//#define CONFIG_SUPPORT_FTS_CTP_UPG
-
-//Justin Porting 20160811 End
-
 #define FOR_TSLIB_TEST
 //#define TOUCH_KEY_SUPPORT
 #ifdef TOUCH_KEY_SUPPORT
@@ -958,7 +949,7 @@ void getVerNo(u8* buf, int len)
 	int i = 0;
 	start_reg = 0xa6;
 
-#if 0
+#if 1
 	printk("read 0xa6 one time. \n");
 	if(FTS_FALSE == fts_register_read(0xa6, buf, len)){
                 return ;
@@ -1185,7 +1176,7 @@ static int ft5x_read_data(void)
 		if(1 == revert_y_flag){
 			event->y5 = SCREEN_MAX_Y - event->y5;
 		}
-		event->touch_ID5=(s16)(buf[0x1d] & 0xF0)>>4;
+		event->touch_ID5=(s16)(buf[0x1D] & 0xF0)>>4;
 		
 		dprintk(DEBUG_X_Y_INFO,"touch id : %d. \n",event->touch_ID5);
 	case 4:
@@ -1254,7 +1245,7 @@ static int ft5x_read_data(void)
 	default:
 		return -1;
 	}
-	event->pressure = 20;
+	event->pressure = 200;
         return 0;
 }
 
@@ -1771,10 +1762,10 @@ exit_check_functionality_failed:
         
 	return err;
 }
-//Justin Porting 20160811 Start
+
 static int ft5x_ts_remove(struct i2c_client *client)
 {
-//Justin Porting 20160811 End
+
 	struct ft5x_ts_data *ft5x_ts = i2c_get_clientdata(client);
 	ft5x_set_reg(FT5X0X_REG_PMODE, PMODE_HIBERNATE);
 	
@@ -1808,9 +1799,7 @@ MODULE_DEVICE_TABLE(i2c, ft5x_ts_id);
 static struct i2c_driver ft5x_ts_driver = {
 	.class          = I2C_CLASS_HWMON,
 	.probe		= ft5x_ts_probe,
-	//Justin Porting 20160811 Start
 	.remove		= ft5x_ts_remove,
-	//Justin Porting 20160811 End
 	.id_table	= ft5x_ts_id,
 	.suspend        = ft5x_ts_suspend,
 	.resume         = ft5x_ts_resume,
@@ -1824,8 +1813,7 @@ static struct i2c_driver ft5x_ts_driver = {
 
 static int aw_open(struct inode *inode, struct file *file)
 {
-	int subminor;
-	int ret = 0;	
+	int subminor;	
 	struct i2c_client *client;
 	struct i2c_adapter *adapter;	
 	struct i2c_dev *i2c_dev;	
@@ -1867,11 +1855,9 @@ static long aw_ioctl(struct file *file, unsigned int cmd,unsigned long arg )
 	switch (cmd) {
 	case UPGRADE:
 	        dprintk(DEBUG_OTHERS_INFO,"==UPGRADE_WORK=\n");
-//Justin Porting 20160811 Start
 #ifdef CONFIG_SUPPORT_FTS_CTP_UPG
-			fts_ctpm_fw_upgrade_with_i_file();
+		fts_ctpm_fw_upgrade_with_i_file();
 #endif
-//Justin Porting 20160811 End
 		// calibrate();
 		break;
 	default:

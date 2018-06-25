@@ -608,20 +608,38 @@ rtp_exchange_x_y_flag = 0
 ;notice ---    tp_int_port &  tp_io_port use the same port
 ;----------------------------------------------------------------------------------
 [ctp]
+compatible          = "allwinner,sunxi-ctp-para"
 ctp_used            = 1
-ctp_name	    = "ft5x"
+ctp_name	    = "bpi_lcd7"
 ctp_twi_id          = 1
-ctp_twi_addr        = 0x38
+ctp_twi_addr        = 0x5d
 ctp_screen_max_x    = 800
 ctp_screen_max_y    = 400
 ctp_revert_x_flag   = 0
 ctp_revert_y_flag   = 0
 ctp_exchange_x_y_flag = 0
+ctp_gesture_wakeup  = 0
 ctp_int_port        = port:PI10<6><default><default><default>
 ctp_wakeup          = port:PI11<1><default><default><1>
 ctp_power_ldo       = "vcc-3v"
 ctp_power_ldo_vol   = 3300
 ctp_power_io        =
+
+;--------------------------------------------------------------------------------
+; CTP automatic detection configuration
+;ctp_detect_used  --- Whether startup automatic inspection function. 1:used,0:unused
+;Module name postposition 1 said detection, 0 means no detection.
+;--------------------------------------------------------------------------------
+[ctp_list]
+compatible                = "allwinner,sunxi-ctp-list"
+ctp_list_used             = 1
+gslX680new                = 0
+gt9xx_ts                  = 0
+gt9xxnew_ts               = 1
+gt82x                     = 0
+zet622x                   = 0
+aw5306_ts                 = 0
+ft5x_ts                   = 1
 
 ;----------------------------------------------------------------------------------
 ;touch key configuration
@@ -845,7 +863,7 @@ cagc_enable             = 1
 lcd_used            = 1
 
 lcd_driver_name     = "S070WV20_MIPI_RGB"
-lcd_backlight       = 50
+lcd_backlight       = 150
 lcd_if              = 4
 lcd_x               = 800
 lcd_y               = 480

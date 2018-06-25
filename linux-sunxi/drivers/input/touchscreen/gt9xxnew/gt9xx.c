@@ -1774,7 +1774,7 @@ static s32 gtp_init_panel(struct goodix_ts_data *ts)
 		} else if (!strcmp(config_info.name,"gt9147_bpi")){
             sensor_id = 4;
             dprintk(DEBUG_INIT,"gt9xx:sensor_id = %d\n",sensor_id);
-		} else if (!strcmp(config_info.name,"bpi_lcd7_gt")){
+		} else if (!strcmp(config_info.name,"bpi_lcd7")){
             sensor_id = 5;
             dprintk(DEBUG_INIT,"gt9xx:sensor_id = %d\n",sensor_id);
 		 } else {		    
@@ -2859,7 +2859,8 @@ static int goodix_ts_remove(struct i2c_client *client)
 
 	pm_runtime_disable(&client->dev);
 	pm_runtime_set_suspended(&client->dev);
-    
+
+	fb_unregister_client(&ts->fb_notif);
 #if GTP_CREATE_WR_NODE
     uninit_wr_node();
 #endif
