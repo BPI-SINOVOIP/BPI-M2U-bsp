@@ -105,7 +105,7 @@ static ssize_t sys_info_show(struct class *class,
 		size += sprintf(buf + size, "%s\n", "normal");
 
 	/* chipid */
-	sunxi_get_serial((u8 *)databuf);
+	sunxi_get_soc_chipid((u8 *)databuf);
 	for (i = 0; i < 4; i++)
 		sprintf(tmpbuf + i*8, "%08x", databuf[i]);
 	tmpbuf[128] = 0;
