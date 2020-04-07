@@ -1270,43 +1270,49 @@ gsensor_int2        =
 
 ;--------------------------------------------------------------------------------
 ;wlan configuration
-;clocks:							32k clk
-;wlan_power:					wifi power
+;clocks:			32k clk
+;wlan_power_num: 		the number of inputs for wifi power
+;wlan_power(n):			wifi power(n)
 ;wlan_io_regulator:		the power of wifi io
-;wlan_busnum:					no. of bus(usb or bus)
-;wlan_regon:					wifi function enable io
-;wlan_hostwake:				wifi device wake-up host
-;status:							okay
+;wlan_busnum:			no. of bus(usb or bus)
+;wlan_regon:			wifi function enable io
+;wlan_hostwake:			wifi device wake-up host
+;status:			okay
 ;--------------------------------------------------------------------------------
 [wlan]
-wlan_used							= 1
-compatible						= "allwinner,sunxi-wlan"
-clocks                = "outa"
-;pinctrl-names					= "default"
-;bt_clk_gpio						= port:PI12<4><0><0><0>
-wlan_power            = "vcc-wifi"
-wlan_io_regulator 		= "vcc-io-wifi"
-wlan_busnum						= 1
-wlan_regon						= port:PG10<1><1><1><0>
-wlan_hostwake					= port:ower0<0><default><default><default>
+wlan_used		= 1
+compatible		= "allwinner,sunxi-wlan"
+clocks                  = "outa"
+;pinctrl-names		= "default"
+;bt_clk_gpio		= port:PI12<4><0><0><0>
+wlan_power_num		= 2
+wlan_power1             = "vcc-wifi1"
+wlan_power2             = "vcc-wifi2"
+wlan_io_regulator 	= "vcc-io-wifi"
+wlan_busnum		= 1
+wlan_regon		= port:PG10<1><1><1><0>
+wlan_hostwake		= port:power0<0><default><default><default>
 
 ;--------------------------------------------------------------------------------
 ;bt configuration
-;clocks:							32k clk
-;bt_power:						bt power
+;clocks:			32k clk
+;bt_power_num			the number of inputs for wifi power
+;bt_power(n):			bt power (n)
 ;wlan_io_regulator:		the power of bt io
-;bt_rst_n:      			bt function enable io
-;status:							okay
+;bt_rst_n:      		bt function enable io
+;status:			okay
 ;--------------------------------------------------------------------------------
 [bt]
-bt_used								= 1
-compatible						= "allwinner,sunxi-bt"
-clocks 								= "outa"
-pinctrl-names					= "default"
-clock_io							= port:PI12<4><0><0><0>
-bt_power 							= "vcc-wifi-2"
-bt_io_regulator 			= "vcc-io-wifi"
-bt_rst_n							= port:PH12<1><1><1><0>
+bt_used			= 1
+compatible		= "allwinner,sunxi-bt"
+clocks 			= "outa"
+pinctrl-names		= "default"
+clock_io		= port:PI12<4><0><0><0>
+bt_power_num 		= 2
+bt_power1 		= "vcc-wifi1"
+bt_power2 		= "vcc-wifi2"
+bt_io_regulator 	= "vcc-io-wifi"
+bt_rst_n		= port:PH12<1><1><1><0>
 
 ;--------------------------------------------------------------------------------
 ;btlpm configuration
@@ -1316,11 +1322,11 @@ bt_rst_n							= port:PH12<1><1><1><0>
 ;status:							okay
 ;--------------------------------------------------------------------------------
 [btlpm]
-btlpm_used						= 0
-compatible						= "allwinner,sunxi-btlpm"
-uart_index						= 3
-bt_wake               = port:PG11<1><1><1><0>
-bt_host_wake          = port:power1<0><default><default><default>
+btlpm_used		= 0
+compatible		= "allwinner,sunxi-btlpm"
+uart_index		= 3
+bt_wake                 = port:PG11<1><1><1><0>
+bt_host_wake            = port:power1<0><default><default><default>
 
 ;--------------------------------------------------------------------------------
 ;gyroscope
@@ -1673,8 +1679,8 @@ regulator7      = "axp221s_aldo1 none vcc-25 csi-avdd"
 regulator8      = "axp221s_aldo2 none vcc-pa ehpy-vdd25"
 regulator9      = "axp221s_aldo3 none avcc vcc-pll"
 regulator10     = "axp221s_dldo1 none vcc-io-wifi vcc-pg "
-regulator11     = "axp221s_dldo2 none vcc-wifi"
-regulator12     = "axp221s_dldo3 none vcc-wifi-2"
+regulator11     = "axp221s_dldo2 none vcc-wifi1"
+regulator12     = "axp221s_dldo3 none vcc-wifi2"
 regulator13     = "axp221s_dldo4 none vdd-sata-25 vcc-pf"
 regulator14     = "axp221s_eldo1 none vcc-pe csi-iovcc csi-afvcc"
 regulator15     = "axp221s_eldo2 none csi-dvdd"

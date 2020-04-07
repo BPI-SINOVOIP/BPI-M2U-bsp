@@ -1,9 +1,30 @@
 /*
- * $Copyright Open Broadcom Corporation$
- *
  * Fundamental types and constants relating to WFA P2P (aka WiFi Direct)
  *
- * $Id: p2p.h 457033 2014-02-20 19:39:45Z $
+ * Copyright (C) 1999-2016, Broadcom Corporation
+ * 
+ *      Unless you and Broadcom execute a separate written software license
+ * agreement governing use of this software, this software is licensed to you
+ * under the terms of the GNU General Public License version 2 (the "GPL"),
+ * available at http://www.broadcom.com/licenses/GPLv2.php, with the
+ * following added to such license:
+ * 
+ *      As a special exception, the copyright holders of this software give you
+ * permission to link this software with independent modules, and to copy and
+ * distribute the resulting executable under terms of your choice, provided that
+ * you also meet, for each linked independent module, the terms and conditions of
+ * the license of that module.  An independent module is a module which is not
+ * derived from this software.  The special exception does not apply to any
+ * modifications of the software.
+ * 
+ *      Notwithstanding the above, under no circumstances may you combine this
+ * software in any way with any other Broadcom software provided under a license
+ * other than the GPL, without Broadcom's express prior written consent.
+ *
+ *
+ * <<Broadcom-WL-IPTag/Open:>>
+ *
+ * $Id: p2p.h 536785 2015-02-24 08:35:00Z $
  */
 
 #ifndef _P2P_H_
@@ -79,7 +100,7 @@ typedef struct wifi_p2p_ie wifi_p2p_ie_t;
 #define P2P_SEID_SESSION_INFO_RESP	29	/* Session Information Response */
 #define P2P_SEID_VNDR			221	/* Vendor-specific subelement */
 
-#define P2P_SE_VS_ID_SERVICES	0x1b 
+#define P2P_SE_VS_ID_SERVICES	0x1b
 
 
 /* WiFi P2P IE subelement: P2P Capability (capabilities info) */
@@ -200,7 +221,7 @@ typedef struct wifi_p2p_status_se_s wifi_p2p_status_se_t;
 				/* Failed, rejected by user */
 #define P2P_STATSE_SUCCESS_USER_ACCEPT		12
 				/* Success, accepted by user */
-				
+
 /* WiFi P2P IE attribute: Extended Listen Timing */
 BWL_PRE_PACKED_STRUCT struct wifi_p2p_ext_se_s {
 	uint8	eltId;		/* ID: P2P_SEID_EXT_TIMING */
@@ -542,9 +563,9 @@ typedef struct wifi_p2p_noa_se wifi_p2p_noa_se_t;
 #define	P2PSD_ACTION_ID_GAS_IRESP	0x0b
 				/* Action value for GAS Initial Response AF */
 #define	P2PSD_ACTION_ID_GAS_CREQ	0x0c
-				/* Action value for GAS Comback Request AF */
+				/* Action value for GAS Comeback Request AF */
 #define	P2PSD_ACTION_ID_GAS_CRESP	0x0d
-				/* Action value for GAS Comback Response AF */
+				/* Action value for GAS Comeback Response AF */
 #define P2PSD_AD_EID				0x6c
 				/* Advertisement Protocol IE ID */
 #define P2PSD_ADP_TUPLE_QLMT_PAMEBI	0x00
@@ -559,7 +580,7 @@ typedef struct wifi_p2p_noa_se wifi_p2p_noa_se_t;
 				/* NQP Query Info ID: 56797 */
 #define P2PSD_GAS_COMEBACKDEALY		0x00
 				/* Not used in the Native GAS protocol */
-				
+
 /* Service Protocol Type */
 typedef enum p2psd_svc_protype {
 	SVC_RPOTYPE_ALL = 0,

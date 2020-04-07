@@ -1,7 +1,7 @@
 /*
  * BCMSDH Function Driver for the native SDIO/MMC driver in the Linux Kernel
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2016, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,10 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_sdmmc_linux.c 434777 2013-11-07 09:30:27Z $
+ *
+ * <<Broadcom-WL-IPTag/Proprietary,Open:>>
+ *
+ * $Id: bcmsdh_sdmmc_linux.c 591173 2015-10-07 06:24:22Z $
  */
 
 #include <typedefs.h>
@@ -110,9 +113,12 @@ static int sdioh_probe(struct sdio_func *func)
 
 	sd_err(("bus num (host idx)=%d, slot num (rca)=%d\n", host_idx, rca));
 	adapter = dhd_wifi_platform_get_adapter(SDIO_BUS, host_idx, rca);
-	if (adapter  != NULL)
+	if (adapter != NULL) {
 		sd_err(("found adapter info '%s'\n", adapter->name));
-	else
+#ifdef BUS_POWER_RESTORE
+		adapter->sdio_func = func;
+#endif
+	} else
 		sd_err(("can't find adapter info for this chip\n"));
 
 #ifdef WL_CFG80211
@@ -233,20 +239,23 @@ static int bcmsdh_sdmmc_suspend(struct device *pdev)
 	struct sdio_func *func = dev_to_sdio_func(pdev);
 	mmc_pm_flag_t sdio_flags;
 
-	printk("%s Enter func->num=%d\n", __FUNCTION__, func->num);
+	printf("%s Enter func->num=%d\n", __FUNCTION__, func->num);
 	if (func->num != 2)
 		return 0;
 
+	dhd_mmc_suspend = TRUE;
 	sdioh = sdio_get_drvdata(func);
 	err = bcmsdh_suspend(sdioh->bcmsdh);
 	if (err) {
-		printk("%s bcmsdh_suspend err=%d\n", __FUNCTION__, err);
+		printf("%s bcmsdh_suspend err=%d\n", __FUNCTION__, err);
+		dhd_mmc_suspend = FALSE;
 		return err;
 	}
 
 	sdio_flags = sdio_get_host_pm_caps(func);
 	if (!(sdio_flags & MMC_PM_KEEP_POWER)) {
 		sd_err(("%s: can't keep power while host is suspended\n", __FUNCTION__));
+		dhd_mmc_suspend = FALSE;
 		return  -EINVAL;
 	}
 
@@ -254,12 +263,15 @@ static int bcmsdh_sdmmc_suspend(struct device *pdev)
 	err = sdio_set_host_pm_flags(func, MMC_PM_KEEP_POWER);
 	if (err) {
 		sd_err(("%s: error while trying to keep power\n", __FUNCTION__));
+		dhd_mmc_suspend = FALSE;
 		return err;
 	}
-	dhd_mmc_suspend = TRUE;
+#if defined(OOB_INTR_ONLY)
+	bcmsdh_oob_intr_set(sdioh->bcmsdh, FALSE);
+#endif
 	smp_mb();
 
-	printk("%s Exit\n", __FUNCTION__);
+	printf("%s Exit\n", __FUNCTION__);
 	return 0;
 }
 
@@ -270,10 +282,10 @@ static int bcmsdh_sdmmc_resume(struct device *pdev)
 #endif
 	struct sdio_func *func = dev_to_sdio_func(pdev);
 
-	printk("%s Enter func->num=%d\n", __FUNCTION__, func->num);
+	printf("%s Enter func->num=%d\n", __FUNCTION__, func->num);
 	if (func->num != 2)
 		return 0;
-	
+
 	dhd_mmc_suspend = FALSE;
 #if defined(OOB_INTR_ONLY)
 	sdioh = sdio_get_drvdata(func);
@@ -281,7 +293,7 @@ static int bcmsdh_sdmmc_resume(struct device *pdev)
 #endif
 
 	smp_mb();
-	printk("%s Exit\n", __FUNCTION__);
+	printf("%s Exit\n", __FUNCTION__);
 	return 0;
 }
 

@@ -27,15 +27,25 @@
 #include <linux/platform_device.h>
 #include <linux/sys_config.h>
 
+
+#if defined(CONFIG_IO_EXPAND)
+/*for R6 scheme which use virtual extended gpio.
+*if the virtual extended gpio is not used,
+*just remove this macro
+*/
+#define VIRTUAL_EXTENDED_GPIO 1
+#endif
+
 struct sunxi_wlan_platdata {
 	int bus_index;
-	struct regulator *wlan_power;
+	int power_num;
+	struct regulator **wlan_power;
 	struct regulator *io_regulator;
 	struct clk *lpo;
 	int gpio_wlan_regon;
 	int gpio_wlan_hostwake;
 
-	char *wlan_power_name;
+	char **wlan_power_name;
 	char *io_regulator_name;
 	char *clk_name;
 
@@ -51,7 +61,7 @@ void sunxi_wlan_set_power(bool on_off)
 {
 	struct platform_device *pdev;
 	int ret = 0;
-	if(!wlan_data)
+	if (!wlan_data)
 		return;
 
 	pdev = wlan_data->pdev;
@@ -63,6 +73,7 @@ void sunxi_wlan_set_power(bool on_off)
 	}
 	mutex_unlock(&sunxi_wlan_mutex);
 }
+
 EXPORT_SYMBOL_GPL(sunxi_wlan_set_power);
 
 int sunxi_wlan_get_bus_index(void)
@@ -75,6 +86,7 @@ int sunxi_wlan_get_bus_index(void)
 	dev_info(&pdev->dev, "bus_index: %d\n", wlan_data->bus_index);
 	return wlan_data->bus_index;
 }
+
 EXPORT_SYMBOL_GPL(sunxi_wlan_get_bus_index);
 
 int sunxi_wlan_get_oob_irq(void)
@@ -88,7 +100,8 @@ int sunxi_wlan_get_oob_irq(void)
 
 	host_oob_irq = gpio_to_irq(wlan_data->gpio_wlan_hostwake);
 	if (IS_ERR_VALUE(host_oob_irq))
-		dev_err(&pdev->dev, "map gpio [%d] to virq failed, errno = %d\n",
+		dev_err(&pdev->dev,
+			"map gpio [%d] to virq failed, errno = %d\n",
 			wlan_data->gpio_wlan_hostwake, host_oob_irq);
 
 	return host_oob_irq;
@@ -105,6 +118,7 @@ int sunxi_wlan_get_oob_irq_flags(void)
 
 	return oob_irq_flags;
 }
+
 EXPORT_SYMBOL_GPL(sunxi_wlan_get_oob_irq_flags);
 
 static int sunxi_wlan_on(struct sunxi_wlan_platdata *data, bool on_off)
@@ -112,65 +126,91 @@ static int sunxi_wlan_on(struct sunxi_wlan_platdata *data, bool on_off)
 	struct platform_device *pdev = data->pdev;
 	struct device *dev = &pdev->dev;
 	int ret = 0;
+	int i = 0;
 
 	if (!on_off && gpio_is_valid(data->gpio_wlan_regon))
+#if defined(VIRTUAL_EXTENDED_GPIO)
+		gpio_set_value_cansleep(data->gpio_wlan_regon, 0);
+#else
 		gpio_set_value(data->gpio_wlan_regon, 0);
+#endif
 
-	if (data->wlan_power_name) {
-		data->wlan_power = regulator_get(dev, data->wlan_power_name);
-		if (!IS_ERR(data->wlan_power)) {
-			if (on_off) {
-				ret = regulator_enable(data->wlan_power);
-				if (ret < 0) {
-					dev_err(dev, "regulator wlan_power enable failed\n");
-					regulator_put(data->wlan_power);
-					return ret;
-				}
+	for (i = 0; i < (data->power_num); i++) {
+		if (data->wlan_power_name[i]) {
+			data->wlan_power[i] =
+			    regulator_get(dev, data->wlan_power_name[i]);
+			if (!IS_ERR(data->wlan_power[i])) {
+				if (on_off) {
+					ret =
+					    regulator_enable(data->
+							     wlan_power[i]);
+					if (ret < 0) {
+						dev_err(dev,
+							"regulator wlan_power enable failed\n");
+						regulator_put(data->
+							      wlan_power[i]);
+						return ret;
+					}
 
-				ret = regulator_get_voltage(data->wlan_power);
-				if (ret < 0) {
-					dev_err(dev, "regulator wlan_power get voltage failed\n");
-					regulator_put(data->wlan_power);
-					return ret;
+					ret =
+					    regulator_get_voltage(data->
+								  wlan_power
+								  [i]);
+					if (ret < 0) {
+						dev_err(dev,
+							"regulator wlan_power get voltage failed\n");
+						regulator_put(data->
+							      wlan_power[i]);
+						return ret;
+					}
+					dev_info(dev,
+						 "check wlan wlan_power voltage: %d\n",
+						 ret);
+				} else {
+					ret =
+					    regulator_disable(data->
+							      wlan_power[i]);
+					if (ret < 0) {
+						dev_err(dev,
+							"regulator wlan_power disable failed\n");
+						regulator_put(data->
+							      wlan_power[i]);
+						return ret;
+					}
 				}
-				dev_info(dev, "check wlan wlan_power voltage: %d\n",
-					ret);
-			} else{
-				ret = regulator_disable(data->wlan_power);
-				if (ret < 0) {
-					dev_err(dev, "regulator wlan_power disable failed\n");
-					regulator_put(data->wlan_power);
-					return ret;
-				}
+				regulator_put(data->wlan_power[i]);
 			}
-			regulator_put(data->wlan_power);
 		}
 	}
 
 	if (data->io_regulator_name) {
 		data->io_regulator = regulator_get(dev,
-			data->io_regulator_name);
+						   data->io_regulator_name);
 		if (!IS_ERR(data->io_regulator)) {
 			if (on_off) {
 				ret = regulator_enable(data->io_regulator);
 				if (ret < 0) {
-					dev_err(dev, "regulator io_regulator enable failed\n");
+					dev_err(dev,
+						"regulator io_regulator enable failed\n");
 					regulator_put(data->io_regulator);
 					return ret;
 				}
 
 				ret = regulator_get_voltage(data->io_regulator);
 				if (ret < 0) {
-					dev_err(dev, "regulator io_regulator get voltage failed\n");
+					dev_err(dev,
+						"regulator io_regulator get voltage failed\n");
 					regulator_put(data->io_regulator);
 					return ret;
 				}
-				dev_info(dev, "check wlan io_regulator voltage: %d\n",
-					ret);
-			} else{
+				dev_info(dev,
+					 "check wlan io_regulator voltage: %d\n",
+					 ret);
+			} else {
 				ret = regulator_disable(data->io_regulator);
 				if (ret < 0) {
-					dev_err(dev, "regulator io_regulator disable failed\n");
+					dev_err(dev,
+						"regulator io_regulator disable failed\n");
 					regulator_put(data->io_regulator);
 					return ret;
 				}
@@ -181,7 +221,11 @@ static int sunxi_wlan_on(struct sunxi_wlan_platdata *data, bool on_off)
 
 	if (on_off && gpio_is_valid(data->gpio_wlan_regon)) {
 		mdelay(10);
+#if defined(VIRTUAL_EXTENDED_GPIO)
+		gpio_set_value_cansleep(data->gpio_wlan_regon, 1);
+#else
 		gpio_set_value(data->gpio_wlan_regon, 1);
+#endif
 	}
 	wlan_data->power_state = on_off;
 
@@ -189,13 +233,14 @@ static int sunxi_wlan_on(struct sunxi_wlan_platdata *data, bool on_off)
 }
 
 static ssize_t power_state_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+				struct device_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%d\n", wlan_data->power_state);
 }
 
 static ssize_t power_state_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count)
+				 struct device_attribute *attr, const char *buf,
+				 size_t count)
 {
 	unsigned long state;
 	int err;
@@ -222,7 +267,7 @@ static ssize_t power_state_store(struct device *dev,
 }
 
 static DEVICE_ATTR(power_state, S_IRUGO | S_IWUSR,
-	power_state_show, power_state_store);
+		   power_state_show, power_state_store);
 
 static int sunxi_wlan_probe(struct platform_device *pdev)
 {
@@ -234,6 +279,9 @@ static int sunxi_wlan_probe(struct platform_device *pdev)
 	const char *power, *io_regulator, *clocks;
 	int ret = 0;
 	u32 val;
+	int i = 0, j = 0;
+	char wlan_name_buf[64] = { 0 }, s[64] = {
+	0};
 
 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
 	if (!dev)
@@ -255,26 +303,58 @@ static int sunxi_wlan_probe(struct platform_device *pdev)
 			return -EINVAL;
 		}
 	}
+
 	dev_info(dev, "wlan_busnum (%u)\n", val);
 
-	if (of_property_read_string(np, "wlan_power", &power)) {
-		dev_warn(dev, "Missing wlan_power.\n");
-	} else{
-		data->wlan_power_name = devm_kzalloc(dev, 64, GFP_KERNEL);
-		if (!data->wlan_power_name)
-			return -ENOMEM;
-		else
-			strcpy(data->wlan_power_name, power);
+	data->power_num = -1;
+	if (!of_property_read_u32(np, "wlan_power_num", &val)) {
+		switch (val) {
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:
+			data->power_num = val;
+			break;
+		default:
+			dev_err(dev, "unsupported wlan_power_num (%u)\n", val);
+			return -EINVAL;
+		}
 	}
-	dev_info(dev, "wlan_power_name (%s)\n", data->wlan_power_name);
+	dev_info(dev, "wlan_power_num (%u)\n", val);
+
+	data->wlan_power_name =
+	    devm_kzalloc(dev, (data->power_num) * sizeof(char *), GFP_KERNEL);
+	for (i = 0; i < (data->power_num); i++) {
+		sprintf(s, "wlan_power%d", i + 1);
+		strcpy(wlan_name_buf, s);
+		if (of_property_read_string(np, wlan_name_buf, &power)) {
+			dev_warn(dev, "Missing wlan_power.\n");
+		} else {
+			data->wlan_power_name[i] =
+			    devm_kzalloc(dev, 64, GFP_KERNEL);
+			if (!data->wlan_power_name[i]) {
+				for (j = 0; j < i; j++) {
+					devm_kfree(dev,
+						   data->wlan_power_name[j]);
+				}
+				devm_kfree(dev, data->wlan_power_name);
+				return -ENOMEM;
+			} else
+				strcpy(data->wlan_power_name[i], power);
+		}
+		dev_info(dev, "wlan_power_name (%s)\n",
+			 data->wlan_power_name[i]);
+	}
 
 	if (of_property_read_string(np, "wlan_io_regulator", &io_regulator)) {
 		dev_warn(dev, "Missing wlan_io_regulator.\n");
-	} else{
+	} else {
 		data->io_regulator_name = devm_kzalloc(dev, 64, GFP_KERNEL);
-		if (!data->io_regulator_name)
-			return -ENOMEM;
-		else
+		if (!data->io_regulator_name) {
+			ret = -ENOMEM;
+			goto end;
+		} else
 			strcpy(data->io_regulator_name, io_regulator);
 	}
 	dev_info(dev, "io_regulator_name (%s)\n", data->io_regulator_name);
@@ -285,71 +365,89 @@ static int sunxi_wlan_probe(struct platform_device *pdev)
 		dev_err(dev, "request pincrtl handle for device [%s] failed\n",
 			dev_name(&pdev->dev));
 	}
-
+#if defined(VIRTUAL_EXTENDED_GPIO)
+	printk("------------SUNXI_RF: Set regon for SUN3IW1P1_R6!----------------\n");
+	val = 0;
+	of_property_read_u32(np, "wlan_board_sel", &val);
+	if (val) {
+		if (!of_property_read_u32(np, "wlan_regon", &val)) {
+			data->gpio_wlan_regon = (int)val;
+		} else {
+			dev_err(dev, "unsupported wlan_regon(%u)\n", val);
+			goto end;
+		}
+	} else {
+		data->gpio_wlan_regon =
+			of_get_named_gpio_flags(np, "wlan_regon", 0,
+					(enum of_gpio_flags *)&config);
+	}
+#else
 	data->gpio_wlan_regon = of_get_named_gpio_flags(np, "wlan_regon", 0,
-		(enum of_gpio_flags *)&config);
+							(enum of_gpio_flags *)
+							&config);
+#endif
 	if (!gpio_is_valid(data->gpio_wlan_regon)) {
 		dev_err(dev, "get gpio wlan_regon failed\n");
-	} else{
+	} else {
 		dev_info(dev,
-				"wlan_regon gpio=%d  mul-sel=%d  pull=%d  drv_level=%d  data=%d\n",
-				config.gpio,
-				config.mul_sel,
-				config.pull,
-				config.drv_level,
-				config.data);
+			 "wlan_regon gpio=%d  mul-sel=%d  pull=%d  drv_level=%d  data=%d\n",
+			 config.gpio,
+			 config.mul_sel,
+			 config.pull, config.drv_level, config.data);
 
 		ret = devm_gpio_request(dev, data->gpio_wlan_regon,
-				"wlan_regon");
+					"wlan_regon");
 		if (ret < 0) {
 			dev_err(dev, "can't request wlan_regon gpio %d\n",
 				data->gpio_wlan_regon);
-			return ret;
+			goto end;
 		}
 
 		ret = gpio_direction_output(data->gpio_wlan_regon, 0);
 		if (ret < 0) {
-			dev_err(dev, "can't request output direction wlan_regon gpio %d\n",
+			dev_err(dev,
+				"can't request output direction wlan_regon gpio %d\n",
 				data->gpio_wlan_regon);
-			return ret;
+			goto end;
 		}
 	}
-
 	data->gpio_wlan_hostwake = of_get_named_gpio_flags(np, "wlan_hostwake",
-		0, (enum of_gpio_flags *)&config);
+							   0,
+							   (enum of_gpio_flags
+							    *)&config);
 	if (!gpio_is_valid(data->gpio_wlan_hostwake)) {
 		dev_err(dev, "get gpio wlan_hostwake failed\n");
-	} else{
-		dev_info(dev, "wlan_hostwake gpio=%d  mul-sel=%d  pull=%d  drv_level=%d  data=%d\n",
-				config.gpio,
-				config.mul_sel,
-				config.pull,
-				config.drv_level,
-				config.data);
+	} else {
+		dev_info(dev,
+			 "wlan_hostwake gpio=%d  mul-sel=%d  pull=%d  drv_level=%d  data=%d\n",
+			 config.gpio, config.mul_sel, config.pull,
+			 config.drv_level, config.data);
 
 		ret = devm_gpio_request(dev, data->gpio_wlan_hostwake,
-			"wlan_hostwake");
+					"wlan_hostwake");
 		if (ret < 0) {
 			dev_err(dev, "can't request wlan_hostwake gpio %d\n",
 				data->gpio_wlan_hostwake);
-			return ret;
+			goto end;
 		}
 
-		gpio_direction_input(data->gpio_wlan_hostwake);
+		ret = gpio_direction_input(data->gpio_wlan_hostwake);
 		if (ret < 0) {
-			dev_err(dev, "can't request input direction wlan_hostwake gpio %d\n",
+			dev_err(dev,
+				"can't request input direction wlan_hostwake gpio %d\n",
 				data->gpio_wlan_hostwake);
-			return ret;
+			goto end;
 		}
 	}
 
 	if (of_property_read_string(np, "clocks", &clocks)) {
 		dev_warn(dev, "Missing clocks.\n");
-	} else{
+	} else {
 		data->clk_name = devm_kzalloc(dev, 64, GFP_KERNEL);
-		if (!data->clk_name)
-			return -ENOMEM;
-		else
+		if (!data->clk_name) {
+			ret = -ENOMEM;
+			goto end;
+		} else
 			strcpy(data->clk_name, clocks);
 	}
 	dev_info(dev, "clk_name (%s)\n", data->clk_name);
@@ -357,7 +455,7 @@ static int sunxi_wlan_probe(struct platform_device *pdev)
 	data->lpo = devm_clk_get(dev, data->clk_name);
 	if (IS_ERR_OR_NULL(data->lpo)) {
 		dev_warn(dev, "clk not config\n");
-	} else{
+	} else {
 		ret = clk_prepare_enable(data->lpo);
 		if (ret < 0)
 			dev_warn(dev, "can't enable clk\n");
@@ -366,11 +464,28 @@ static int sunxi_wlan_probe(struct platform_device *pdev)
 	device_create_file(dev, &dev_attr_power_state);
 	data->power_state = 0;
 
+end:
+	if (ret != 0) {
+		for (i = 0; i < (wlan_data->power_num); i++)
+			devm_kfree(dev, data->wlan_power_name[i]);
+		devm_kfree(dev, data->wlan_power_name);
+		return ret;
+	}
+
+	data->wlan_power =
+	    devm_kzalloc(dev, (data->power_num) * sizeof(struct regulator *),
+			 GFP_KERNEL);
 	return 0;
 }
 
 static int sunxi_wlan_remove(struct platform_device *pdev)
 {
+	int i = 0;
+
+	devm_kfree(&pdev->dev, wlan_data->wlan_power);
+	for (i = 0; i < (wlan_data->power_num); i++)
+		devm_kfree(&pdev->dev, wlan_data->wlan_power_name[i]);
+	devm_kfree(&pdev->dev, wlan_data->wlan_power_name);
 	device_remove_file(&pdev->dev, &dev_attr_power_state);
 
 	if (!IS_ERR_OR_NULL(wlan_data->lpo))
@@ -380,18 +495,18 @@ static int sunxi_wlan_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id sunxi_wlan_ids[] = {
-	{ .compatible = "allwinner,sunxi-wlan" },
+	{.compatible = "allwinner,sunxi-wlan"},
 	{ /* Sentinel */ }
 };
 
 static struct platform_driver sunxi_wlan_driver = {
-	.probe		= sunxi_wlan_probe,
-	.remove	= sunxi_wlan_remove,
-	.driver	= {
-		.owner	= THIS_MODULE,
-		.name	= "sunxi-wlan",
-		.of_match_table	= sunxi_wlan_ids,
-	},
+	.probe = sunxi_wlan_probe,
+	.remove = sunxi_wlan_remove,
+	.driver = {
+		   .owner = THIS_MODULE,
+		   .name = "sunxi-wlan",
+		   .of_match_table = sunxi_wlan_ids,
+		   },
 };
 
 module_platform_driver(sunxi_wlan_driver);
