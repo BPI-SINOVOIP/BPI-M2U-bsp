@@ -38,7 +38,8 @@ typedef struct core_pll_freq_tbl {
 static PLL_TABLE pll1_table[] =
 {	/*pll     N    M   P*/   /* pll = 24M*(N+1)/(M+1)/(P+1) */
 	{408 ,	  16 ,  0,  0},
-	{1008,    42 ,  0,  0},
+	{1008,    41 ,  0,  0},
+	{1440,    59 ,  0,  0},
 };
 
 
@@ -71,12 +72,14 @@ static int clk_get_pll_para(PLL_TABLE *factor, int pll_clk)
 int sunxi_clock_get_pll6(void)
 {
 	unsigned int reg_val;
-	int factor_n, factor_k, pll6;
+	int factor_n, factor_m0,factor_m1, pll6;
 
 	reg_val = readl(CCMU_PLL_PERI0_CTRL_REG);
-	factor_n = ((reg_val >> 8) & 0x1f) + 1;
-	factor_k = ((reg_val >> 4) & 0x03) + 1;
-	pll6 = 24 * factor_n * factor_k/2;
+	factor_n = ((reg_val >> 8) & 0xff) + 1;
+	factor_m0 = ((reg_val >> 0) & 0x01) + 1;
+	factor_m1 = ((reg_val >> 1) & 0x01) + 1;
+	pll6 = (24 * factor_n /factor_m0/factor_m1)>>2;
+
 	return pll6;
 }
 
@@ -173,7 +176,7 @@ int sunxi_clock_get_apb1(void)
 	int clock = 0, factor_m = 0,factor_n = 0;
 
 	reg_val = readl(CCMU_APB1_CFG_GREG);
-	factor_m  = (reg_val >> 0) & 0x03;
+	factor_m  = ((reg_val >> 0) & 0x03) + 1;
 	factor_n  = 1<<((reg_val >> 8) & 0x03);
 	src = (reg_val >> 24)&0x3;
 
@@ -186,10 +189,10 @@ int sunxi_clock_get_apb1(void)
 		src_clock =32/1000;
 		break;
 	case 2:	//PSI
-		src_clock =sunxi_clock_get_ahb();
+		src_clock = sunxi_clock_get_ahb();
 		break;
 	case 3://PLL_PERI0(1X)
-		clock   = sunxi_clock_get_pll6();
+		src_clock = sunxi_clock_get_pll6();
 		break;
 	default:
 		return 0;
@@ -273,12 +276,16 @@ int sunxi_clock_set_corepll(int frequency)
 	unsigned int reg_val;
 	PLL_TABLE  pll_factor;
 
+	if(frequency == sunxi_clock_get_corepll())
+	{
+		return 0;
+	}
+
 	//switch to 24M
 	reg_val = readl(CCMU_CPUX_AXI_CFG_REG);
 	reg_val &= ~(0x03 << 24);
 	reg_val |=  (0x00 << 24);
 	writel(reg_val,CCMU_CPUX_AXI_CFG_REG);
-	__udelay(20);
 
 	//get config para form freq table
 	clk_get_pll_para(&pll_factor, frequency);
@@ -304,7 +311,7 @@ int sunxi_clock_set_corepll(int frequency)
 	//wait PLL_CPUX stable
 #ifndef FPGA_PLATFORM
 	while(!(readl(CCMU_PLL_CPUX_CTRL_REG) & (0x1<<28)));
-	__usdelay(1);
+	udelay(20);
 #endif
 	/* lock disable */
 	reg_val = readl(CCMU_PLL_CPUX_CTRL_REG);

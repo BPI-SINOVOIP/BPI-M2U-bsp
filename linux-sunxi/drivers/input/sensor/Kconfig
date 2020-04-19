@@ -44,10 +44,24 @@ config SENSORS_GPADC
         help
           If you say yes here you get support for the gpadc collect analog input
 
+config SENSORS_TPADC
+        tristate "SUNXI TPADC"
+        depends on INPUT_SENSOR && ARCH_SUN8IW11P1
+        default n
+        help
+          If you say yes here you get support for the tpadc collect analog input
+
 config SENSORS_GPADC_TEST
         tristate "SUNXI GPADC test"
         depends on SENSORS_GPADC
         default n
         help
           If you say yes here you get support for the gpadc test sample
+
+config KEY_GPIO
+	bool "allwinnner KEY GPIO support"
+	depends on SENSORS_GPADC
+	default n
+	help
+
 endif

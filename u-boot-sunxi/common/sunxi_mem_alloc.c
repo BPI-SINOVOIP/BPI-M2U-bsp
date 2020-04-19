@@ -22,6 +22,7 @@
  * MA 02111-1307 USA
  */
 #include <common.h>
+#include <malloc.h>
 
 struct alloc_struct_t
 {
@@ -146,4 +147,55 @@ void  free_noncache(void *p)
     prev->next = ptr->next;     /* delete the node which need be released from the memory block chain  */
 
     return ;
+}
+
+void *malloc_align(size_t size, size_t align)
+{
+	int *ret, *ret_align, *ret_tem;
+	int  tem;
+	if (size <= 0 && align <=0)
+	{
+		printf("input arg error: should bigger than 0\n");
+	}
+	if ((align & 0x3))
+	{
+		printf("align arg error: align at least 4 byte.\n");
+		return NULL;
+	}
+	size =  size + align;
+	ret = (int *)malloc(size);
+	if (!ret)
+	{
+		printf("malloc return NULL! size = %d\n", size);
+		return NULL;
+	}
+
+	if (!((int)ret & (align-1)))
+	{
+		/* the buffer is align
+		 * */
+		tem = (int)ret + align;
+		ret_align = (int *)(tem);
+		ret_tem = ret_align;
+		ret_tem--;
+		*ret_tem = (int)ret;
+	}
+	else
+	{
+		tem =(int)ret & ~(align-1);
+		tem = tem+align;
+		ret_align = (int *)(tem);
+		ret_tem = ret_align;
+		ret_tem--;
+		*ret_tem = (int)ret;
+	}
+	return (void *)ret_align;
+}
+
+void free_align(void *ptr)
+{
+	int *ret;
+	ret = (int *)ptr;
+	ret--;
+	free((void *)*ret);
 }

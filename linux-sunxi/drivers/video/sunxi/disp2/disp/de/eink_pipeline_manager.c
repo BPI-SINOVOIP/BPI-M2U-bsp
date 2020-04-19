@@ -12,6 +12,16 @@
 #ifdef SUPPORT_EINK
 
 #define PIPELINE_NUM 16
+static int op_skip;
+static struct mutex mlock;
+
+static int __overlap_judge_skip(struct pipeline_manager *manager, u32 skip)
+{
+	mutex_lock(&mlock);
+	op_skip = skip;
+	mutex_unlock(&mlock);
+	return 0;
+}
 
 /* return 0, no overlap, 1 overlap.*/
 static int __overlap_judge(struct area_info pipeline_area, struct area_info update_area)
@@ -21,6 +31,13 @@ static int __overlap_judge(struct area_info pipeline_area, struct area_info upda
 
 	struct area_info *top_area;
 	struct area_info *bottom_area;
+
+	mutex_lock(&mlock);
+	if (op_skip) {
+		mutex_unlock(&mlock);
+		return 0;
+	}
+	mutex_unlock(&mlock);
 
 	if (update_area.x_top > pipeline_area.x_top) {
 		right_area = &update_area;
@@ -350,6 +367,7 @@ int pipeline_manager_init(struct disp_eink_manager* eink_manager)
 
 	mutex_init(&pipeline_manager->mlock);
 	mutex_init(&pipeline_manager->list.mlock);
+	mutex_init(&mlock);
 
 	for (i = 0; i < PIPELINE_NUM; i++) {
 		pipeline[i] = (struct pipeline_info *)disp_sys_malloc(sizeof(struct pipeline_info));
@@ -364,6 +382,7 @@ int pipeline_manager_init(struct disp_eink_manager* eink_manager)
 	}
 
 	pipeline_manager->check_overlap = __check_overlap;
+	pipeline_manager->op_skip = __overlap_judge_skip;
 	pipeline_manager->config_one_pipeline = __config_one_pipeline;
 	pipeline_manager->config_and_enable_one_pipeline = __config_and_enable_one_pipeline;
 	pipeline_manager->update_pipeline_list = __update_pipeline_list;

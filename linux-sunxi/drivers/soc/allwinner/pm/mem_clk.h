@@ -22,7 +22,10 @@
 
 #if defined(CONFIG_ARCH_SUN8I) || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1) || \
+	defined(CONFIG_ARCH_SUN3IW1P1)
 struct clk_div_t {
 	__u32 axi_div;		/* division of axi clock, divide cpu clock */
 	__u32 ahb_apb_div;	/* ahb1/apb1 clock divide ratio */
@@ -34,7 +37,9 @@ struct clk_misc_t {
 	__u32 pll1_tun;		/*0x250 */
 #if defined(CONFIG_ARCH_SUN8IW5P1) || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1)
 	__u32 Pll3Ctl;		/*0x10, vedio */
 	__u32 Pll4Ctl;		/*0x18, ve */
 	__u32 PllVedioBias;	/*0x228,  pll vedio bias reg */

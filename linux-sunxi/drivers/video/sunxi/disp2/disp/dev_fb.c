@@ -16,7 +16,7 @@
 #include <linux/fb.h>
 #include <linux/memblock.h>
 
-
+#define VSYNC_NUM 4
 typedef struct
 {
 	struct device           *dev;
@@ -30,7 +30,11 @@ typedef struct
 	wait_queue_head_t       wait[3];
 	unsigned long           wait_count[3];
 	struct task_struct      *vsync_task[3];
-	ktime_t                 vsync_timestamp[3];
+	spinlock_t              slock[DISP_SCREEN_NUM];
+	ktime_t                 vsync_timestamp[DISP_SCREEN_NUM][VSYNC_NUM];
+	int                     vsync_cur_line[DISP_SCREEN_NUM][VSYNC_NUM];
+	u32                     vsync_timestamp_head[DISP_SCREEN_NUM];
+	u32                     vsync_timestamp_tail[DISP_SCREEN_NUM];
 
 	int                     blank[3];
 }fb_info_t;
@@ -66,6 +70,10 @@ s32 fb_draw_colorbar(char * base, u32 width, u32 height, struct fb_var_screeninf
 
 	if (!base)
 		return -1;
+
+	/*do not draw colorbar when boot sync*/
+	if (g_disp_drv.para.boot_info.sync == 1)
+		return 0;
 
 	for (i = 0; i<height; i++) {
 		for (j = 0; j<width/4; j++) {
@@ -124,11 +132,14 @@ s32 fb_draw_gray_pictures(char * base, u32 width, u32 height, struct fb_var_scre
 	return 0;
 }
 
-static int Fb_map_video_memory(struct fb_info *info)
+static int fb_map_video_memory(struct fb_info *info)
 {
 	info->screen_base = (char __iomem *)disp_malloc(info->fix.smem_len, (u32 *)(&info->fix.smem_start));
 	if (info->screen_base)	{
-		__inf("Fb_map_video_memory(reserve), pa=0x%p size:0x%x\n",(void*)info->fix.smem_start, (unsigned int)info->fix.smem_len);
+		__inf("%s(reserve),va=0x%p, pa=0x%p size:0x%x\n", __func__,
+		    (void *)info->screen_base,
+		    (void *)info->fix.smem_start,
+		    (unsigned int)info->fix.smem_len);
 		memset((void* __force)info->screen_base,0x0,info->fix.smem_len);
 
 		g_fb_addr.fb_paddr = (uintptr_t)info->fix.smem_start;
@@ -144,9 +155,21 @@ static int Fb_map_video_memory(struct fb_info *info)
 }
 
 
-static inline void Fb_unmap_video_memory(struct fb_info *info)
+static inline void fb_unmap_video_memory(struct fb_info *info)
 {
+	if (!info->screen_base) {
+		__wrn("%s: screen_base is null\n", __func__);
+		return;
+	}
+	__inf("%s: screen_base=0x%p, smem=0x%p, len=0x%x\n", __func__,
+	    (void *)info->screen_base,
+	    (void *)info->fix.smem_start,
+	    info->fix.smem_len);
 	disp_free((void * __force)info->screen_base, (void*)info->fix.smem_start, info->fix.smem_len);
+	info->screen_base = 0;
+	info->fix.smem_start = 0;
+	g_fb_addr.fb_paddr = 0;
+	g_fb_addr.fb_size = 0;
 }
 
 static void *Fb_map_kernel(unsigned long phys_addr, unsigned long size)
@@ -687,48 +710,143 @@ static int sunxi_fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 
 static int sunxi_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 {
-	unsigned long mmio_pgoff;
-	unsigned long start;
-	u32 len;
 
-	start = info->fix.smem_start;
-	if (start == 0)
-		return -EINVAL;
-	len = info->fix.smem_len;
-	mmio_pgoff = PAGE_ALIGN((start & ~PAGE_MASK) + len) >> PAGE_SHIFT;
+	unsigned int offset = vma->vm_pgoff << PAGE_SHIFT;
 
-	if (vma->vm_pgoff >= mmio_pgoff) {
-		if (info->var.accel_flags)
-			return -EINVAL;
-		vma->vm_pgoff -= mmio_pgoff;
-		start = info->fix.mmio_start;
-		len = info->fix.mmio_len;
+	if (offset < info->fix.smem_len) {
+		return dma_mmap_writecombine(g_fbi.dev, vma, info->screen_base,
+					     info->fix.smem_start,
+					     info->fix.smem_len);
 	}
-	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
-	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-	return vm_iomap_memory(vma, start, len);
+
+	return -EINVAL;
 }
 
+/**
+ * drv_disp_vsync_event - wakeup vsync thread
+ * @sel: the index of display manager
+ *
+ * Get the current time, push it into the cirular queue,
+ * and then wakeup the vsync thread.
+ */
 s32 drv_disp_vsync_event(u32 sel)
 {
-	g_fbi.vsync_timestamp[sel] = ktime_get();
+	unsigned long flags;
+	ktime_t now;
+	unsigned int head, tail, next;
+	bool full = false;
+	int cur_line = -1;
+	struct disp_device *dispdev = NULL;
+	struct disp_manager *mgr = g_disp_drv.mgr[sel];
+
+	if (mgr)
+		dispdev = mgr->device;
+	if (dispdev) {
+		if (DISP_OUTPUT_TYPE_LCD == dispdev->type) {
+			disp_panel_para panel;
+			if (dispdev->get_panel_info) {
+				dispdev->get_panel_info(dispdev, &panel);
+				cur_line = disp_al_lcd_get_cur_line(dispdev->hwdev_index, &panel);
+			}
+		} else {
+			cur_line = disp_al_device_get_cur_line(dispdev->hwdev_index);
+		}
+	}
+
+	now = ktime_get();
+	spin_lock_irqsave(&g_fbi.slock[sel], flags);
+	head = g_fbi.vsync_timestamp_head[sel];
+	tail = g_fbi.vsync_timestamp_tail[sel];
+	next = tail + 1;
+	next = (next >= VSYNC_NUM) ? 0 : next;
+	if (next == head)
+		full = true;
+
+	if (!full) {
+		g_fbi.vsync_timestamp[sel][tail] = now;
+		g_fbi.vsync_cur_line[sel][tail] = cur_line;
+		g_fbi.vsync_timestamp_tail[sel] = next;
+	}
+	spin_unlock_irqrestore(&g_fbi.slock[sel], flags);
 
 	if (g_fbi.vsync_task[sel])
 		wake_up_process(g_fbi.vsync_task[sel]);
 
+	if (full)
+		return -1;
 	return 0;
 }
 
+/**
+ * vsync_proc - sends vsync message
+ * @disp: the index of display manager
+ *
+ * Get the timestamp from the circular queue,
+ * And send it widthin vsync message to the userland.
+ */
 static int vsync_proc(u32 disp)
 {
 	char buf[64];
 	char *envp[2];
+	unsigned long flags;
+	unsigned int head, tail, next;
+	ktime_t time;
+	s64 ts;
+	int cur_line = -1;
 
-	snprintf(buf, sizeof(buf), "VSYNC%d=%llu", disp,
-	    ktime_to_ns(g_fbi.vsync_timestamp[disp]));
-	envp[0] = buf;
-	envp[1] = NULL;
-	kobject_uevent_env(&g_fbi.dev->kobj, KOBJ_CHANGE, envp);
+	struct disp_device *dispdev = NULL;
+	struct disp_manager *mgr = g_disp_drv.mgr[disp];
+	int start_delay = -1;
+	u32 total_lines = 0;
+	u64 period = 0;
+
+	if (mgr)
+		dispdev = mgr->device;
+	if (dispdev) {
+		start_delay = dispdev->timings.start_delay;
+		total_lines = dispdev->timings.ver_total_time;
+		period = dispdev->timings.frame_period;
+	}
+
+	spin_lock_irqsave(&g_fbi.slock[disp], flags);
+	head = g_fbi.vsync_timestamp_head[disp];
+	tail = g_fbi.vsync_timestamp_tail[disp];
+	while (head != tail) {
+		time = g_fbi.vsync_timestamp[disp][head];
+		cur_line = g_fbi.vsync_cur_line[disp][head];
+		next = head + 1;
+		next = (next >= VSYNC_NUM) ? 0 : next;
+		g_fbi.vsync_timestamp_head[disp] =  next;
+		spin_unlock_irqrestore(&g_fbi.slock[disp], flags);
+
+		ts = ktime_to_ns(time);
+		if ((0 <= cur_line)
+			&& (0 < period)
+			&& (0 <= start_delay)
+			&& (0 < total_lines)
+			&& (cur_line != start_delay)) {
+			u64 tmp;
+			if (cur_line < start_delay) {
+				tmp = (start_delay - cur_line) * period;
+				do_div(tmp, total_lines);
+				ts += tmp;
+			} else {
+				tmp = (cur_line - start_delay) * period;
+				do_div(tmp, total_lines);
+				ts -= tmp;
+			}
+		}
+		snprintf(buf, sizeof(buf), "VSYNC%d=%llu", disp, ts);
+		envp[0] = buf;
+		envp[1] = NULL;
+		kobject_uevent_env(&g_fbi.dev->kobj, KOBJ_CHANGE, envp);
+
+		spin_lock_irqsave(&g_fbi.slock[disp], flags);
+		head = g_fbi.vsync_timestamp_head[disp];
+		tail = g_fbi.vsync_timestamp_tail[disp];
+	}
+
+	spin_unlock_irqrestore(&g_fbi.slock[disp], flags);
 
 	return 0;
 }
@@ -866,6 +984,57 @@ static int sunxi_fb_ioctl(struct fb_info *info, unsigned int cmd,unsigned long a
 	case FBIO_WAITFORVSYNC:
 	{
 		//ret = fb_wait_for_vsync(info);
+		break;
+	}
+
+	case FBIO_FREE:
+	{
+		int fb_id = 0; /* fb0 */
+		struct fb_info *fbinfo = g_fbi.fbinfo[fb_id];
+
+		if ((!g_fbi.fb_enable[fb_id])
+		    || (fbinfo != info)) {
+			__wrn("%s, fb%d already release ?"
+			    " or fb_info mismatch: fbinfo=0x%p, info=0x%p\n",
+			    __func__, fb_id, fbinfo, info);
+			return -1;
+		}
+
+		__inf("### FBIO_FREE ###\n");
+
+		fb_unmap_video_memory(fbinfo);
+
+		/* unbound fb0 from layer(1,0)  */
+		g_fbi.layer_hdl[fb_id][0] = 0;
+		g_fbi.layer_hdl[fb_id][1] = 0;
+		g_fbi.fb_mode[fb_id] = 0;
+		g_fbi.fb_enable[fb_id] = 0;
+		break;
+	}
+
+	case FBIO_ALLOC:
+	{
+		int fb_id = 0; /* fb0 */
+		struct fb_info *fbinfo = g_fbi.fbinfo[fb_id];
+
+		if (g_fbi.fb_enable[fb_id]
+		    || (fbinfo != info)) {
+			__wrn("%s, fb%d already enable ?"
+			    " or fb_info mismatch: fbinfo=0x%p, info=0x%p\n",
+			    __func__, fb_id, fbinfo, info);
+			return -1;
+		}
+
+		__inf("### FBIO_ALLOC ###\n");
+
+		/* fb0 bound to layer(1,0)  */
+		g_fbi.layer_hdl[fb_id][0] = 1;
+		g_fbi.layer_hdl[fb_id][1] = 0;
+
+		fb_map_video_memory(fbinfo);
+
+		g_fbi.fb_mode[fb_id] = g_fbi.fb_para[fb_id].fb_mode;
+		g_fbi.fb_enable[fb_id] = 1;
 		break;
 	}
 
@@ -1219,7 +1388,7 @@ static s32 display_fb_request(u32 fb_id, struct disp_fb_create_info *fb_para)
 	info->fix.smem_len      = info->fix.line_length * fb_para->height * fb_para->buffer_num;
 	if (0 != info->fix.line_length)
 		info->var.yres_virtual  = info->fix.smem_len / info->fix.line_length;
-	Fb_map_video_memory(info);
+	fb_map_video_memory(info);
 
 	for (sel = 0; sel < num_screens; sel++) {
 		if (sel == fb_para->fb_mode)	{
@@ -1280,8 +1449,10 @@ static s32 display_fb_request(u32 fb_id, struct disp_fb_create_info *fb_para)
 			config.info.fb.size[2].height = fb_para->height;
 			config.info.fb.color_space = DISP_BT601;
 
+#if !defined(CONFIG_EINK_PANEL_USED)
 			if (mgr && mgr->set_layer_config)
 				mgr->set_layer_config(mgr, &config, 1);
+#endif
 		}
 	}
 
@@ -1325,7 +1496,7 @@ static s32 display_fb_release(u32 fb_id)
 #if defined(CONFIG_FB_CONSOLE_SUNXI)
 		fb_dealloc_cmap(&info->cmap);
 #endif
-		Fb_unmap_video_memory(info);
+		fb_unmap_video_memory(info);
 
 		return 0;
 	}	else {
@@ -1409,6 +1580,7 @@ s32 fb_init(struct platform_device *pdev)
 	for (i=0; i<num_screens; i++) {
 		char task_name[25];
 
+		spin_lock_init(&g_fbi.slock[i]);
 		sprintf(task_name, "vsync proc %ld", i);
 		g_fbi.vsync_task[i] = kthread_create(vsync_thread, (void*)i, task_name);
 		if (IS_ERR(g_fbi.vsync_task[i])) {
@@ -1534,5 +1706,4 @@ s32 fb_exit(void)
 
 	return 0;
 }
-
 

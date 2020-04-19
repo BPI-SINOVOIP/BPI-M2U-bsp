@@ -8,5 +8,6 @@ obj-$(CONFIG_SENSORS_BMA250)    += bma250.o
 obj-$(CONFIG_SENSORS_SC7A30)   += sc7a30.o
 obj-$(CONFIG_SENSORS_MMA7660)   += mma7660.o
 obj-$(CONFIG_SENSORS_GPADC)   += sunxi_gpadc.o
+obj-$(CONFIG_SENSORS_TPADC)   += sunxi_tpadc.o
 obj-$(CONFIG_SENSORS_GPADC_TEST)   += sunxi_gpadc_test.o
 

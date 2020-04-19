@@ -666,6 +666,7 @@ static void sw_uart_shutdown(struct uart_port *port)
 	sw_uport->lcr = 0;
 	sw_uport->mcr = 0;
 	sw_uport->fcr = 0;
+	serial_out(port, sw_uport->ier, SUNXI_UART_IER);
 	free_irq(port->irq, port);
 }
 
@@ -979,6 +980,55 @@ static void sw_uart_pm(struct uart_port *port, unsigned int state,
 #endif
 }
 
+#ifdef CONFIG_CONSOLE_POLL
+/*
+ * Console polling routines for writing and reading from the uart while
+ * in an interrupt or debug context.
+ */
+
+static int sw_get_poll_char(struct uart_port *port)
+{
+	struct sw_uart_port *sw_uport = UART_TO_SPORT(port);
+	unsigned int lsr = serial_in(port, SUNXI_UART_LSR);
+
+	if (!(lsr & SUNXI_UART_LSR_DR)) {
+		return NO_POLL_CHAR;
+	}
+
+	return serial_in(port, SUNXI_UART_RBR);
+}
+
+
+static void sw_put_poll_char(struct uart_port *port,
+			unsigned char c)
+{
+	unsigned int ier;
+	struct sw_uart_port *sw_uport = UART_TO_SPORT(port);
+
+	/*
+	 * First save the IER then disable the interrupts.
+	 */
+	ier = serial_in(port, SUNXI_UART_IER);
+
+	serial_out(port, 0, SUNXI_UART_IER);
+	wait_for_xmitr(sw_uport);
+
+	serial_out(port, c, SUNXI_UART_THR);
+	if (c == 10) {
+		wait_for_xmitr(sw_uport);
+		serial_out(port, 13, SUNXI_UART_THR);
+	}
+	/*
+	 * Finally, wait for transmitter to become empty
+	 * and restore the IER
+	 */
+	wait_for_xmitr(sw_uport);
+	serial_out(port, ier, SUNXI_UART_IER);
+}
+
+#endif /* CONFIG_CONSOLE_POLL */
+
+
 static struct uart_ops sw_uart_ops = {
 	.tx_empty = sw_uart_tx_empty,
 	.set_mctrl = sw_uart_set_mctrl,
@@ -999,6 +1049,10 @@ static struct uart_ops sw_uart_ops = {
 	.verify_port = sw_uart_verify_port,
 	.ioctl = sw_uart_ioctl,
 	.pm = sw_uart_pm,
+#ifdef CONFIG_CONSOLE_POLL
+	.poll_get_char = sw_get_poll_char,
+	.poll_put_char = sw_put_poll_char,
+#endif
 };
 
 static int sw_uart_regulator_request(struct sw_uart_port* sw_uport, struct sw_uart_pdata *pdata)
@@ -1388,6 +1442,27 @@ static int sw_uart_probe(struct platform_device *pdev)
 		SERIAL_MSG("uart%d error to get clk\n", pdev->id);
 		return -EINVAL;
 	}
+	/* uart clk come from apb2, apb2 default clk is hosc. if change rate
+	 * needed, must switch apb2's source clk first and then set its rate
+	 * */
+	sw_uport->sclk = of_clk_get(np, 1);
+	if (!IS_ERR(sw_uport->sclk)) {
+		sw_uport->pclk = of_clk_get(np, 2);
+		port->uartclk = clk_get_rate(sw_uport->sclk);
+		/*config a fixed divider before switch source clk for apb2 */
+		clk_set_rate(sw_uport->sclk, port->uartclk/6);
+		/* switch source clock for apb2 */
+		clk_set_parent(sw_uport->sclk, sw_uport->pclk);
+		ret = of_property_read_u32(np, "clock-frequency",
+					&port->uartclk);
+		if (ret) {
+			SERIAL_MSG("uart%d get clock-freq failed\n", pdev->id);
+			return -EINVAL;
+		}
+		/* set apb2 clock frequency now */
+		clk_set_rate(sw_uport->sclk, port->uartclk);
+	}
+
 	port->uartclk = clk_get_rate(sw_uport->mclk);
 #else
 	port->uartclk = 24000000;
@@ -1428,7 +1503,7 @@ static int sw_uart_probe(struct platform_device *pdev)
 	port->type = PORT_SUNXI;
 	port->flags = UPF_BOOT_AUTOCONF;
 	port->ops = &sw_uart_ops;
-	port->fifosize = 64;
+	port->fifosize = SUNXI_UART_FIFO_SIZE;
 	platform_set_drvdata(pdev, port);
 
 	sunxi_uart_sysfs(pdev);
@@ -1522,6 +1597,7 @@ static const struct dev_pm_ops sw_uart_pm_ops = {
 static const struct of_device_id sunxi_uart_match[] = {
 	{ .compatible = "allwinner,sun8i-uart", },
 	{ .compatible = "allwinner,sun50i-uart", },
+	{ .compatible = "allwinner,sun3i-uart", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, sunxi_uart_match);

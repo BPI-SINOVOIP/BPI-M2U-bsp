@@ -57,6 +57,7 @@ int disp_al_capture_get_status(unsigned int disp);
 
 int disp_al_lcd_cfg(u32 screen_id, disp_panel_para *panel,
 		    panel_extend_para *extend_panel);
+int disp_al_lcd_cfg_ext(u32 screen_id, panel_extend_para *extend_panel);
 int disp_al_lcd_enable(u32 screen_id, disp_panel_para *panel);
 int disp_al_lcd_disable(u32 screen_id, disp_panel_para *panel);
 int disp_al_lcd_query_irq(u32 screen_id, enum __lcd_irq_id_t irq_id,

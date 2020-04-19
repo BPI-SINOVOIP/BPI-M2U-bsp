@@ -33,15 +33,15 @@
 //#define get_wvalue(addr)	(*((volatile unsigned long  *)(addr)))
 //#define put_wvalue(addr, v)	(*((volatile unsigned long  *)(addr)) = (unsigned long)(v))
 #define  NAND_DRV_VERSION_0		0x03
-#define  NAND_DRV_VERSION_1		0x5001
-#define  NAND_DRV_DATE			0x20160414
-#define  NAND_DRV_TIME			0x1716
+#define  NAND_DRV_VERSION_1		0x5015
+#define  NAND_DRV_DATE			0x20170911
+#define  NAND_DRV_TIME			0x1921
 
 
 extern int sunxi_get_securemode(void);
 __u32 get_wvalue(__u32 addr)
 {
-	return (smc_readl(addr));
+	return smc_readl(addr);
 }
 
 void put_wvalue(__u32 addr,__u32 v)
@@ -53,7 +53,7 @@ __u32 NAND_GetNdfcVersion(void);
 void * NAND_Malloc(unsigned int Size);
 void NAND_Free(void *pAddr, unsigned int Size);
 int NAND_Get_Version(void);
-static __u32 boot_mode;
+__u32 boot_mode;
 //static __u32 gpio_hdl;
 static int nand_nodeoffset;
 
@@ -103,6 +103,11 @@ int NAND_Print_DBG(const char * str, ...)
 __s32 NAND_CleanFlushDCacheRegion(void *buff_addr, __u32 len)
 {
 	flush_cache((ulong)buff_addr, len);
+	return 0;
+}
+
+__s32 NAND_InvaildDCacheRegion(__u32 rw, __u32 buff_addr, __u32 len)
+{
 	return 0;
 }
 
@@ -203,10 +208,10 @@ __u32 _Getpll6Clk(void)
 
 __s32 _get_ndfc_clk_v1(__u32 nand_index, __u32 *pdclk)
 {
-	__u32 sclk0_reg_adr;
+	__u32 sclk0_reg_adr = 0;
 	__u32 sclk_src, sclk_src_sel;
 	__u32 sclk_pre_ratio_n, sclk_ratio_m;
-	__u32 reg_val, sclk0;
+	__u32 reg_val = 0, sclk0;
 
 	if (nand_index > 1) {
 		printf("wrong nand id: %d\n", nand_index);

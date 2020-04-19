@@ -318,6 +318,11 @@ TftpSend(void)
 	int len = 0;
 	ushort *s;
 
+	/* FIXME: to fix tftp timeout. */
+#if defined(CONFIG_SUN8IW12P1)
+	udelay(5);
+#endif
+
 #ifdef CONFIG_MCAST_TFTP
 	/* Multicast TFTP.. non-MasterClients do not ACK data. */
 	if (Multicast

@@ -35,7 +35,7 @@ int print_boot_type(void)
 
 	puts("BOOT:  ");
 
-	type = uboot_spare_head.boot_data.storage_type;
+	type = get_boot_storage_type();
 	switch (type) {
 	case SUNXI_BOOT_TYPE_MMC0:
 		puts("MMC0\n");

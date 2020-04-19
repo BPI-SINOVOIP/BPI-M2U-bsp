@@ -25,6 +25,7 @@
 #include <asm/arch/gic.h>
 #include <asm/io.h>
 #include <private_uboot.h>
+#include <cputask.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -39,6 +40,9 @@ int interrupt_init (void)
 	IRQ_STACK_START = gd->irq_sp - 4;
 	IRQ_STACK_START_IN = gd->irq_sp + 8;
 	FIQ_STACK_START = IRQ_STACK_START - CONFIG_STACKSIZE_IRQ;
+
+	debug("IRQ_STACK_START=0x%x\n", (uint32_t)IRQ_STACK_START);
+	cpu0_set_irq_stack(IRQ_STACK_START);
 
 	return arch_interrupt_init();
 }

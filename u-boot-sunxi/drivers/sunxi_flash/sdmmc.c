@@ -4,10 +4,18 @@
 #include <boot_type.h>
 #include <sunxi_board.h>
 #include <mmc.h>
+#include <malloc.h>
+
 #include "flash_interface.h"
 
+static int mmc_secure_storage_read_key(int item, unsigned char *buf, unsigned int len);
+static int mmc_secure_storage_read_map(int item, unsigned char *buf, unsigned int len);
+
 static struct mmc *mmc_boot,*mmc_sprite;
-int mmc_no;
+static int mmc_no;
+static unsigned char _inner_buffer[4096+64]; /*align temp buffer*/
+
+
 //-------------------------------------noraml interface--------------------------------------------
 static int
 sunxi_flash_mmc_read(unsigned int start_block, unsigned int nblock, void *buffer)
@@ -171,6 +179,45 @@ int sunxi_sprite_mmc_secread_backup(int item ,unsigned char *buf,unsigned int nb
     else
         return -1;
 }
+
+int mmc_secure_storage_read(int item, unsigned char *buf, unsigned int len)
+{
+	if (item == 0)
+		return mmc_secure_storage_read_map(item, buf, len);
+	else
+		return mmc_secure_storage_read_key(item, buf, len);
+}
+
+int mmc_secure_storage_write(int item, unsigned char *buf, unsigned int len)
+{
+	unsigned char * align ;
+	unsigned int blkcnt;
+	int workmode;
+
+	if(((unsigned int)buf%32)){ // input buf not align
+		align = (unsigned char *)(((unsigned int)_inner_buffer + 0x20)&(~0x1f)) ;
+		memcpy(align, buf, len);
+	}else
+		align=buf;
+
+	blkcnt = (len+511)/512 ;
+	workmode = uboot_spare_head.boot_data.work_mode;
+	if(workmode == WORK_MODE_BOOT || workmode == WORK_MODE_SPRITE_RECOVERY)
+	{
+		return (sunxi_flash_mmc_secwrite(item, align, blkcnt) == blkcnt) ? 0 : -1;
+	}
+	else if((workmode & WORK_MODE_PRODUCT) || (workmode == 0x30))
+	{
+		return sunxi_sprite_mmc_secwrite(item, align, blkcnt);
+	}
+	else
+	{
+		printf("workmode=%d is err\n", workmode);
+		return -1;
+	}
+
+}
+
 //-----------------------------------end ------------------------------------------------------
 
 int sdmmc_init_for_boot(int workmode, int card_no)
@@ -208,22 +255,27 @@ int sdmmc_init_for_boot(int workmode, int card_no)
 	sunxi_sprite_read_pt  = sunxi_flash_read_pt;
 	sunxi_sprite_write_pt = sunxi_flash_write_pt;
 
+	/* for secure stoarge */
+	sunxi_secstorage_read_pt  = mmc_secure_storage_read;
+	sunxi_secstorage_write_pt = mmc_secure_storage_write;
+
 	return 0;
 	
 }
 
 int sdmmc_init_for_sprite(int workmode)
 {
-	printf("try nand fail\n");
-	printf("try card 2 \n");
-        board_mmc_pre_init(2);
+	printf("try card 2\n");
+	board_mmc_pre_init(2);
 	mmc_sprite = find_mmc_device(2);
+	mmc_no = 2;
 	if(!mmc_sprite){
 		printf("fail to find one useful mmc card2\n");
 #ifdef CONFIG_MMC3_SUPPORT
                 printf("try to find card3 \n");
                 board_mmc_pre_init(3);
                 mmc_sprite = find_mmc_device(3);
+		mmc_no = 3;
                 if(!mmc_sprite)
                 {
                         printf("try card3 fail \n");
@@ -231,7 +283,7 @@ int sdmmc_init_for_sprite(int workmode)
                 }
                 else
                 {
-                        uboot_spare_head.boot_data.storage_type = STORAGE_EMMC3;
+						set_boot_storage_type(STORAGE_EMMC3);
                 }
 #else
                 return -1;
@@ -239,7 +291,7 @@ int sdmmc_init_for_sprite(int workmode)
 	}
         else
         {
-	        uboot_spare_head.boot_data.storage_type = STORAGE_EMMC;
+	       set_boot_storage_type(STORAGE_EMMC);
         }
 	if (mmc_init(mmc_sprite)) {
 		printf("MMC init failed\n");
@@ -254,6 +306,10 @@ int sdmmc_init_for_sprite(int workmode)
 	sunxi_sprite_phyread_pt  = sunxi_sprite_mmc_phyread;
 	sunxi_sprite_phywrite_pt = sunxi_sprite_mmc_phywrite;
 	sunxi_sprite_force_erase_pt = sunxi_sprite_mmc_force_erase;
+
+	/* for secure stoarge */
+	sunxi_secstorage_read_pt  = mmc_secure_storage_read;
+	sunxi_secstorage_write_pt = mmc_secure_storage_write;
 	debug("sunxi sprite has installed sdcard2 function\n");
 	
 	return 0;
@@ -328,4 +384,219 @@ int card_read_boot0( void *buffer, uint length )
 	}
 	return 0;
 }
+
+
+static int check_secure_storage_key(unsigned char *buffer)
+{
+	store_object_t *obj = (store_object_t *)buffer;
+
+	if( obj->magic != STORE_OBJECT_MAGIC ){
+		printf("Input object magic fail [0x%x]\n", obj->magic);
+		return -1 ;
+	}
+
+	if( obj->crc != crc32( 0 , (void *)obj, sizeof(*obj)-4 ) ){
+		printf("Input object crc fail [0x%x]\n", obj->crc);
+		return -1 ;
+	}
+	return 0;
+}
+
+static int check_secure_storage_map(unsigned char *buffer)
+{
+	struct map_info *map_buf = (struct map_info *)buffer;
+
+	if (map_buf->magic != STORE_OBJECT_MAGIC)
+	{
+		printf("Item0 (Map) magic is bad\n");
+		return 2;
+	}
+	if (map_buf->crc != crc32( 0 , (void *)map_buf, sizeof(struct map_info)-4 ))
+	{
+		printf("Item0 (Map) crc is fail [0x%x]\n", map_buf->crc);
+		return -1;
+	}
+	return 0;
+}
+
+static int mmc_secure_storage_read_key(int item, unsigned char *buf, unsigned int len)
+{
+	unsigned char *align ;
+	unsigned int blkcnt;
+	int ret ,workmode;
+
+	if(((unsigned int)buf%32)){
+		align = (unsigned char *)(((unsigned int)_inner_buffer + 0x20)&(~0x1f)) ;
+		memset(align,0,4096);
+	}else {
+		align = buf ;
+	}
+
+	blkcnt = (len+511)/512 ;
+
+	workmode = uboot_spare_head.boot_data.work_mode;
+	if(workmode == WORK_MODE_BOOT || workmode == WORK_MODE_SPRITE_RECOVERY)
+	{
+		ret = (sunxi_flash_mmc_secread(item, align, blkcnt) == blkcnt) ? 0 : -1;
+	}
+	else if ((workmode & WORK_MODE_PRODUCT) || (workmode == 0x30))
+	{
+		ret = sunxi_sprite_mmc_secread(item, align, blkcnt);
+	}
+	else
+	{
+		printf("workmode=%d is err\n", workmode);
+		return -1;
+	}
+	if (!ret)
+	{
+		/*check copy 0 */
+		if (!check_secure_storage_key(align)){
+			printf("the secure storage item%d copy0 is good\n",item);
+			goto ok ; /*copy 0 pass*/
+		}
+		printf("the secure storage item%d copy0 is bad\n", item);
+	}
+
+	// read backup
+	memset(align, 0x0, len);
+	printf("read item%d copy1\n", item);
+	if(workmode == WORK_MODE_BOOT || workmode == WORK_MODE_SPRITE_RECOVERY)
+	{
+		ret = (sunxi_flash_mmc_secread_backup(item, align, blkcnt) == blkcnt) ? 0 : -1;
+	}
+	else if ((workmode & WORK_MODE_PRODUCT) || (workmode == 0x30))
+	{
+		ret = sunxi_sprite_mmc_secread_backup(item, align, blkcnt);
+	}
+	else
+	{
+		printf("workmode=%d is err\n", workmode);
+		return -1;
+	}
+	if (!ret)
+	{
+		/*check copy 1 */
+		if (!check_secure_storage_key(align)){
+			printf("the secure storage item%d copy1 is good\n",item);
+			goto ok ; /*copy 1 pass*/
+		}
+		printf("the secure storage item%d copy1 is bad\n", item);
+	}
+
+	printf("sunxi_secstorage_read fail\n");
+	return -1;
+
+ok:
+	if(((unsigned int)buf%32))
+		memcpy(buf,align,len);
+	return 0 ;
+}
+
+static int mmc_secure_storage_read_map(int item, unsigned char *buf, unsigned int len)
+{
+	int have_map_copy0 ;
+	unsigned char *align ;
+	unsigned int blkcnt;
+	int ret ,workmode;
+	char * map_copy0_buf;
+
+	if(((unsigned int)buf%32)){
+		align = (unsigned char *)(((unsigned int)_inner_buffer + 0x20)&(~0x1f)) ;
+		memset(align,0,4096);
+	}else {
+		align = buf ;
+	}
+
+	blkcnt = (len+511)/512 ;
+
+	map_copy0_buf=(char *)malloc(blkcnt*512);
+	if(!map_copy0_buf){
+		printf("out of memory\n");
+		return -1 ;
+	}
+
+	printf("read item%d copy0\n", item);
+	workmode = uboot_spare_head.boot_data.work_mode;
+	if(workmode == WORK_MODE_BOOT || workmode == WORK_MODE_SPRITE_RECOVERY)
+	{
+		ret = (sunxi_flash_mmc_secread(item, align, blkcnt) == blkcnt) ? 0 : -1;
+	}
+	else if ((workmode & WORK_MODE_PRODUCT) || (workmode == 0x30))
+	{
+		ret = sunxi_sprite_mmc_secread(item, align, blkcnt);
+	}
+	else
+	{
+		printf("workmode=%d is err\n", workmode);
+		return -1;
+	}
+	if (!ret)
+	{
+		/*read ok*/
+		ret = check_secure_storage_map(align);
+		if (ret == 0)
+		{
+			printf("the secure storage item0 copy0 is good\n");
+			goto ok ; /*copy 0 pass*/
+		}else if (ret == 2){
+			memcpy(map_copy0_buf, align, len);
+			have_map_copy0 = 1;
+			printf("the secure storage item0 copy0 is bad\n");
+		}else
+			printf("the secure storage item0 copy 0 crc fail, the data is bad\n");
+	}
+
+	// read backup
+	memset(align, 0x0, len);
+	printf("read item%d copy1\n", item);
+	if(workmode == WORK_MODE_BOOT || workmode == WORK_MODE_SPRITE_RECOVERY)
+	{
+		ret = (sunxi_flash_mmc_secread(item, align, blkcnt) == blkcnt) ? 0 : -1;
+	}
+	else if ((workmode & WORK_MODE_PRODUCT) || (workmode == 0x30))
+	{
+		ret = sunxi_sprite_mmc_secread(item, align, blkcnt);
+	}
+	else
+	{
+		printf("workmode=%d is err\n", workmode);
+		return -1;
+	}
+	if (!ret)
+	{
+		ret = check_secure_storage_map(align);
+		if (ret == 0){
+			printf("the secure storage item0 copy1 is good\n");
+			goto ok ;
+		}else if (ret == 2){
+			if (have_map_copy0 && !memcmp(map_copy0_buf, align, len))
+			{
+				printf("the secure storage item0 copy0 == copy1, the data is good\n");
+				goto ok ; /*copy have no magic and crc*/
+			}
+			else
+			{
+				printf("the secure storage item0 copy0 != copy1, the data is bad\n");
+				free(map_copy0_buf);
+				return -1;
+			}
+		}else{
+			printf("the secure storage item0 copy 1 crc fail, the data is bad\n");
+			free(map_copy0_buf);
+			return -1;
+		}
+	}
+	printf("unknown error happen in item 0 read\n");
+	free(map_copy0_buf);
+	return -1 ;
+
+ok:
+	if(((unsigned int)buf%32))
+		memcpy(buf,align,len);
+	free(map_copy0_buf);
+	return 0 ;
+}
+
+
 

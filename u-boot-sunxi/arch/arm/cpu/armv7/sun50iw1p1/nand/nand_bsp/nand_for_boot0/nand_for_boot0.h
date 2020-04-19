@@ -12,30 +12,29 @@
 #define BADBLOCK -2
 
 
-typedef struct 
-{
+typedef struct {
 	__u8 id[8];
 	__u8 chip_cnt;
 	__u8 chip_connect;
 	__u8 rb_cnt;
 	__u8 rb_connect;
 	__u32 good_block_ratio;
-}_nand_connect_info_t;
+} _nand_connect_info_t;
 
-struct boot_physical_param{
-	__u8   chip; //chip no
-	__u16  block; // block no within chip
-	__u16  page; // page no within block
-	__u16  sectorbitmap; //done't care
-	void   *mainbuf; //data buf
-	void   *oobbuf; //oob buf
+struct boot_physical_param {
+	__u8   chip; /* chip no */
+	__u16  block; /* block no within chip */
+	__u16  page; /* page no within block */
+	__u16  sectorbitmap; /* done't care */
+	void   *mainbuf; /* data buf */
+	void   *oobbuf; /* oob buf */
 };
 
-struct boot_flash_info{
+struct boot_flash_info {
 	__u32 chip_cnt;
 	__u32 blk_cnt_per_chip;
-	__u32 blocksize; //unit by sector 
-	__u32 pagesize; //unit by sector
+	__u32 blocksize; /* unit by sector */
+	__u32 pagesize; /* unit by sector */
 	__u32 pagewithbadflag; /*bad block flag was written at the first byte of spare area of this page*/
 };
 
@@ -45,7 +44,7 @@ struct boot_flash_info{
 *
 *Description: read one page data from nand based on single plane;
 *
-*Arguments  : *readop - the structure with physical address in nand and data buffer 
+*Arguments  : *readop - the structure with physical address in nand and data buffer
 *
 *Return     :   = SUCESS  read ok;
 *               = FAIL    read fail.

@@ -311,7 +311,7 @@ int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	} else {
 		filename = getenv("bootfile");
 		if (!filename) {
-			puts("** No boot file defined **\n");
+			printf("** No boot file defined **\n");
 			return 1;
 		}
 	}
@@ -332,11 +332,11 @@ int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 
 	printf("%d bytes read in %lu ms", len_read, time);
 	if (time > 0) {
-		puts(" (");
+		printf(" (");
 		print_size(len_read / time * 1000, "/s");
-		puts(")");
+		printf(")");
 	}
-	puts("\n");
+	printf("\n");
 
 	setenv_hex("filesize", len_read);
 
@@ -350,7 +350,7 @@ int do_ls(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		return CMD_RET_USAGE;
 	if (argc > 4)
 		return CMD_RET_USAGE;
-	
+
 	char c = argv[2][0];
 	char partition[10];
 	if( c < '0' || c > '9'){
@@ -413,11 +413,11 @@ int do_save(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 
 	printf("%d bytes written in %lu ms", len, time);
 	if (time > 0) {
-		puts(" (");
+		printf(" (");
 		print_size(len / time * 1000, "/s");
-		puts(")");
+		printf(")");
 	}
-	puts("\n");
+	printf("\n");
 
 	return 0;
 }

@@ -125,6 +125,7 @@ struct sd_ssr {
 	unsigned int		au;			/* In sectors */
 	unsigned int		erase_timeout;		/* In milliseconds */
 	unsigned int		erase_offset;		/* In milliseconds */
+	unsigned int		speed_class;
 };
 
 struct sd_switch_caps {

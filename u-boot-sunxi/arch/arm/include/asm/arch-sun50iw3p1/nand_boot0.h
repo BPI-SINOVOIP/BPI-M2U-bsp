@@ -38,7 +38,7 @@
 #define  __basic_nf_func_h
 
 #define BOOT0_START_BLK_NUM             0
-#define BLKS_FOR_BOOT0                  2
+#define BLKS_FOR_BOOT0                  4
 #define BOOT1_START_BLK_NUM             BLKS_FOR_BOOT0
 
 #define BLKS_FOR_BOOT1_IN_16K_BLK_NF    32

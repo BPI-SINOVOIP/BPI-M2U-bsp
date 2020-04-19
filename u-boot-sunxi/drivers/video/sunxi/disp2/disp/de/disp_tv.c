@@ -126,6 +126,52 @@ static s32 tv_clk_disable(struct disp_device*  ptv)
 	return 0;
 }
 
+static s32 tv_calc_judge_line(struct disp_device *ptv)
+{
+	struct disp_device_private_data *ptvp = disp_tv_get_priv(ptv);
+	int start_delay, usec_start_delay;
+	int usec_judge_point;
+	int pixel_clk;
+
+	if (!ptv || !ptvp) {
+		DE_WRN("tv init null hdl!\n");
+		return DIS_FAIL;
+	}
+
+	pixel_clk = ptvp->video_info->pixel_clk;
+#if defined(TV_UGLY_CLK_RATE)
+	pixel_clk = (pixel_clk == TV_UGLY_CLK_RATE) ?
+	    TV_COMPOSITE_CLK_RATE : pixel_clk;
+#endif
+	/*
+	 * usec_per_line = 1 / fps / vt * 1000000
+	 *               = 1 / (pixel_clk / vt / ht) / vt * 1000000
+	 *               = ht / pixel_clk * 1000000
+	 */
+	ptvp->frame_per_sec = pixel_clk
+	    / ptvp->video_info->hor_total_time
+	    / ptvp->video_info->ver_total_time
+	    * (ptvp->video_info->b_interlace + 1)
+	    / (ptvp->video_info->trd_mode + 1);
+	ptvp->usec_per_line = ptvp->video_info->hor_total_time
+	    * 1000000 / pixel_clk;
+
+	start_delay =
+	    disp_al_device_get_start_delay(ptv->hwdev_index);
+	usec_start_delay = start_delay * ptvp->usec_per_line;
+
+	if (usec_start_delay <= 200)
+		usec_judge_point = usec_start_delay * 3 / 7;
+	else if (usec_start_delay <= 400)
+		usec_judge_point = usec_start_delay / 2;
+	else
+		usec_judge_point = 200;
+	ptvp->judge_line = usec_judge_point
+	    / ptvp->usec_per_line;
+
+	return 0;
+}
+
 s32 disp_tv_enable( struct disp_device* ptv)
 {
 	int ret;
@@ -164,6 +210,8 @@ s32 disp_tv_enable( struct disp_device* ptv)
 		return DIS_FAIL;
 	}
 	memcpy(&ptv->timings, ptvp->video_info, sizeof(struct disp_video_timings));
+	tv_calc_judge_line(ptv);
+
 	if (mgr->enable)
 		mgr->enable(mgr);
 #if defined(CONFIG_ARCH_SUN8IW6)
@@ -205,7 +253,7 @@ s32 disp_tv_sw_enable( struct disp_device* ptv)
 
 	if (!ptv || !ptvp) {
 		DE_WRN("tv init null hdl!\n");
-		printf("[DISP_TV] ptv | ptvp is wrong\n");
+		DE_WRN("[DISP_TV] ptv | ptvp is wrong\n");
 		return DIS_FAIL;
 	}
 
@@ -235,6 +283,8 @@ s32 disp_tv_sw_enable( struct disp_device* ptv)
 		return DIS_FAIL;
 	}
 	memcpy(&ptv->timings, ptvp->video_info, sizeof(struct disp_video_timings));
+	tv_calc_judge_line(ptv);
+
 	if (mgr->sw_enable)
 		mgr->sw_enable(mgr);
 	if (NULL == ptvp->tv_func.tv_enable) {
@@ -381,7 +431,7 @@ s32 disp_tv_resume(struct disp_device* ptv)
 	return 0;
 }
 
-s32 disp_tv_set_mode(struct disp_device* ptv, enum disp_output_type tv_mode)
+s32 disp_tv_set_mode(struct disp_device *ptv, enum disp_tv_mode tv_mode)
 {
 	s32 ret = 0;
 	struct disp_device_private_data *ptvp = disp_tv_get_priv(ptv);
@@ -407,7 +457,7 @@ s32 disp_tv_set_mode(struct disp_device* ptv, enum disp_output_type tv_mode)
 s32 disp_tv_get_mode(struct disp_device* ptv)
 {
 
-	enum disp_output_type  tv_mode;
+	enum disp_tv_mode  tv_mode;
 	struct disp_device_private_data *ptvp = disp_tv_get_priv(ptv);
 
 	if ((NULL == ptv) || (NULL == ptvp)) {
@@ -416,7 +466,7 @@ s32 disp_tv_get_mode(struct disp_device* ptv)
 	}
 
 	if (ptvp->tv_func.tv_get_mode == NULL) {
-		DE_WRN("hdmi_set_mode is null!\n");
+		DE_WRN("tv_set_mode is null!\n");
 		return -1;
 	}
 
@@ -484,9 +534,21 @@ s32 disp_tv_check_support_mode(struct disp_device*  ptv, enum disp_output_type t
 		DE_WRN("tv set func null  hdl!\n");
 		return DIS_FAIL;
 	}
-	if (ptvp->tv_func.tv_get_input_csc == NULL)
-		return DIS_FAIL;
+	if (ptvp->tv_func.tv_mode_support == NULL)
+		return 0;
 	return ptvp->tv_func.tv_mode_support(ptv->disp, tv_mode);
+}
+
+static s32 disp_tv_get_fps(struct disp_device *ptv)
+{
+	struct disp_device_private_data *ptvp = disp_tv_get_priv(ptv);
+
+	if ((NULL == ptv) || (NULL == ptvp)) {
+		DE_WRN("tv set func null  hdl!\n");
+		return 0;
+	}
+
+	return ptvp->frame_per_sec;
 }
 
 s32 disp_init_tv_para(disp_bsp_init_para * para)
@@ -519,18 +581,64 @@ s32	disp_set_enhance_mode(struct disp_device *ptv, u32 mode)
 	struct disp_device_private_data *ptvp = disp_tv_get_priv(ptv);
 
 	if ((NULL == ptv) || (NULL == ptvp)) {
-		printf("tv private is null!\n");
+		DE_WRN("tv private is null!\n");
 		return DIS_FAIL;
 	}
 
 	if (ptvp->tv_func.tv_hot_plugging_detect== NULL) {
-		printf("tv set_enhance_mode is null!\n");
+		DE_WRN("tv tv_hot_plugging_detect is null!\n");
 		return DIS_FAIL;
 	}
 
 	return ptvp->tv_func.tv_set_enhance_mode(ptv->disp, mode);
 }
 
+static bool disp_tv_check_config_dirty(struct disp_device *ptv,
+					struct disp_device_config *config)
+{
+	bool ret = false;
+	struct disp_device_private_data *ptvp = disp_tv_get_priv(ptv);
+
+	if ((ptv == NULL) || (ptvp == NULL)) {
+		DE_WRN("NULL hdl!\n");
+		ret = false;
+		goto exit;
+	}
+
+	if ((ptvp->enabled == 0) ||
+	    (config->mode != ptvp->tv_mode))
+		ret = true;
+
+exit:
+	return ret;
+}
+
+static s32 disp_tv_set_static_config(struct disp_device *ptv,
+			       struct disp_device_config *config)
+{
+	return disp_tv_set_mode(ptv, config->mode);
+}
+
+static s32 disp_tv_get_static_config(struct disp_device *ptv,
+			      struct disp_device_config *config)
+{
+	int ret = 0;
+	struct disp_device_private_data *ptvp = disp_tv_get_priv(ptv);
+
+	if ((ptv == NULL) || (ptvp == NULL)) {
+		DE_WRN("NULL hdl!\n");
+		ret = -1;
+		goto exit;
+	}
+
+	config->type = ptv->type;
+	config->mode = ptvp->tv_mode;
+	if (ptvp->tv_func.tv_get_input_csc)
+		config->format = ptvp->tv_func.tv_get_input_csc(ptv->disp);
+
+exit:
+	return ret;
+}
 
 s32 disp_init_tv(void)//disp_bsp_init_para * para)  //call by disp_display
 {
@@ -542,7 +650,7 @@ s32 disp_init_tv(void)//disp_bsp_init_para * para)  //call by disp_display
 	u32 num_devices_support_tv = 0;
 	int value = 0;
 	char type_name[32] = {0};
-	char str[10] = {0};
+//	char str[10] = {0};
 	int ret = 0;
 #if defined(__LINUX_PLAT__)
 		spin_lock_init(&g_tv_data_lock);
@@ -577,7 +685,7 @@ s32 disp_init_tv(void)//disp_bsp_init_para * para)  //call by disp_display
 
 		snprintf(type_name, sizeof(type_name), "tv%d", disp);
 
-		ret = disp_sys_script_get_item(type_name, "status", (int *)str, 2);
+/*		ret = disp_sys_script_get_item(type_name, "status", (int *)str, 2);
 		if (ret != 2) {
 			DE_WRN("TV get status err.\n");
 		} else {
@@ -586,6 +694,17 @@ s32 disp_init_tv(void)//disp_bsp_init_para * para)  //call by disp_display
 				continue;
 			}
 		}
+*/
+		ret = disp_sys_script_get_item(type_name, "used", &value, 1);
+		if (ret != 1) {
+			DE_WRN("TV get status err.\n");
+			} else {
+			if (value != 1) {
+				disp++;
+				continue;
+			}
+		}
+
 
 		ret = disp_sys_script_get_item(type_name, "interface", &value, 1);
 		if (ret != 1) {
@@ -623,12 +742,16 @@ s32 disp_init_tv(void)//disp_bsp_init_para * para)  //call by disp_display
 		p_tv->is_enabled = disp_tv_is_enabled;
 		p_tv->set_mode = disp_tv_set_mode;
 		p_tv->get_mode = disp_tv_get_mode;
+		p_tv->set_static_config = disp_tv_set_static_config;
+		p_tv->get_static_config = disp_tv_get_static_config;
+		p_tv->check_config_dirty = disp_tv_check_config_dirty;
 		p_tv->check_support_mode = disp_tv_check_support_mode;
 		p_tv->get_input_csc = disp_tv_get_input_csc;
 		p_tv->detect = disp_tv_detect;
 		p_tv->suspend = disp_tv_suspend;
 		p_tv->resume = disp_tv_resume;
 		p_tv->set_enhance_mode = disp_set_enhance_mode;
+		p_tv->get_fps = disp_tv_get_fps;
 		p_tv->init(p_tv);
 
 		disp_device_register(p_tv);

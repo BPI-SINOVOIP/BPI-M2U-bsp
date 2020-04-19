@@ -61,6 +61,8 @@ int smc_tee_rssk_encrypt(char *out_buf, char *in_buf, int len, int *out_len);
 int smc_aes_rssk_decrypt_to_keysram(void);
 int smc_aes_algorithm(char *out_buf, char *in_buf, int data_len, char* pkey, int key_mode, int decrypt);
 int smc_tee_keybox_store(const char *name, char *in_buf, int len);
+int smc_tee_probe_drm_configure(ulong *drm_base, ulong *drm_size);
+
 
 int arm_svc_set_cpu_on(int cpu, uint entry);
 int arm_svc_set_cpu_off(int cpu);

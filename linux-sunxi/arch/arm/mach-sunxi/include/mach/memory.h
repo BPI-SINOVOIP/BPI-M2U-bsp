@@ -34,7 +34,11 @@
  *
  */
 #if !defined(PLAT_PHYS_OFFSET)
-#define PLAT_PHYS_OFFSET         UL(0x40000000)
+#ifdef CONFIG_ARCH_SUN3I
+#define PLAT_PHYS_OFFSET    UL(0x80000000)
+#else
+#define PLAT_PHYS_OFFSET    UL(0x40000000)
+#endif
 #endif
 
 #if !defined(PLAT_MEM_SIZE)
@@ -49,7 +53,9 @@
  *   We need to restrict CMA area in the front 256M, because VE only support these address.
  */
 
-
+#if defined CONFIG_ARCH_SUN8IW5P1
+#include "sun8i/memory-sun8iw5p1.h"
+#endif
 
 #define __sram	__section(.sram.text)
 #define __sramdata __section(.sram.data)

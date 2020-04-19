@@ -11,6 +11,12 @@ enum {
 	FB_ID_INVALID,
 };
 
+enum {
+	FB_PIXEL_ALPHA_MODE = 0,
+	FB_GLOBAL_ALPHA_MODE,
+	FB_GLOBAL_PIXEL_ALPHA_MODE,
+};
+
 typedef struct color {
 	unsigned char blue;
 	unsigned char green;
@@ -74,6 +80,8 @@ extern int fb_init(void);
 extern int fb_quit(void);
 extern struct canvas *fb_lock(const unsigned int fb_id);
 extern int fb_unlock(unsigned int fb_id, rect_t *dirty_rects, int count);
+extern int fb_set_alpha_mode(unsigned int fb_id,
+	unsigned char alpha_mode, unsigned char alpha_value);
 
 extern int save_disp_cmd(void);
 

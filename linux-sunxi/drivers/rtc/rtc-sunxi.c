@@ -36,8 +36,11 @@
 #include <linux/pm_runtime.h>
 #include <linux/rtc.h>
 #include <linux/types.h>
+#include <linux/reboot.h>
 
 #include "rtc-sunxi.h"
+
+static void __iomem *global_pgregbase;
 
 static struct sunxi_rtc_data_year data_year_param[] = {
 	[0] = {
@@ -427,8 +430,20 @@ static int sunxi_rtc_settime(struct device *dev, struct rtc_time *rtc_tm)
 		SUNXI_TIME_SET_HOUR_VALUE(rtc_tm->tm_hour);
 
 	writel(0, chip->base + SUNXI_RTC_HMS);
-	writel(0, chip->base + SUNXI_RTC_YMD);
 
+	/*
+	 * After writing the RTC HH-MM-SS register, the
+	 * SUNXI_LOSC_CTRL_RTC_HMS_ACC bit is set and it will not
+	 * be cleared until the real writing operation is finished
+	 */
+
+	if (sunxi_rtc_wait(chip, SUNXI_LOSC_CTRL,
+				SUNXI_LOSC_CTRL_RTC_HMS_ACC, 50)) {
+		dev_err(dev, "Failed to set rtc time.\n");
+		return -1;
+	}
+
+	udelay(100);
 	writel(time, chip->base + SUNXI_RTC_HMS);
 
 	/*
@@ -481,8 +496,10 @@ static const struct rtc_class_ops sunxi_rtc_ops = {
 static const struct of_device_id sunxi_rtc_dt_ids[] = {
 	{ .compatible = "allwinner,sun4i-a10-rtc", .data = &data_year_param[0] },
 	{ .compatible = "allwinner,sun7i-a20-rtc", .data = &data_year_param[1] },
+	{ .compatible = "allwinner,sun8iw5-rtc", .data = &data_year_param[0] },
 	{ .compatible = "allwinner,sun8iw10-rtc", .data = &data_year_param[2] },
 	{ .compatible = "allwinner,sun8iw11p1-rtc", .data = &data_year_param[3] },
+	{ .compatible = "allwinner,sun8iw17-rtc", .data = &data_year_param[3] },
 	{ .compatible = "allwinner,sun50i-rtc", .data = &data_year_param[0] },
 	{ .compatible = "allwinner,sun50iw3-rtc", .data = &data_year_param[3] },
 	{ .compatible = "allwinner,sun50iw6-rtc", .data = &data_year_param[3] },
@@ -512,13 +529,63 @@ static ssize_t sunxi_rtc_max_year_show(struct device *dev,
 static struct device_attribute sunxi_rtc_max_year_attr =
 	__ATTR(max_year, S_IRUGO, sunxi_rtc_max_year_show, NULL);
 
+#ifdef CONFIG_SUNXI_BOOTUP_EXTEND
+static int sunxi_reboot_callback(struct notifier_block *this,
+		unsigned long code, void *data)
+{
+	unsigned int rtc_flag = 0;
+
+	if (data == NULL)
+		return NOTIFY_DONE;
+
+	pr_info("sunxi rtc reboot, arg %s\n", (char *)data);
+
+	if (!strncmp(data, "debug", sizeof("debug"))) {
+		rtc_flag = SUNXI_DEBUG_MODE_FLAG;
+	} else if (!strncmp(data, "efex", sizeof("efex"))) {
+		rtc_flag = SUNXI_EFEX_CMD_FLAG;
+	} else if (!strncmp(data, "boot-resignature",
+						sizeof("boot-resignature"))) {
+		rtc_flag = SUNXI_BOOT_RESIGNATURE_FLAG;
+	} else if (!strncmp(data, "recovery", sizeof("recovery"))
+		|| !strncmp(data, "boot-recovery", sizeof("boot-recovery"))) {
+		rtc_flag = SUNXI_BOOT_RECOVERY_FLAG;
+	} else if (!strncmp(data, "sysrecovery", sizeof("sysrecovery"))) {
+		rtc_flag = SUNXI_SYS_RECOVERY_FLAG;
+	} else if (!strncmp(data, "bootloader", sizeof("bootloader"))) {
+		rtc_flag = SUNXI_FASTBOOT_FLAG;
+	} else if (!strncmp(data, "usb-recovery", sizeof("usb-recovery"))) {
+		rtc_flag = SUNXI_USB_RECOVERY_FLAG;
+	} else {
+		pr_warn("unkown reboot arg %s", (char *)data);
+		return NOTIFY_DONE;
+	}
+
+	/*write the data to reg*/
+	writel(rtc_flag, global_pgregbase);
+	return NOTIFY_DONE;
+}
+
+
+static struct notifier_block sunxi_reboot_notifier = {
+	.notifier_call = sunxi_reboot_callback,
+};
+#endif
+
 static int sunxi_rtc_probe(struct platform_device *pdev)
 {
 	struct sunxi_rtc_dev *chip;
 	struct resource *res;
 	const struct of_device_id *of_id;
 	int ret;
+#ifdef CONFIG_SUNXI_BOOTUP_EXTEND
+	u32 gpr_offset = 0;
+	u32 gpr_len = 0;
+	u32 gpr_num = 0;
+#endif
 	unsigned int tmp_data;
+
+	global_pgregbase = NULL;
 
 	of_id = of_match_device(sunxi_rtc_dt_ids, &pdev->dev);
 	if (!of_id) {
@@ -552,7 +619,7 @@ static int sunxi_rtc_probe(struct platform_device *pdev)
 	ret = sunxi_rtc_verify_ymd(chip);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to set vaild rtc date\n");
-		goto fail;
+		goto fail_1;
 	}
 
 #ifdef CONFIG_RTC_SHUTDOWN_ALARM
@@ -585,10 +652,12 @@ static int sunxi_rtc_probe(struct platform_device *pdev)
 	writel(SUNXI_ALRM_WAKEUP_OUTPUT_EN, chip->base +
 	       SUNXI_ALARM_CONFIG);
 	/*
-	 * select RTC clock source, use default auto switch mode
-	 * and set Crystal oscillator strength
+	 * select RTC clock source
 	 */
-	tmp_data = REG_CLK32K_AUTO_SWT_EN | EXT_LOSC_GSM;
+	tmp_data = readl(chip->base + SUNXI_LOSC_CTRL);
+	tmp_data &= (~REG_CLK32K_AUTO_SWT_EN);
+	tmp_data |= (RTC_SOURCE_EXTERNAL | REG_LOSCCTRL_MAGIC);
+	tmp_data |= (EXT_LOSC_GSM);
 	writel(tmp_data, chip->base + SUNXI_LOSC_CTRL);
 	device_init_wakeup(&pdev->dev, 1);
 
@@ -596,46 +665,105 @@ static int sunxi_rtc_probe(struct platform_device *pdev)
 	                                &sunxi_rtc_ops, THIS_MODULE);
 	if (IS_ERR(chip->rtc)) {
 		dev_err(&pdev->dev, "unable to register device\n");
-		goto fail;
+		goto fail_1;
 	}
 
 	chip->irq = platform_get_irq(pdev, 0);
 	if (chip->irq < 0) {
 		dev_err(&pdev->dev, "No IRQ resource\n");
-		goto fail;
+		goto fail_2;
 	}
 
 	ret = devm_request_irq(&pdev->dev, chip->irq, sunxi_rtc_alarmirq,
 	                       0, dev_name(&pdev->dev), chip);
 	if (ret) {
 		dev_err(&pdev->dev, "Could not request IRQ\n");
-		goto fail;
+		goto fail_2;
 	}
 	dev_info(&pdev->dev, "RTC enabled\n");
 
 	device_create_file(&pdev->dev, &sunxi_rtc_min_year_attr);
 	device_create_file(&pdev->dev, &sunxi_rtc_max_year_attr);
 
+#ifdef CONFIG_SUNXI_BOOTUP_EXTEND
+	ret = of_property_read_u32(pdev->dev.of_node ,
+					"gpr_offset" , &gpr_offset);
+	if (ret) {
+		dev_err(&pdev->dev, "Could not get Gpr offset\n");
+		goto fail_3;
+	}
+
+	ret = of_property_read_u32(pdev->dev.of_node ,
+					"gpr_len" , &gpr_len);
+	if (ret) {
+		dev_err(&pdev->dev, "Could not get Gpr len\n");
+		goto fail_3;
+	}
+
+	ret = of_property_read_u32(pdev->dev.of_node ,
+					"gpr_cur_pos" , &gpr_num);
+	if (ret) {
+		dev_err(&pdev->dev , "Could not get Gpr reboot cur pos");
+		goto fail_3;
+	} else {
+
+		if (gpr_num >= gpr_len) {
+			dev_err(&pdev->dev ,
+				"gpr_cur_pos is out of range!\n");
+			goto fail_3;
+		}
+		/*
+		  * This notification function is for monitoring reboot command
+		  * when the system has been started, the reboot parameter is
+		  * stored in the RTC General Purpose register.
+		  *
+		  * gpr_offset:  General Purpose register's offset
+		  * gpr_len: The number of General Purpose registers
+		  * gpr_cur_pos: which to store the parameter in
+		  * General Purpose register
+		 */
+		ret = register_reboot_notifier(&sunxi_reboot_notifier);
+		if (ret) {
+			dev_err(&pdev->dev ,
+				"register reboot notifier error %d\n", ret);
+			goto fail_3;
+		}
+		global_pgregbase = chip->base + gpr_offset + 0x4 * gpr_num;
+	}
+
 	return 0;
 
-fail:
+fail_3:
+	device_remove_file(&pdev->dev, &sunxi_rtc_min_year_attr);
+	device_remove_file(&pdev->dev, &sunxi_rtc_max_year_attr);
+	devm_free_irq(&pdev->dev , chip->irq , chip);
+#else
+	return 0;
+#endif
+fail_2:
+	devm_rtc_device_unregister(&pdev->dev , chip->rtc);
+fail_1:
 	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
+	devm_kfree(&pdev->dev , chip);
 	return -EIO;
 }
 
 static int sunxi_rtc_remove(struct platform_device *pdev)
 {
 	struct sunxi_rtc_dev *chip = platform_get_drvdata(pdev);
-
+#ifdef CONFIG_SUNXI_BOOTUP_EXTEND
+	unregister_reboot_notifier(&sunxi_reboot_notifier);
+#endif
 	device_remove_file(&pdev->dev, &sunxi_rtc_min_year_attr);
 	device_remove_file(&pdev->dev, &sunxi_rtc_max_year_attr);
-
-	devm_rtc_device_unregister(chip->dev, chip->rtc);
+	devm_free_irq(&pdev->dev , chip->irq , chip);
+	devm_rtc_device_unregister(chip->dev , chip->rtc);
 
 	/* Disable the clock/module */
 	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
+	devm_kfree(&pdev->dev , chip);
 
 	return 0;
 }

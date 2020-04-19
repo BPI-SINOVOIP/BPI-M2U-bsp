@@ -17,7 +17,7 @@
 /* #define DRQSRC_RESEVER		12 */
 /* #define DRQSRC_RESEVER		13 */
 
-#define DRQSRC_DMIC_RX		14
+#define DRQSRC_DMIC		14
 #define DRQSRC_AUDIO_CODEC	15
 #define DRQSRC_CODEC		DRQSRC_AUDIO_CODEC
 

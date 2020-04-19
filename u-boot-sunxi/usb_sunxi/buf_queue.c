@@ -27,6 +27,7 @@
 
 //extern __u32 NAND_GetPageSize(void);
 extern __u32 NAND_GetLogicPageSize(void);
+extern int get_boot_storage_type(void);
 
 
 int                buf_queue_init_flag = 0;
@@ -51,7 +52,7 @@ int buf_queue_init(void)
     }
     
     //init queue page size and max len by storage type
-    int storage_type = uboot_spare_head.boot_data.storage_type;
+    int storage_type = get_boot_storage_type();
     if(storage_type == 0)
     {
         buf_queue_page_size = NAND_GetLogicPageSize();

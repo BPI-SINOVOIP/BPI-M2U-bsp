@@ -77,14 +77,14 @@ static int mmc_update_clk(struct sunxi_mmc_host* mmchost)
 {
 	struct mmc_reg_v4p1 *reg = (struct mmc_reg_v4p1 *)mmchost->reg;
 	unsigned int cmd;
-	unsigned timeout = 1000;
+	unsigned timeout = 100000;
 
 	writel(readl(&reg->clkcr)|(0x1<<31), &reg->clkcr);
 
 	cmd = (1U << 31) | (1 << 21) | (1 << 13);
   	writel(cmd, &reg->cmd);
 	while((readl(&reg->cmd)&0x80000000) && --timeout){
-		__msdelay(1);
+		__usdelay(1);
 	}
 	if (!timeout){
 		MMCINFO("mmc %d update clk failed\n",mmchost->mmc_no);
@@ -147,7 +147,7 @@ static int mmc_set_mclk(struct sunxi_mmc_host* mmchost, u32 clk_hz)
 	}
 
 	//rval = (1U << 31) | (src << 24) | (n << 16) | (m - 1);
-	rval = (src << 24) | (n << 16) | (m - 1);
+	rval = (src << 24) | (n << 8) | (m - 1);
 	writel(rval, mmchost->mclkbase);
 
 	return 0;
@@ -159,7 +159,7 @@ static unsigned mmc_get_mclk(struct sunxi_mmc_host* mmchost)
 	unsigned rval = readl(mmchost->mclkbase);
 
 	m = rval & 0xf;
-	n = (rval>>16) & 0x3;
+	n = (rval>>8) & 0x3;
 	src = (rval>>24) & 0x3;
 
 	if (src == 0)
@@ -238,6 +238,18 @@ static unsigned mmc_config_delay(struct sunxi_mmc_host* mmchost)
 	{
 		spd_md = mmchost->tm4.cur_spd_md;
 		freq = mmchost->tm4.cur_freq;
+
+		/*
+		{
+			int work_mode = uboot_spare_head.boot_data.work_mode;
+			if (work_mode == WORK_MODE_BOOT) {
+				MMCINFO("s-%x %x  o-%x %x\n", mmchost->tm4.sdly[spd_md*MAX_CLK_FREQ_NUM+freq], \
+					mmchost->tm4.def_sdly[spd_md*MAX_CLK_FREQ_NUM+freq], \
+					mmchost->tm4.odly[spd_md*MAX_CLK_FREQ_NUM+freq], \
+					mmchost->tm4.def_odly[spd_md*MAX_CLK_FREQ_NUM+freq]);
+			}
+		}
+		*/
 
 		if (mmchost->tm4.sdly[spd_md*MAX_CLK_FREQ_NUM+freq] != 0xFF)
 			sdly = mmchost->tm4.sdly[spd_md*MAX_CLK_FREQ_NUM+freq];
@@ -525,6 +537,10 @@ static void mmc_ddr_mode_onoff(struct mmc *mmc, int on)
 	rval = readl(&reg->gctrl);
 	rval &= (~(1U << 10));
 
+    /*  disable ccu clock */
+    writel(readl(mmchost->mclkbase)&(~(1<<31)), mmchost->mclkbase);
+    MMCDBG("disable mclk %x\n", readl(mmchost->mclkbase));
+
 	if (on) {
 		rval |= (1U << 10);
 		writel(rval, &reg->gctrl);
@@ -533,6 +549,10 @@ static void mmc_ddr_mode_onoff(struct mmc *mmc, int on)
 		writel(rval, &reg->gctrl);
 		MMCDBG("set %d rgctrl 0x%x to disable ddr mode\n", mmchost->mmc_no, readl(&reg->gctrl));
 	}
+
+    /*  enable ccu clock */ 
+    writel(readl(mmchost->mclkbase)|(1<<31), mmchost->mclkbase);
+    MMCDBG("enable mmc %d mclk %x\n", mmchost->mmc_no, readl(mmchost->mclkbase));
 }
 
 static void mmc_hs400_mode_onoff(struct mmc *mmc, int on)
@@ -564,14 +584,15 @@ static int mmc_calibrate_delay_unit(struct sunxi_mmc_host* mmchost)
 
 	struct mmc_reg_v4p1 *reg = (struct mmc_reg_v4p1 *)mmchost->reg;
 	unsigned rval = 0;
-	unsigned clk[3] = {50*1000*1000, 100*1000*1000, 200*1000*1000};
-	unsigned period[3] = {10*1000, 5*1000, 2500}; //ps, module clk is 2xclk at init phase.
+	unsigned clk[4] = {50*1000*1000, 100*1000*1000, 150*1000*1000, 200*1000*1000};
+	/*ps, module clk is 2xclk at init phase.*/
+	unsigned period[4] = {10*1000, 5*1000, 3333, 2500};
 	unsigned result = 0;
 	int i = 0;
 
 	MMCDBG("start %s, don't access device...\n", __FUNCTION__);
 
-	for (i=0; i<3; i++)
+	for (i = 0; i < 4; i++)
 	{
 		MMCINFO("%d MHz...\n", clk[i]/1000/1000);
 		/* close card clock */
@@ -642,6 +663,7 @@ static int mmc_calibrate_delay_unit(struct sunxi_mmc_host* mmchost)
 #endif	/* FPGA_PLATFORM */
 	return 0;
 }
+
 static int mmc_core_init(struct mmc *mmc)
 {
 	struct sunxi_mmc_host* mmchost = (struct sunxi_mmc_host *)mmc->priv;
@@ -668,7 +690,8 @@ static int mmc_core_init(struct mmc *mmc)
 	writel(3, &reg->csdc);
 	writel(0xdeb, &reg->dbgc);
 
-	mmc_calibrate_delay_unit(mmchost);
+	if (mmchost->cfg.platform_caps.cal_delay_unit)
+		mmc_calibrate_delay_unit(mmchost);
 	return 0;
 }
 
@@ -777,13 +800,13 @@ static int mmc_trans_data_by_cpu(struct mmc *mmc, struct mmc_data *data)
 	unsigned i;
 	unsigned byte_cnt = data->blocksize * data->blocks;
 	unsigned *buff;
-	unsigned timeout = 1000;
+	unsigned timeout = 100000;
 
 	if (data->flags & MMC_DATA_READ) {
 		buff = (unsigned int *)data->dest;
 		for (i=0; i<(byte_cnt>>2); i++) {
 			while(--timeout && (readl(&reg->status)&(1 << 2))){
-				__msdelay(1);
+				__usdelay(1);
 			}
 			if (timeout <= 0)
 				goto out;
@@ -794,7 +817,7 @@ static int mmc_trans_data_by_cpu(struct mmc *mmc, struct mmc_data *data)
 		buff = (unsigned int *)data->src;
 		for (i=0; i<(byte_cnt>>2); i++) {
 			while(--timeout && (readl(&reg->status)&(1 << 3))){
-				__msdelay(1);
+				__usdelay(1);
 			}
 			if (timeout <= 0)
 				goto out;
@@ -919,7 +942,9 @@ static int mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 	if (cmd->resp_type & MMC_RSP_BUSY)
 		MMCDBG("mmc %d mmc cmd %d check rsp busy\n", mmchost->mmc_no,cmd->cmdidx);
 	if ((cmd->cmdidx == 12)&&!(cmd->flags&MMC_CMD_MANUAL)){
-		MMCDBG("note we don't send stop cmd\n");
+		MMCDBG("usually, cmd12 is sent after cmd18/cmd25 automantically.\n");
+		/* don't wait write busy here, because no cmd12 will be sent for cmd24.
+		write busy status will be check after sent cmd25. */
 		return 0;
 	}
 	/*
@@ -1102,6 +1127,11 @@ out:
 	if(error){
 		mmchost->raw_int_bak = readl(&reg->rint )& 0xbfc2;
 		mmc_dump_errinfo(mmchost,cmd);
+		/*
+		if  (!mmc->do_tuning)  {
+			dumphex32("mmc", (char*)reg, 0x170);
+		}
+		*/
 	}
 	if (data && usedma) {
 		/* IDMASTAREG

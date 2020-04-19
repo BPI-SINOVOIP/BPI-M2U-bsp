@@ -343,37 +343,48 @@ int NAND_CheckBoot(void)
 {
 	unsigned int len;
 	unsigned char *buf;
+	int ret;
 
 	NAND_Print(" check boot start.\n");
+	NAND_PhysicLock();
 
 	len = nand_get_uboot_total_len();
 	if (len == 0) {
 		NAND_Print("not uboot\n");
+		NAND_PhysicUnLock();
 		return -1;
 	}
 
-	buf = vmalloc(len);
+	buf = vmalloc(len + 32 * 1024);
 	if (buf == NULL) {
 		NAND_Print("check uboot no memory\n");
+		NAND_PhysicUnLock();
 		return -1;
 	}
 
-	if (nand_check_uboot(buf, len) != 0) {
+	ret = nand_check_uboot(buf, len);
+	if (ret != 0) {
 		NAND_Print("check uboot fail\n");
+		vfree(buf);
+		NAND_PhysicUnLock();
 		return -1;
 	}
+
 /*
 	len = nand_get_nboot_total_len();
 	if(len == 0)
 	{
 		NAND_Print("not nboot\n");
 		vfree(buf);
+		NAND_PhysicUnLock();
 		return -1;
 	}
 
 	nand_check_nboot(buf,len);
 */
-	vfree(buf);
+
+    vfree(buf);
+    NAND_PhysicUnLock();
 
 	NAND_Print(" check boot  end.\n");
 

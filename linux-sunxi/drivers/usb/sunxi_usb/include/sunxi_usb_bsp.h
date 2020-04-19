@@ -121,9 +121,12 @@
 #define  USBC_REG_o_ISCR				0x0400
 #define  USBC_REG_o_PHYCTL				0x0404
 #define  USBC_REG_o_PHYBIST				0x0408
-#define  USBC_REG_o_PHYTUNE				0x040c
+#define  USBC_REG_o_PHYTUNE				0x0418
 
-#if defined (CONFIG_ARCH_SUN50I) || defined (CONFIG_ARCH_SUN8IW10) || defined (CONFIG_ARCH_SUN8IW11)
+#if defined(CONFIG_ARCH_SUN50I) || defined(CONFIG_ARCH_SUN8IW10) \
+	|| defined(CONFIG_ARCH_SUN8IW11) || defined(CONFIG_ARCH_SUN8IW6) \
+	|| defined(CONFIG_ARCH_SUN8IW5) || defined(CONFIG_ARCH_SUN8IW8) \
+	|| defined(CONFIG_ARCH_SUN8IW17)
 #define  USBPHYC_REG_o_PHYCTL		    0x0410
 #else
 #define  USBPHYC_REG_o_PHYCTL		    0x0404
@@ -789,6 +792,7 @@ void USBC_PHY_Set_Ctl(void __iomem *regs, __u32 mask);
 void USBC_PHY_Clear_Ctl(void __iomem *regs, __u32 mask);
 void UsbPhyInit(__u32 usbc_no);
 void UsbPhyEndReset(__u32 usbc_no);
+void usb_otg_phy_txtune(void __iomem *regs);
 
 /* usb test mode */
 void USBC_EnterMode_TestPacket(__hdle hUSB);

@@ -44,9 +44,9 @@ extern int BOOT_NandGetPara(boot_nand_para_t *nand_info, __u32 size);
 */
 __s32 NFB_GetFlashInfo(boot_flash_info_t *param)
 {
-    boot_nand_para_t nand_info;
+	boot_nand_para_t nand_info;
 
-    BOOT_NandGetPara(&nand_info, sizeof(boot_nand_para_t));
+	BOOT_NandGetPara(&nand_info, sizeof(boot_nand_para_t));
 	param->chip_cnt	 		= nand_info.ChipCnt;
 	param->blk_cnt_per_chip = nand_info.BlkCntPerDie * nand_info.DieCntPerChip;
 	param->blocksize 		= nand_info.SectorCntPerPage * nand_info.PageCntPerPhyBlk;
@@ -77,16 +77,13 @@ __s32 NFB_PhyInit(void)
 		NAND_Print("NB0 : nand phy init fail\n");
 		return ret;
 	}
-
 	ret = BOOT_AnalyzeNandSystem();
 	if (ret)
 	{
-		NAND_Print("NB0 : nand scan fail\n");
+		NAND_Print("NB0 : nand scan fail, ret = %d\n", ret);
 		return ret;
 	}
-
 	NAND_Print("NB0 : nand phy init ok\n");
-
 
 	return(PHY_ChangeMode(1));
 }

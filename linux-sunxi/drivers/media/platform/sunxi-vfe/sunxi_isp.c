@@ -26,14 +26,21 @@
 #include "lib/bsp_isp.h"
 #include "sunxi_isp.h"
 #include "vfe.h"
-
+/*
 #define ISP_MODULE_NAME "sunxi_isp"
 #if defined CONFIG_ARCH_SUN50I
 #define ISP_HEIGHT_16B_ALIGN 0
 #else
 #define ISP_HEIGHT_16B_ALIGN 1
+#endif*/
+#define ISP_MODULE_NAME "sunxi_isp"
+#if defined CONFIG_ARCH_SUN8IW8P1
+#define ISP_HEIGHT_16B_ALIGN 1
+#else
+#define ISP_HEIGHT_16B_ALIGN 0
 #endif
-static int isp_dbg_en = 0; 
+
+static int isp_dbg_en;
 static int isp_dbg_lv = 1;
 
 static LIST_HEAD(isp_drv_list);

@@ -4,67 +4,56 @@
  *
  * SPDX-License-Identifier:     GPL-2.0+
  */
-/*
-**********************************************************************************************************************
-*
-*	 the Embedded Secure Bootloader System
-*
-*
-*	 Copyright(C), 2006-2014, Allwinnertech Co., Ltd.
-*        All Rights Reserved
-*
-* File    :
-*
-* By      :
-*
-* Version : V2.00
-*
-* Date	  :
-*
-* Descript:
-**********************************************************************************************************************
-*/
 
 #ifndef __EFUSE_H__
 #define __EFUSE_H__
 
 #include "asm/arch/platform.h"
 
-#define SID_PRCTL				(SUNXI_SID_BASE + 0x40)
-#define SID_PRKEY				(SUNXI_SID_BASE + 0x50)
-#define SID_RDKEY				(SUNXI_SID_BASE + 0x60)
-#define SJTAG_AT0				(SUNXI_SID_BASE + 0x80)
-#define SJTAG_AT1				(SUNXI_SID_BASE + 0x84)
-#define SJTAG_S					(SUNXI_SID_BASE + 0x88)
-#define SID_RF(n)               (SUNXI_SID_BASE + (n) * 4 + 0x80)
+#define SID_PRCTL               (SUNXI_SID_BASE + 0x40)
+#define SID_PRKEY               (SUNXI_SID_BASE + 0x50)
+#define SID_RDKEY               (SUNXI_SID_BASE + 0x60)
+#define SJTAG_AT0               (SUNXI_SID_BASE + 0x80)
+#define SJTAG_AT1               (SUNXI_SID_BASE + 0x84)
+#define SJTAG_S                 (SUNXI_SID_BASE + 0x88)
 
 #define SID_EFUSE               (SUNXI_SID_BASE + 0x200)
 #define SID_SECURE_MODE         (SUNXI_SID_BASE + 0xA0)
+#define SID_OP_LOCK  (0xAC)
 
+#define EFUSE_CHIPD             (0x00) /* 0x0-0xf, 128bits */
+#define EFUSE_BROM_CONFIG       (0x10) /* 16 bit config, 16 bits try */
+#define EFUSE_THERMAL_SENSOR    (0x14) /* 0x14-0x1b, 64bits */
+#define EFUSE_TF_ZONE           (0x1C) /* 0x1c-0x2b, 128bits */
+#define EFUSE_OEM_PROGRAM       (0x2C) /* 0x2c-0x3f, 160bits */
 
-#define EFUSE_CHIPD             (0x00)
-#define EFUSE_OEM_PROGRAM       (0x10)
-#define EFUSE_NV1               (0x14)
-#define EFUSE_NV2               (0x18)
-#define EFUSE_RSK_PUB_HASH      (0x20)
-#define EFUSE_THERMAL_SENSOR    (0x34)
-#define EFUSE_RENEWABILITY      (0x3C)
-#define EFUSE_IN                (0x44)
-#define EFUSE_INDENTIFICATION   (0x5C)
-#define EFUSE_ID                (0x60)
-#define EFUSE_ROTPK             (0x64)
-#define EFUSE_SSK               (0x84)
-#define EFUSE_RSSK              (0x94)
+/* write protect */
+#define EFUSE_WRITE_PROTECT     (0x40) /* 0x40-0x43, 32bits */
+/* read  protect */
+#define EFUSE_READ_PROTECT      (0x44) /* 0x44-0x47, 32bits */
+/* jtag security */
+#define EFUSE_LCJS              (0x48)
+/* jtag attribute */
+#define EFUSE_ATTR              (0x4C)
 
-#define EFUSE_HDCP_HUSH         (0xB4)
-#define EFUSE_EK_HUSH           (0xC4)
-#define EFUSE_SN                (0xD4)
+/*0x50-0x6F
+0x50-0x67: 192bits HUK hardware Unique key
+0x68-0x6b: 32bits ID of operator
+0x6C-0x6F: 32bits ID
+*/
+#define EFUSE_HUK               (0x50)
+#define EFUSE_INDENTIFICATION   (0x68)
+#define EFUSE_ID                (0x6C)
 
-#define EFUSE_BACKUP_KEY        (0xEC)
-#define EFUSE_LCJS              (0xF4)
-#define EFUSE_DEBUG             (0xF8)
-#define EFUSE_CHIPCONFIG        (0xFC)
-
+#define EFUSE_ROTPK             (0x70) /* 0x70-0x8f, 256bits */
+#define EFUSE_SSK               (0x90) /* 0x90-0x9f, 128bits */
+#define EFUSE_RSSK              (0xA0) /* 0xA0-0xBf, 256bits */
+#define EFUSE_HDCP_HASH         (0xC0) /* 0xC0-0xCf, 128bits */
+#define EFUSE_EK_HASH           (0xD0) /* 0xD0-0xDf, 128bits */
+#define EFUSE_SN                (0xE0) /* 0xE0-0xF7, 192bits */
+#define EFUSE_NV1               (0xF8) /* 0xF8-0xFB, 32 bits */
+#define EFUSE_NV2               (0xFC) /* 0xFC-0x117,224bits */
+#define EFUSE_BACKUP_KEY        (0x118)/* 0x118-0x13F,320bits */
 
 extern void sid_set_security_mode(void);
 extern int  sid_probe_security_mode(void);

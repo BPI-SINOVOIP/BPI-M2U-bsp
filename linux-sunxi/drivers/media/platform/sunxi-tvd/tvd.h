@@ -18,6 +18,8 @@
 #include <media/v4l2-ctrls.h>
 #include "bsp_tvd.h"
 
+#define TVD_MAX 4
+
 static LIST_HEAD(devlist);
 
 enum hpd_status {
@@ -64,8 +66,12 @@ struct writeback_addr {
 
 struct tvd_status {
 	int tvd_used;
+	int tvd_opened;
 	int tvd_if;
 	int tvd_3d_used;
+	int locked;
+	int tvd_system;
+	int tvd_clk_enabled;
 };
 
 struct tvd_3d_fliter {
@@ -107,11 +113,16 @@ struct tvd_dev {
 
 	unsigned int            interface; /*0 cvbs,1 ypbprI,2 ypbprP*/
 	unsigned int            system;	/*0 ntsc, 1 pal*/
+	unsigned int		row;
+	unsigned int		column;
 
 	unsigned int            locked;	/* signal is stable or not */
 	unsigned int            format;
-	unsigned int            channel_index[4];
+	unsigned int            channel_index[TVD_MAX];
+	unsigned int            channel_offset_y[TVD_MAX];
+	unsigned int            channel_offset_c[TVD_MAX];
 	int			irq;
+	char			name[10];
 
 	/* working state */
 	unsigned long 	        generating;
@@ -144,6 +155,7 @@ struct tvd_dev {
 	struct tvd_dmaqueue       vidq_special;
 	struct tvd_dmaqueue       done_special;
 	int special_active;
+	int mulit_channel_mode;
 };
 
 #endif /* __TVD__H__ */

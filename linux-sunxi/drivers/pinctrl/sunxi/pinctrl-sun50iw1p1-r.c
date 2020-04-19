@@ -107,11 +107,15 @@ static const struct sunxi_desc_pin sun50iw1p1_r_pins[] = {
 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 12)),	/* PL_EINT12 */
 };
 
+#define IRQ_BANK_NUM 1
+static const unsigned sun50iw1p1_r_irq_bank_base[IRQ_BANK_NUM] = {0};
+
 static const struct sunxi_pinctrl_desc sun50iw1p1_r_pinctrl_data = {
 	.pins = sun50iw1p1_r_pins,
 	.npins = ARRAY_SIZE(sun50iw1p1_r_pins),
 	.pin_base = PL_BASE,
-	.irq_banks = 1,
+	.irq_banks = IRQ_BANK_NUM,
+	.irq_bank_base = sun50iw1p1_r_irq_bank_base,
 };
 
 static int sun50iw1p1_r_pinctrl_probe(struct platform_device *pdev)

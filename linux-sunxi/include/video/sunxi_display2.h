@@ -57,6 +57,10 @@ enum disp_pixel_format
 	DISP_FORMAT_ABGR_1555                    = 0x11,
 	DISP_FORMAT_RGBA_5551                    = 0x12,
 	DISP_FORMAT_BGRA_5551                    = 0x13,
+	DISP_FORMAT_A2R10G10B10                  = 0x14,
+	DISP_FORMAT_A2B10G10R10                  = 0x15,
+	DISP_FORMAT_R10G10B10A2                  = 0x16,
+	DISP_FORMAT_B10G10R10A2                  = 0x17,
 
 	/* SP: semi-planar, P:planar, I:interleaved
 	 * UVUV: U in the LSBs;     VUVU: V in the LSBs */
@@ -68,7 +72,8 @@ enum disp_pixel_format
 	DISP_FORMAT_YUV422_I_VYUY                = 0x45,//MSB  V-Y-U-Y  LSB
 	DISP_FORMAT_YUV444_P                     = 0x46,//MSB  P3-2-1-0 LSB,  YYYY UUUU VVVV, reserved
 	DISP_FORMAT_YUV422_P                     = 0x47,//MSB  P3-2-1-0 LSB   YYYY UU   VV
-	DISP_FORMAT_YUV420_P                     = 0x48,//MSB  P3-2-1-0 LSB   YYYY U    V
+	/* MSB  P3-2-1-0 LSB   YYYY V    U */
+	DISP_FORMAT_YUV420_P                     = 0x48,
 	DISP_FORMAT_YUV411_P                     = 0x49,//MSB  P3-2-1-0 LSB   YYYY U    V
 	DISP_FORMAT_YUV422_SP_UVUV               = 0x4a,//MSB  V-U-V-U  LSB
 	DISP_FORMAT_YUV422_SP_VUVU               = 0x4b,//MSB  U-V-U-V  LSB
@@ -76,7 +81,24 @@ enum disp_pixel_format
 	DISP_FORMAT_YUV420_SP_VUVU               = 0x4d,
 	DISP_FORMAT_YUV411_SP_UVUV               = 0x4e,
 	DISP_FORMAT_YUV411_SP_VUVU               = 0x4f,
-	DISP_FORMAT_8BIT_GRAY				= 0x50,
+	DISP_FORMAT_8BIT_GRAY                    = 0x50,
+	DISP_FORMAT_YUV444_I_AYUV_10BIT          = 0x51,
+	DISP_FORMAT_YUV444_I_VUYA_10BIT          = 0x52,
+	DISP_FORMAT_YUV422_I_YVYU_10BIT          = 0x53,
+	DISP_FORMAT_YUV422_I_YUYV_10BIT          = 0x54,
+	DISP_FORMAT_YUV422_I_UYVY_10BIT          = 0x55,
+	DISP_FORMAT_YUV422_I_VYUY_10BIT          = 0x56,
+	DISP_FORMAT_YUV444_P_10BIT               = 0x57,
+	DISP_FORMAT_YUV422_P_10BIT               = 0x58,
+	DISP_FORMAT_YUV420_P_10BIT               = 0x59,
+	DISP_FORMAT_YUV411_P_10BIT               = 0x5a,
+	DISP_FORMAT_YUV422_SP_UVUV_10BIT         = 0x5b,
+	DISP_FORMAT_YUV422_SP_VUVU_10BIT         = 0x5c,
+	DISP_FORMAT_YUV420_SP_UVUV_10BIT         = 0x5d,
+	DISP_FORMAT_YUV420_SP_VUVU_10BIT         = 0x5e,
+	DISP_FORMAT_YUV411_SP_UVUV_10BIT         = 0x5f,
+	DISP_FORMAT_YUV411_SP_VUVU_10BIT         = 0x60,
+	DISP_FORMAT_MAX,
 };
 
 enum disp_3d_out_mode
@@ -97,23 +119,62 @@ enum disp_3d_out_mode
 
 enum disp_color_space
 {
-	DISP_BT601  = 0,
-	DISP_BT709  = 1,
-	DISP_YCC    = 2,
+	DISP_UNDEF = 0x00,
+	DISP_UNDEF_F = 0x01,
+	DISP_GBR = 0x100,
+	DISP_BT709 = 0x101,
+	DISP_FCC = 0x102,
+	DISP_BT470BG = 0x103,
+	DISP_BT601 = 0x104,
+	DISP_SMPTE240M = 0x105,
+	DISP_YCGCO = 0x106,
+	DISP_BT2020NC = 0x107,
+	DISP_BT2020C = 0x108,
+	DISP_GBR_F = 0x200,
+	DISP_BT709_F = 0x201,
+	DISP_FCC_F = 0x202,
+	DISP_BT470BG_F = 0x203,
+	DISP_BT601_F = 0x204,
+	DISP_SMPTE240M_F = 0x205,
+	DISP_YCGCO_F = 0x206,
+	DISP_BT2020NC_F = 0x207,
+	DISP_BT2020C_F = 0x208,
+	DISP_RESERVED = 0x300,
+	DISP_RESERVED_F = 0x301,
 };
 
 enum disp_csc_type
 {
 	DISP_CSC_TYPE_RGB        = 0,
-	DISP_CSC_TYPE_YUV1       = 1,//HDMI
-	DISP_CSC_TYPE_YUV2       = 2,//TV
+	DISP_CSC_TYPE_YUV444     = 1,
+	DISP_CSC_TYPE_YUV422     = 2,
+	DISP_CSC_TYPE_YUV420     = 3,
+};
+
+enum disp_data_bits {
+	DISP_DATA_8BITS    = 0,
+	DISP_DATA_10BITS   = 1,
+	DISP_DATA_12BITS   = 2,
+	DISP_DATA_16BITS   = 3,
+};
+
+enum disp_dvi_hdmi {
+	DISP_DVI_HDMI_UNDEFINED = 0,
+	DISP_DVI = 1,
+	DISP_HDMI = 2,
+};
+
+enum disp_scan_info {
+	DISP_SCANINFO_NO_DATA = 0,
+	OVERSCAN = 1,
+	UNDERSCAN = 2,
 };
 
 enum disp_color_range
 {
-	DISP_COLOR_RANGE_16_255 = 0,
-	DISP_COLOR_RANGE_0_255  = 1,
-	DISP_COLOR_RANGE_16_235 = 2,
+	DISP_COLOR_RANGE_DEFAULT = 0, /*default*/
+	DISP_COLOR_RANGE_0_255  = 1, /*full*/
+	DISP_COLOR_RANGE_16_235 = 2, /*limited*/
 };
 
 enum disp_output_type
@@ -123,6 +184,7 @@ enum disp_output_type
 	DISP_OUTPUT_TYPE_TV     = 2,
 	DISP_OUTPUT_TYPE_HDMI   = 4,
 	DISP_OUTPUT_TYPE_VGA    = 8,
+	DISP_OUTPUT_TYPE_EDP    = 32, /*16 for vdpo*/
 };
 
 enum disp_tv_mode
@@ -154,7 +216,23 @@ enum disp_tv_mode
 	DISP_TV_MOD_3840_2160P_30HZ     = 0x1c,
 	DISP_TV_MOD_3840_2160P_25HZ     = 0x1d,
 	DISP_TV_MOD_3840_2160P_24HZ     = 0x1e,
-	/* vga */
+	DISP_TV_MOD_4096_2160P_24HZ     = 0x1f,
+	DISP_TV_MOD_4096_2160P_25HZ     = 0x20,
+	DISP_TV_MOD_4096_2160P_30HZ     = 0x21,
+	DISP_TV_MOD_3840_2160P_60HZ     = 0x22,
+	DISP_TV_MOD_4096_2160P_60HZ     = 0x23,
+	DISP_TV_MOD_3840_2160P_50HZ     = 0x24,
+	DISP_TV_MOD_4096_2160P_50HZ     = 0x25,
+	DISP_TV_MOD_1280_1024P_60HZ     = 0x41,
+	DISP_TV_MOD_1024_768P_60HZ      = 0x42,
+	DISP_TV_MOD_900_540P_60HZ       = 0x43,
+	DISP_TV_MOD_1920_720P_60HZ      = 0x44,
+	/*
+	 * vga
+	 * NOTE:macro'value of new solution must between
+	 * DISP_VGA_MOD_640_480P_60 and DISP_VGA_MOD_MAX_NUM
+	 * or you have to modify is_vag_mode function in drv_tv.h
+	 */
 	DISP_VGA_MOD_640_480P_60         = 0x50,
 	DISP_VGA_MOD_800_600P_60         = 0x51,
 	DISP_VGA_MOD_1024_768P_60        = 0x52,
@@ -163,8 +241,10 @@ enum disp_tv_mode
 	DISP_VGA_MOD_1366_768P_60        = 0x55,
 	DISP_VGA_MOD_1440_900P_60        = 0x56,
 	DISP_VGA_MOD_1920_1080P_60       = 0x57,
-	DISP_VGA_MOD_1920_1200P_60       = 0x58,
-	DISP_TV_MODE_NUM                 = 0x59,
+	DISP_VGA_MOD_1280_720P_60        = 0x58,
+	DISP_VGA_MOD_1920_1200P_60       = 0x5a,
+	DISP_VGA_MOD_MAX_NUM             = 0x5b,
+	DISP_TV_MODE_NUM                 = 0x5c,
 };
 
 //FIXME:still need?
@@ -182,6 +262,11 @@ enum disp_buffer_flags
 	DISP_BF_STEREO_SSH    = 1 << 2,//stereo side by side half
 	DISP_BF_STEREO_SSF    = 1 << 3,//stereo side by side full
 	DISP_BF_STEREO_LI     = 1 << 4,//stereo line interlace
+	/*
+	 * 2d plus depth to convert into 3d,
+	 * left and right image using the same frame buffer
+	 */
+	DISP_BF_STEREO_2D_DEPTH  = 1 << 5,
 };
 
 enum disp_layer_mode
@@ -195,6 +280,41 @@ enum disp_scan_flags
 	DISP_SCAN_PROGRESSIVE                 = 0,//non interlace
 	DISP_SCAN_INTERLACED_ODD_FLD_FIRST    = 1 << 0,//interlace ,odd field first
 	DISP_SCAN_INTERLACED_EVEN_FLD_FIRST   = 1 << 1,//interlace,even field first
+};
+
+enum disp_eotf {
+	DISP_EOTF_RESERVED = 0x000,
+	DISP_EOTF_BT709 = 0x001,
+	DISP_EOTF_UNDEF = 0x002,
+	DISP_EOTF_GAMMA22 = 0x004, /* SDR */
+	DISP_EOTF_GAMMA28 = 0x005,
+	DISP_EOTF_BT601 = 0x006,
+	DISP_EOTF_SMPTE240M = 0x007,
+	DISP_EOTF_LINEAR = 0x008,
+	DISP_EOTF_LOG100 = 0x009,
+	DISP_EOTF_LOG100S10 = 0x00a,
+	DISP_EOTF_IEC61966_2_4 = 0x00b,
+	DISP_EOTF_BT1361 = 0x00c,
+	DISP_EOTF_IEC61966_2_1 = 0X00d,
+	DISP_EOTF_BT2020_0 = 0x00e,
+	DISP_EOTF_BT2020_1 = 0x00f,
+	DISP_EOTF_SMPTE2084 = 0x010, /* HDR10 */
+	DISP_EOTF_SMPTE428_1 = 0x011,
+	DISP_EOTF_ARIB_STD_B67 = 0x012, /* HLG */
+};
+
+/* disp_atw_mode - mode for asynchronous time warp
+ *
+ * @NORMAL_MODE: dual buffer, left eye and right eye buffer is individual
+ * @LEFT_RIGHT_MODE: single buffer, the left half of each line buffer
+ *		     is for left eye, the right half is for the right eye
+ * @UP_DOWN_MODE: single buffer, the first half of the total buffer
+ *		  is for the left eye, the second half is for the right eye
+ */
+enum disp_atw_mode {
+	NORMAL_MODE,
+	LEFT_RIGHT_MODE,
+	UP_DOWN_MODE,
 };
 
 struct disp_output
@@ -257,6 +377,115 @@ struct disp_layer_config
 	unsigned int layer_id;
 };
 
+/* disp_atw_info - asynchronous time wrap infomation
+ *
+ * @used: indicate if the atw funtion is used
+ * @mode: atw mode
+ * @b_row: the row number of the micro block
+ * @b_col: the column number of the micro block
+ * @cof_fd: dma_buf fd for the buffer contaied coefficient for atw
+ */
+struct disp_atw_info {
+	bool used;
+	enum disp_atw_mode mode;
+	unsigned int b_row;
+	unsigned int b_col;
+	int cof_fd;
+};
+
+/* disp_fb_info2 - image buffer info v2
+ *
+ * @fd: dma_buf  fd for frame buffer
+ * @size: size<width,height> for each buffer, unit:pixels
+ * @align: align for each buffer, unit:bytes
+ * @format: pixel format
+ * @color_space: color space
+ * @trd_right_fd: dma_buf fd for the right-eye frame buffer,
+ *                  valid when frame-packing 3d buffer input
+ * @pre_multiply: indicate the pixel use premultiplied alpha
+ * @crop: crop rectangle for buffer to be display
+ * @flag: indicate stereo/non-stereo buffer
+ * @scan: indicate interleave/progressive scan type, and the scan order
+ * @depth: depth perception for stereo image, only valid when stereo image input
+ *            unit: pixel
+ * @fbd_en: indicate if enable fbd function
+ * @metadata_fd: dma_buf fd for the buffer contained metadata for fbc/hdr
+ * @metadata_size: the size of metadata buffer, unit:bytes
+ * @metadata_flag: the flag to indicate the type of metadata buffer
+ *	0     : no metadata
+ *	1 << 0: hdr static metadata
+ *	1 << 1: hdr dynamic metadata
+ *	1 << 4:	frame buffer compress(fbc) metadata
+ *	x     : all type could be "or" together
+ */
+struct disp_fb_info2 {
+	int                      fd;
+	struct disp_rectsz       size[3];
+	unsigned int             align[3];
+	enum disp_pixel_format   format;
+	enum disp_color_space    color_space;
+	int                      trd_right_fd;
+	bool                     pre_multiply;
+	struct disp_rect64       crop;
+	enum disp_buffer_flags   flags;
+	enum disp_scan_flags     scan;
+	enum disp_eotf           eotf;
+	int                      depth;
+	unsigned int             fbd_en;
+	int                      metadata_fd;
+	unsigned int             metadata_size;
+	unsigned int             metadata_flag;
+};
+
+/* disp_layer_info2 - layer info v2
+ *
+ * @mode: buffer/clolor mode, when in color mode, the layer is widthout buffer
+ * @zorder: the zorder of layer, 0~max-layer-number
+ * @alpha_mode:
+ *	0: pixel alpha;
+ *	1: global alpha
+ *	2: mixed alpha, compositing width pixel alpha before global alpha
+ * @alpha_value: global alpha value, valid when alpha_mode is not pixel alpha
+ * @screen_win: the rectangle on the screen for fb to be display
+ * @b_trd_out: indicate if 3d display output
+ * @out_trd_mode: 3d output mode, valid when b_trd_out is true
+ * @color: the color value to be display, valid when layer is in color mode
+ * @fb: the framebuffer info related width the layer, valid when in buffer mode
+ * @id: frame id, the user could get the frame-id display currently by
+ *	DISP_LAYER_GET_FRAME_ID ioctl
+ * @atw: asynchronous time wrap information
+ */
+struct disp_layer_info2 {
+	enum disp_layer_mode      mode;
+	unsigned char             zorder;
+	unsigned char             alpha_mode;
+	unsigned char             alpha_value;
+	struct disp_rect          screen_win;
+	bool                      b_trd_out;
+	enum disp_3d_out_mode     out_trd_mode;
+	union {
+		unsigned int            color;
+		struct disp_fb_info2    fb;
+	};
+
+	unsigned int              id;
+	struct disp_atw_info      atw;
+};
+
+/* disp_layer_config2 - layer config v2
+ *
+ * @info: layer info
+ * @enable: indicate to enable/disable the layer
+ * @channel: the channel index of the layer, 0~max-channel-number
+ * @layer_id: the layer index of the layer widthin it's channel
+ */
+struct disp_layer_config2 {
+	struct disp_layer_info2 info;
+	bool enable;
+	unsigned int channel;
+	unsigned int layer_id;
+};
+
 struct disp_colorkey
 {
     struct disp_color      ck_max;
@@ -281,6 +510,126 @@ struct disp_capture_info
 	struct disp_s_frame out_frame;
 };
 
+/* disp_s_frame2 - display simple frame buffer
+ *
+ * @format: pixel format of fb
+ * @size: size for each plane
+ * @crop: crop zone to be fill image data
+ * @fd: dma_buf fd
+ */
+struct disp_s_frame2 {
+	enum disp_pixel_format format;
+	struct disp_rectsz size[3];
+	struct disp_rect crop;
+	int fd;
+};
+
+/* disp_capture_info2 - display capture information
+ *
+ * @window: the rectange on the screen to be capture
+ * @out_frame: the framebuffer to be restore capture image data
+ */
+struct disp_capture_info2 {
+	struct disp_rect window;
+	struct disp_s_frame2 out_frame;
+};
+
+struct disp_capture_fmt {
+	enum disp_pixel_format format;   /* write-back ouput format, doson't support YUV ouput yet */
+	struct disp_rect window;         /* source crop */
+	struct disp_rect crop;           /* output crop */
+};
+
+struct disp_capture_buffer {
+	int handle;                      /* Unique integer id represent this buffer */
+	enum disp_pixel_format format;   /* write-back ouput format */
+	struct disp_rect window;         /* source crop */
+	struct disp_rect crop;           /* output crop */
+	struct disp_rectsz size[3];
+
+	int fd;
+	int width;                       /* buffer width  in pixels */
+	int height;                      /* buffer height in pixels */
+};
+
+struct disp_capture_handle {
+	int handle;    /* unique integer id represent a capture buffer */
+	int fencefd;   /* fence fd for this buffer */
+};
+
+enum disp_capture_extend_cmd {
+	DISP_CAPTURE_E_SET_FMT,
+	DISP_CAPTURE_E_BUFFER_LIST_INIT,
+	DISP_CAPTURE_E_BUFFER_LIST_CLEAR,
+	DISP_CAPTURE_E_ACQUIRE_BUFFER,
+	DISP_CAPTURE_E_RELEASE_BUFFER,
+	DISP_CAPTURE_E_CTRL,
+};
+
+/* disp_device_config - display deivce config
+ *
+ * @type: output type
+ * @mode: output mode
+ * @format: data format
+ * @bits:   data bits
+ * @eotf:   electro-optical transfer function
+ *	    SDR  : DISP_EOTF_GAMMA22
+ *	    HDR10: DISP_EOTF_SMPTE2084
+ *	    HLG  : DISP_EOTF_ARIB_STD_B67
+ * @cs:     color space type
+ *	    DISP_BT601: SDR for SD resolution(< 720P)
+ *	    DISP_BT709: SDR for HD resolution(>= 720P)
+ *	    DISP_BT2020NC: HDR10 or HLG or wide-color-gamut
+ * @dvi_hdmi: output mode
+ *        DVI: DISP_DVI
+ *        HDMI: DISP_HDMI
+ * @range:    RGB/YUV quantization range
+ *          DEFUALT: limited range when sending a CE video format
+ *                   full range when sending an IT video format
+ *          LIMITED: color limited range from 16 to 235
+ *          FULL: color full range from 0 to 255
+ * @scan info:
+ *        DISP_SCANINFO_NO_DATA: overscan if it is a CE format,
+ *                               underscan if it is an IT format
+ *        OVERSCAN: composed for overscan display
+ *        UNDERSCAN: composed for underscan display
+ * @aspect_ratio: active format aspect ratio
+ */
+struct disp_device_config {
+	enum disp_output_type		type;
+	enum disp_tv_mode			mode;
+	enum disp_csc_type			format;
+	enum disp_data_bits			bits;
+	enum disp_eotf				eotf;
+	enum disp_color_space		cs;
+	enum disp_dvi_hdmi	        dvi_hdmi;
+	enum disp_color_range		range;
+	enum disp_scan_info			scan;
+	unsigned int				aspect_ratio;
+	unsigned int				reserve1;
+};
+
+/* disp_device_dynamic_config - display deivce dynamic config
+ *
+ * @metadata_fd: dma_buf fd for the buffer contained metadata for fbc/hdr
+ * @metadata_size: the size of metadata buffer, unit:bytes
+ * @metadata_flag: the flag to indicate the type of metadata buffer
+ *	0     : no metadata
+ *	1 << 0: hdr static metadata
+ *	1 << 1: hdr dynamic metadata
+ *	1 << 4:	frame buffer compress(fbc) metadata
+ *	x     : all type could be "or" together
+ * @vmap:vmap a block contigous phys memory into virtual space
+ * @vunmap: release virtual mapping obtained by vmap()
+ */
+struct disp_device_dynamic_config {
+	int			 metadata_fd;
+	unsigned int             metadata_size;
+	unsigned int             metadata_flag;
+	void *(*vmap)(unsigned long phys_addr, unsigned long size);
+	void (*vunmap)(const void *vaddr);
+};
+
 struct disp_video_timings
 {
 	unsigned int    vic;  //video infomation code
@@ -293,7 +642,7 @@ struct disp_video_timings
 	unsigned int    hor_back_porch;
 	unsigned int    hor_front_porch;
 	unsigned int    hor_sync_time;
-	unsigned int    ver_total_time;
+	unsigned int    ver_total_time; /* lines of a frame */
 	unsigned int    ver_back_porch;
 	unsigned int    ver_front_porch;
 	unsigned int    ver_sync_time;
@@ -302,6 +651,10 @@ struct disp_video_timings
 	bool            b_interlace;
 	unsigned int    vactive_space;
 	unsigned int    trd_mode;
+
+	unsigned long      dclk_rate_set; /*unit: hz */
+	unsigned long long frame_period; /* unit: ns */
+	int                start_delay; /* unit: line */
 };
 
 enum disp_fb_mode
@@ -348,6 +701,10 @@ struct disp_tv_func
 		int (*tv_mode_support) (u32 sel, enum disp_tv_mode mode);
 		int (*tv_hot_plugging_detect)(u32 state);
 		int (*tv_set_enhance_mode)(u32 sel, u32 mode);
+		int (*tv_irq_enable)(u32 sel, u32 irq_id, u32 en);
+		int (*tv_irq_query)(u32 sel);
+		int (*tv_get_startdelay)(u32 sel);
+		int (*tv_get_cur_line)(u32 sel);
 };
 
 /* disp_vdevice_interface_para - vdevice interaface parameter
@@ -374,6 +731,8 @@ struct disp_tv_func
  *	1: vsync active high,hsync active low
  *	2: vsync active low,hsync active high
  *	3: vsync active high,hsync active high
+ * @ccir_clk_div:the divide number of tcon_lcd's clk freq
+ * @input_csc:colorspace type of video source
  */
 struct disp_vdevice_interface_para
 {
@@ -383,6 +742,8 @@ struct disp_vdevice_interface_para
 	unsigned int fdelay;
 	unsigned int clk_phase;
 	unsigned int sync_polarity;
+	unsigned int ccir_clk_div;
+	unsigned int input_csc;
 };
 
 struct disp_vdevice_source_ops
@@ -407,6 +768,10 @@ struct disp_device_func
 	int (*early_suspend)(void);
 	int (*late_resume)(void);
 	int (*get_interface_para)(void *para);
+	int (*set_static_config)(struct disp_device_config *config);
+	int (*get_static_config)(struct disp_device_config *config);
+	int (*set_dynamic_config)(struct disp_device_dynamic_config *config);
+	int (*get_dynamic_config)(struct disp_device_dynamic_config *config);
 };
 
 struct disp_vdevice_init_data
@@ -460,6 +825,8 @@ enum tag_DISP_CMD
 	DISP_SET_COLOR_RANGE = 0x11,
 	DISP_GET_COLOR_RANGE = 0x12,
 	DISP_HWC_CUSTOM = 0x13,
+	DISP_DEVICE_SET_CONFIG = 0x14,
+	DISP_DEVICE_GET_CONFIG = 0x15,
 
 	//----layer----
 	DISP_LAYER_ENABLE = 0x40,
@@ -471,6 +838,12 @@ enum tag_DISP_CMD
 	DISP_LAYER_GET_FRAME_ID = 0x46,
 	DISP_LAYER_SET_CONFIG = 0x47,
 	DISP_LAYER_GET_CONFIG = 0x48,
+	/*
+	 * LAYER_S(G)ET_CONFIG2 takes disp_layer_config2,
+	 * it will support more featuras
+	 */
+	DISP_LAYER_SET_CONFIG2 = 0x49,
+	DISP_LAYER_GET_CONFIG2 = 0x4a,
 
 	//----hdmi----
 	DISP_HDMI_SUPPORT_MODE = 0xc4,
@@ -496,10 +869,16 @@ enum tag_DISP_CMD
 	DISP_LCD_CHECK_OPEN_FINISH = 0x10f,
 	DISP_LCD_CHECK_CLOSE_FINISH = 0x110,
 
+	/*tv*/
+	DISP_TV_SET_GAMMA_TABLE = 0x111,
+
 	//---- capture ---
 	DISP_CAPTURE_START = 0x140,//caputre screen and scaler to dram
 	DISP_CAPTURE_STOP = 0x141,
 	DISP_CAPTURE_COMMIT = 0x142,
+	DISP_CAPTURE_COMMIT2 = 0x143,
+	DISP_CAPTURE_QUERY = 0x144,
+	DISP_CAPTURE_EXTEND = 0x145,
 
 	//---enhance ---
 	DISP_ENHANCE_ENABLE = 0x180,
@@ -530,6 +909,7 @@ enum tag_DISP_CMD
 	DISP_EINK_UPDATE  = 0x402,
 	DISP_EINK_SET_TEMP = 0x403,
 	DISP_EINK_GET_TEMP = 0x404,
+	DISP_EINK_OVERLAP_SKIP = 0x405,
 };
 
 #define FBIOGET_LAYER_HDL_0 0x4700

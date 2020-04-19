@@ -4,7 +4,7 @@
 
 static void __iomem *tve_reg_base[TVE_DEVICE_NUM];
 static void __iomem *sid_reg_base;
-static s32 tve_low_dac_auto_cali(u32 sel, u32 cali);
+static s32 tve_low_dac_auto_cali(u32 sel, u32 *cali);
 
 s32 tve_low_set_reg_base(u32 sel, void __iomem *address)
 {
@@ -75,7 +75,7 @@ s32 tve_low_close(u32 sel)
 	return 0;
 }
 
-s32 tve_low_set_tv_mode(u32 sel, enum disp_tv_mode mode, u32 cali)
+s32 tve_low_set_tv_mode(u32 sel, enum disp_tv_mode mode, u32 *cali)
 {
 	tve_low_dac_auto_cali(sel, cali);
 	if (DISP_TV_MOD_NTSC == mode) {
@@ -165,7 +165,7 @@ s32 tve_low_dac_autocheck_disable(u32 sel)
 	return 0;
 }
 
-static s32 tve_low_dac_auto_cali(u32 sel, u32 cali)
+static s32 tve_low_dac_auto_cali(u32 sel, u32 *cali)
 {
 	u32 dac_err_reg[10];
 	s32 dac_err_val[10];
@@ -181,7 +181,7 @@ static s32 tve_low_dac_auto_cali(u32 sel, u32 cali)
 	TVE_WUINT32(sel, TVE_030, 0x00000000); /* auto detect disable */
 	TVE_WUINT32(sel, TVE_008, 0x433e12b1); /* dac setting */
 
-	TVE_WUINT32(sel, TVE_304, cali << 16 | 0xc << 8);
+	TVE_WUINT32(sel, TVE_304, *cali << 16 | 0xc << 8);
 	TVE_SET_BIT(sel, TVE_300, 0x1);	/* force DAC for cali */
 	for (i = 0; i < 3; i++) {
 		TVE_SET_BIT(sel, TVE_304, 0x1 << 4);
@@ -213,10 +213,10 @@ static s32 tve_low_dac_auto_cali(u32 sel, u32 cali)
 	else
 		dac_err_auto = dac_err_val[2];
 
-	if (cali & (1 << 9))
-		dac_err_efuse = 0 + (cali & 0x1ff);
+	if (*cali & (1 << 9))
+		dac_err_efuse = 0 + (*cali & 0x1ff);
 	else
-		dac_err_efuse = 0 - (cali & 0x1ff);
+		dac_err_efuse = 0 - (*cali & 0x1ff);
 
 	if (abs(dac_err_auto - dac_err_efuse) < 100)
 		dac_err_opti = dac_err_auto;

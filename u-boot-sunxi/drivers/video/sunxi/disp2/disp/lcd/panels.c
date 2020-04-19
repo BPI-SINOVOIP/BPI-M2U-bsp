@@ -14,6 +14,18 @@ extern __lcd_panel_t S070WV20_MIPI_RGB_panel;
 extern __lcd_panel_t LHR050H41_MIPI_RGB_panel;
 
 __lcd_panel_t* panel_array[] = {
+#if defined(CONFIG_ARCH_SUN50IW3P1)
+	&lq101r1sx03_panel,
+	&ls029b3sx02_panel,
+	&vr_ls055t1sx01_panel,
+	&sl008pn21d_panel,
+	&he0801a068_panel,
+#else
+#if defined(CONFIG_ARCH_SUN8IW12P1)
+	&ili9341_panel,
+	&fd055hd003s_panel,
+	&default_panel,
+#else
 	&default_panel,
 	&lt070me05000_panel,
 	&wtq05027d01_panel,
@@ -22,8 +34,16 @@ __lcd_panel_t* panel_array[] = {
 	&tft720x1280_panel,
 	&S6D7AA0X01_panel,
 	&inet_dsi_panel,
-	&S070WV20_MIPI_RGB_panel,
+	&gg1p4062utsw_panel,
+	&vr_sharp_panel,
+	&he0801a068_panel,
+
+#endif
+#endif /*endif CONFIG_ARCH_SUN50IW3P1 */
+#if defined(CONFIG_ARCH_SUN8IW11P1)
+    &S070WV20_MIPI_RGB_panel,
 	&LHR050H41_MIPI_RGB_panel,
+#endif
 	/* add new panel below */
 
 	NULL,

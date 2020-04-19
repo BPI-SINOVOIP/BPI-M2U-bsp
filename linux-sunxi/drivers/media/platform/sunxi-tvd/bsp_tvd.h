@@ -41,6 +41,13 @@
 
 #define FLITER_NUM 1
 #define TVD_3D_COMP_BUFFER_SIZE (0x400000)
+#define CVBS_INTERFACE 0
+#define YPBPRI_INTERFACE 1
+#define YPBPRP_INTERFACE 2
+#define NTSC 0
+#define PAL 1
+#define NONE 2
+
 
 //
 // detail information of registers
@@ -1099,7 +1106,9 @@ s32 tvd_irq_status_clear(u32 sel,TVD_IRQ_T irq_id);
 s32 tvd_dma_irq_status_get(u32 sel, u32 *irq_status);
 s32 tvd_dma_irq_status_clear_err_flag(u32 sel, u32 irq_status);
 
-s32 tvd_adc_config(u32 adc);
+void tvd_enable_chanel(u32 sel, u32 en);
+
+s32 tvd_adc_config(u32 adc, u32 en);
 s32 tvd_set_saturation(u32 sel, u32 saturation);
 s32 tvd_set_luma(u32 sel,u32 luma);
 s32 tvd_set_contrast(u32 sel, u32 contrast);

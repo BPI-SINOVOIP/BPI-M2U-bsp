@@ -36,12 +36,15 @@
 static int arm_enter_idle_state(struct cpuidle_device *dev,
 				struct cpuidle_driver *drv, int idx)
 {
+#if defined CONFIG_ARCH_SUN50IW6P1
 	int ret;
 
-	if (1) {
+	/* if (!idx) */
+	{
 		cpu_do_idle();
 		return idx;
 	}
+	idx = 1;
 
 	ret = cpu_pm_enter();
 	if (!ret) {
@@ -56,6 +59,64 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
 	}
 
 	return ret ? -1 : idx;
+#elif defined CONFIG_ARCH_SUN50IW3P1
+	int ret;
+
+	idx = 0;
+	if (!idx) {
+		cpu_do_idle();
+		return idx;
+	}
+
+	if (idx > 2)
+		idx = 2;
+
+	ret = cpu_pm_enter();
+	if (!ret) {
+		/*
+		 * Pass idle state index to cpu_suspend which in turn will
+		 * call the CPU ops suspend protocol with idle index as a
+		 * parameter.
+		 */
+		smp_wmb();
+		arm_cpuidle_suspend(idx);
+
+		cpu_pm_exit();
+	}
+
+	return ret ? -1 : idx;
+#elif defined CONFIG_ARCH_SUN50IW3P1
+	int ret;
+
+	idx = 0;
+	if (!idx) {
+		cpu_do_idle();
+		return idx;
+	}
+
+	if (idx > 2)
+		idx = 2;
+
+	ret = cpu_pm_enter();
+	if (!ret) {
+		/*
+		 * Pass idle state index to cpu_suspend which in turn will
+		 * call the CPU ops suspend protocol with idle index as a
+		 * parameter.
+		 */
+		smp_wmb();
+		arm_cpuidle_suspend(idx);
+
+		cpu_pm_exit();
+	}
+
+	return ret ? -1 : idx;
+#else
+	cpu_do_idle();
+
+	return idx;
+#endif
+
 }
 
 static struct cpuidle_driver arm_idle_driver = {

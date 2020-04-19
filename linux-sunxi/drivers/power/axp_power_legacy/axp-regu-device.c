@@ -1,10 +1,13 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/notifier.h>
 #include <linux/platform_device.h>
 #include <linux/string.h>
 #include <linux/power/axp_depend.h>
 #include "axp-regu.h"
+
+RAW_NOTIFIER_HEAD(axp_regu_notifier);
 
 static struct of_device_id axp_regu_device_match[] = {
 	{ .compatible = "allwinner,", .data = NULL },
@@ -15,6 +18,7 @@ static struct axp_consumer_supply *consumer_supply_count;
 
 static s32 axp_regu_device_probe(struct platform_device *pdev)
 {
+	int ret;
 	struct device_node *node = pdev->dev.of_node;
 	const struct of_device_id *device;
 	struct axp_reg_init *axp_init_data = NULL;
@@ -98,7 +102,7 @@ static s32 axp_regu_device_probe(struct platform_device *pdev)
 				(regu_consumer_supply+i)->supply = (const char *)((struct axp_consumer_supply *)(consumer_supply_count+i)->supply);
 
 				{
-					int ret = 0, sys_id_conut = 0;
+					int sys_id_conut = 0;
 
 					sys_id_conut = axp_check_sys_id((consumer_supply_count+i)->supply);
 					if (0 <= sys_id_conut) {
@@ -113,7 +117,11 @@ static s32 axp_regu_device_probe(struct platform_device *pdev)
 		}
 
 	}
-	return 0;
+
+	ret = __raw_notifier_call_chain(&axp_regu_notifier, AXP_READY,
+					NULL, -1, NULL);
+
+	return notifier_to_errno(ret);
 }
 
 static struct platform_driver axp_regu_device_driver = {

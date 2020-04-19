@@ -641,6 +641,8 @@
 #define  USBC_INTUSB_RESUME					    (1 << USBC_BP_INTUSB_RESUME)
 #define  USBC_INTUSB_SUSPEND					(1 << USBC_BP_INTUSB_SUSPEND)
 
+#define  USBC_PHY_CTL_VBUSVLDEXT		5
+#define  USBC_PHY_CTL_SIDDQ			3
 
 //-----------------------------------------------------------------------
 //   USB host ²Ù×÷²¿·Ö

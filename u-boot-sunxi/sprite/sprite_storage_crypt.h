@@ -2,26 +2,6 @@
 #define _SPRITE_STORAGE_CRYPT_H_
 
 
-#define SUNXI_SECSTORE_VERSION	1
-
-#define MAX_STORE_LEN 0xc00 /*3K payload*/
-#define STORE_OBJECT_MAGIC	0x17253948
-#define STORE_REENCRYPT_MAGIC 0x86734716
-#define STORE_WRITE_PROTECT_MAGIC   0x8ad3820f
-typedef struct{
-	unsigned int	magic ; /* store object magic*/
-	int				id ;    /*store id, 0x01,0x02.. for user*/
-	char			name[64]; /*OEM name*/
-    unsigned int	re_encrypt; /*flag for OEM object*/
-	unsigned int	version ;	
-	unsigned int    write_protect ;  /*can be placed or not, =0, can be write_protectd*/	
-	unsigned int	reserved[3];
-	unsigned int	actual_len ; /*the actual len in data buffer*/
-	unsigned char	data[MAX_STORE_LEN]; /*the payload of secure object*/
-	unsigned int	crc ; /*crc to check the sotre_objce valid*/
-}store_object_t;
-
-
 enum{
     /* TEE SMC command type */
     TEE_SMC_INIT_CALL                   = 0x0FFFFFF1,

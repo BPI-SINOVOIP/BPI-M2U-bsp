@@ -49,4 +49,5 @@ struct ac200_tv_priv {
 
 extern struct ac200_tv_priv tv_priv;
 extern struct disp_video_timings tv_video_timing[];
+extern int acx00_enable(void);
 #endif

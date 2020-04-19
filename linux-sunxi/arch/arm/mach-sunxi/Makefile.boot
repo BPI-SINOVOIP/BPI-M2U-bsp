@@ -1,1 +1,5 @@
+ifdef CONFIG_ARCH_SUN3I
+zreladdr-$(CONFIG_ARCH_SUNXI)	+= 0x80008000
+else
 zreladdr-$(CONFIG_ARCH_SUNXI)	+= 0x40008000
+endif

@@ -28,7 +28,12 @@
 #include <sunxi_mbr.h>
 #include <sunxi_board.h>
 
+#if defined (CONFIG_SUNXI_SPINOR)
+#define  VERIFY_ONCE_BYTES    (2 * 1024 * 1024)
+#else
 #define  VERIFY_ONCE_BYTES    (16 * 1024 * 1024)
+#endif
+
 #define  VERIFY_ONCE_SECTORS  (VERIFY_ONCE_BYTES/512)
 /*
 ************************************************************************************************************
@@ -184,101 +189,15 @@ uint sunxi_sprite_part_sparsedata_verify(void)
 {
 	return unsparse_checksum();
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
 uint sunxi_sprite_generate_checksum(void *buffer, uint length, uint src_sum)
 {
-#ifndef CONFIG_USE_NEON_SIMD
-	uint *buf;
-	uint count;
-	uint sum;
-
-	/* 生成校验和 */
-	count = length >> 2;                       // 以 字（4bytes）为单位计数
-	sum = 0;
-	buf = (__u32 *)buffer;
-	do
-	{
-		sum += *buf++;                         // 依次累加，求得校验和
-		sum += *buf++;                         // 依次累加，求得校验和
-		sum += *buf++;                         // 依次累加，求得校验和
-		sum += *buf++;                         // 依次累加，求得校验和
-	}while( ( count -= 4 ) > (4-1) );
-
-	while( count-- > 0 )
-		sum += *buf++;
-#else
-	uint sum;
-
-	sum = add_sum_neon(buffer, length);
-#endif
-	sum = sum - src_sum + STAMP_VALUE;
-
-    return sum;
+	return sunxi_generate_checksum(buffer, length, src_sum);
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
 int sunxi_sprite_verify_checksum(void *buffer, uint length, uint src_sum)
 {
-#ifndef CONFIG_USE_NEON_SIMD
-	uint *buf;
-	uint count;
-	uint sum;
-
-	/* 生成校验和 */
-	count = length >> 2;                       // 以 字（4bytes）为单位计数
-	sum = 0;
-	buf = (__u32 *)buffer;
-	do
-	{
-		sum += *buf++;                         // 依次累加，求得校验和
-		sum += *buf++;                         // 依次累加，求得校验和
-		sum += *buf++;                         // 依次累加，求得校验和
-		sum += *buf++;                         // 依次累加，求得校验和
-	}while( ( count -= 4 ) > (4-1) );
-
-	while( count-- > 0 )
-		sum += *buf++;
-#else
-	uint sum;
-
-	sum = add_sum_neon(buffer, length);
-#endif
-	sum = sum - src_sum + STAMP_VALUE;
-
-	debug("src sum=%x, check sum=%x\n", src_sum, sum);
-	if( sum == src_sum )
-		return 0;               // 校验成功
-	else
-		return -1;              // 校验失败
+	return sunxi_verify_checksum(buffer, length, src_sum);
 }
 /*
 ***************************************************************
@@ -370,6 +289,29 @@ int sunxi_sprite_verify_mbr(void *buffer)
 
     return 0;
 }
+
+int sunxi_sprite_read_mbr(void *buffer, uint mbr_copy)
+{
+	uint sectors;
+
+	sectors = mbr_copy*SUNXI_MBR_SIZE/512;
+	if (sectors != sunxi_sprite_read(0, sectors, buffer))
+		return -1;
+
+#ifdef CONFIG_GPT_SUPPORT
+	char *p = buffer;
+	char *p_sunxi_mbr = p +  3*SUNXI_MBR_SIZE;
+	/* 00K~48K ->GPT entry */
+	/* 48K~64K ->sunxi mbr */
+	/* for sunxi_sprite_verify_mbr get success result */
+	memcpy(p + 0*SUNXI_MBR_SIZE, p_sunxi_mbr, SUNXI_MBR_SIZE);
+	memcpy(p + 1*SUNXI_MBR_SIZE, p_sunxi_mbr, SUNXI_MBR_SIZE);
+	memcpy(p + 2*SUNXI_MBR_SIZE, p_sunxi_mbr, SUNXI_MBR_SIZE);
+#endif
+	return 0;
+
+}
+
 /*
 ************************************************************************************************************
 *

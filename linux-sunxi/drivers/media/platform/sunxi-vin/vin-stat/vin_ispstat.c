@@ -108,7 +108,7 @@ static void isp_stat_buf_release(struct isp_stat *stat)
 static struct ispstat_buffer *isp_stat_buf_get(struct isp_stat *stat,
 					       struct vin_isp_stat_data *data)
 {
-	int rval = 0, i = 0, *tmp_data;
+	int rval = 0;
 	unsigned long flags;
 	struct ispstat_buffer *buf;
 
@@ -135,16 +135,11 @@ static struct ispstat_buffer *isp_stat_buf_get(struct isp_stat *stat,
 			isp_stat_buf_release(stat);
 			return ERR_PTR(-EINVAL);
 		}
-		tmp_data = (int *)buf->virt_addr;
-		for (i = 0; i < buf->buf_size/(sizeof(int)); i++) {
-			tmp_data[i] = 65535;
-		}
-		rval = copy_to_user(data->buf,
-				    buf->virt_addr,
-				    buf->buf_size);
+
+		rval = copy_to_user(data->buf, buf->virt_addr, buf->buf_size);
 
 		if (rval) {
-			vin_print("%s: failed copying %d bytes of stat data\n",
+			vin_warn("%s: failed copying %d bytes of stat data\n",
 					stat->sd.name, rval);
 			buf = ERR_PTR(-EFAULT);
 			isp_stat_buf_release(stat);
@@ -168,7 +163,7 @@ static void isp_stat_bufs_free(struct isp_stat *stat)
 		mm->vir_addr = buf->virt_addr;
 		mm->phy_addr = buf->phy_addr;
 		mm->dma_addr = buf->dma_addr;
-		os_mem_free(mm);
+		os_mem_free(&stat->isp->pdev->dev, mm);
 
 		buf->dma_addr = NULL;
 		buf->virt_addr = NULL;
@@ -192,18 +187,19 @@ static int isp_stat_bufs_alloc_dma(struct isp_stat *stat, unsigned int size)
 		struct ispstat_buffer *buf = &stat->buf[i];
 		struct vin_mm *mm = &stat->ion_man[i];
 		mm->size = stat->buf_alloc_size;
-		if (!os_mem_alloc(mm)) {
+		if (!os_mem_alloc(&stat->isp->pdev->dev, mm)) {
 			buf->virt_addr = mm->vir_addr;
 			buf->phy_addr = mm->phy_addr;
 			buf->dma_addr = mm->dma_addr;
 		}
 		if (!buf->virt_addr || !buf->dma_addr) {
-			vin_print("%s: Can't acquire memory for DMA buffer %d\n",
+			vin_err("%s: Can't acquire memory for DMA buffer %d\n",
 				stat->sd.name, i);
 			isp_stat_bufs_free(stat);
 			return -ENOMEM;
 		}
 		buf->empty = 1;
+		memset(buf->virt_addr, 0, stat->buf_alloc_size);
 
 		vin_log(VIN_LOG_STAT, "%s: buffer[%d] allocated."
 			"dma_addr=0x%08lx virt_addr=0x%08lx\n",
@@ -228,7 +224,7 @@ static int isp_stat_bufs_alloc(struct isp_stat *stat, u32 size)
 	}
 
 	if (stat->state != ISPSTAT_DISABLED || stat->buf_processing) {
-		vin_print("%s: trying to allocate memory when busy\n",
+		vin_err("%s: trying to allocate memory when busy\n",
 			 stat->sd.name);
 		spin_unlock_irqrestore(&stat->isp->slock, flags);
 		return -EBUSY;
@@ -277,8 +273,6 @@ int vin_isp_stat_request_statistics(struct isp_stat *stat,
 		return PTR_ERR(buf);
 	}
 
-	data->ts.tv_sec = buf->ts.tv_sec;
-	data->ts.tv_usec = buf->ts.tv_nsec / NSEC_PER_USEC;
 	data->config_counter = buf->config_counter;
 	data->frame_number = buf->frame_number;
 	data->buf_size = buf->buf_size;
@@ -294,7 +288,7 @@ int vin_isp_stat_config(struct isp_stat *stat, void *new_conf)
 {
 	int ret;
 	unsigned long irqflags;
-	struct ispstat_generic_config *user_cfg = new_conf;
+	struct vin_isp_h3a_config *user_cfg = new_conf;
 	u32 buf_size = user_cfg->buf_size;
 
 	if (!new_conf) {
@@ -304,7 +298,7 @@ int vin_isp_stat_config(struct isp_stat *stat, void *new_conf)
 
 	mutex_lock(&stat->ioctl_lock);
 
-	vin_print("%s: configuring module with buffer size=0x%08lx\n",
+	vin_log(VIN_LOG_STAT, "%s: configuring module with buffer size=0x%08lx\n",
 		stat->sd.name, (unsigned long)buf_size);
 
 	ret = stat->ops->validate_params(stat, new_conf);
@@ -455,7 +449,7 @@ int vin_isp_stat_enable(struct isp_stat *stat, u8 enable)
 {
 	unsigned long irqflags;
 
-	vin_print("%s: user wants to %s module.\n",
+	vin_log(VIN_LOG_STAT, "%s: user wants to %s module.\n",
 		stat->sd.name, enable ? "enable" : "disable");
 
 	/* Prevent enabling while configuring */
@@ -471,6 +465,9 @@ int vin_isp_stat_enable(struct isp_stat *stat, u8 enable)
 			stat->sd.name);
 		return -EINVAL;
 	}
+	stat->stata_en_flag = enable;
+	stat->isp->server_run = 0;
+	stat->isp->first_frame = 0;
 
 	if (enable) {
 		if (stat->state == ISPSTAT_DISABLING)
@@ -499,7 +496,8 @@ int vin_isp_stat_enable(struct isp_stat *stat, u8 enable)
 int vin_isp_stat_s_stream(struct v4l2_subdev *subdev, int enable)
 {
 	struct isp_stat *stat = v4l2_get_subdevdata(subdev);
-	vin_print("%s", __func__);
+
+	vin_log(VIN_LOG_STAT, "%s", __func__);
 
 	if (enable) {
 		isp_stat_try_enable(stat);
@@ -522,7 +520,6 @@ static void __stat_isr(struct isp_stat *stat)
 	int ret = STAT_BUF_DONE;
 	int buf_processing;
 	unsigned long irqflags;
-	struct vin_pipeline *pipe;
 	vin_log(VIN_LOG_STAT, "%s buf state is %d, frame number is %d "
 		"0x%x %d %d %d %d %d\n", __func__,
 		stat->state, stat->frame_number,
@@ -535,6 +532,7 @@ static void __stat_isr(struct isp_stat *stat)
 		spin_unlock_irqrestore(&stat->isp->slock, irqflags);
 		return;
 	}
+	stat->isp->h3a_stat.frame_number++;
 	buf_processing = stat->buf_processing;
 	stat->buf_processing = 1;
 	stat->ops->enable(stat, 0);
@@ -546,13 +544,6 @@ static void __stat_isr(struct isp_stat *stat)
 			/* Module still need to copy data to buffer. */
 			ret = stat->ops->buf_process(stat);
 		spin_lock_irqsave(&stat->isp->slock, irqflags);
-
-		pipe = to_vin_pipeline(&stat->sd.entity);
-		if (pipe == NULL) {
-			vin_err("stat subdev is not in any pipeline!\n");
-			return;
-		}
-		stat->frame_number = atomic_read(&pipe->frame_number);
 
 		ret = isp_stat_buf_process(stat, ret);
 
@@ -630,7 +621,8 @@ int vin_isp_stat_init(struct isp_stat *stat, const char *name,
 		       const struct v4l2_subdev_ops *sd_ops)
 {
 	int ret;
-	vin_print("%s\n", __func__);
+
+	vin_log(VIN_LOG_STAT, "%s\n", __func__);
 	stat->buf = kcalloc(STAT_MAX_BUFS, sizeof(*stat->buf), GFP_KERNEL);
 	if (!stat->buf)
 		return -ENOMEM;
@@ -654,5 +646,5 @@ void vin_isp_stat_cleanup(struct isp_stat *stat)
 	mutex_destroy(&stat->ioctl_lock);
 	isp_stat_bufs_free(stat);
 	kfree(stat->buf);
-	vin_print("%s", __func__);
+	vin_log(VIN_LOG_STAT, "%s", __func__);
 }

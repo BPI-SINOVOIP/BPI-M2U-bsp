@@ -32,6 +32,9 @@ extern struct disp_capture* disp_get_capture(u32 disp);
 extern struct disp_device* disp_get_lcd(u32 disp);
 extern struct disp_manager* disp_get_layer_manager(u32 disp);
 extern unsigned int composer_dump(char* buf);
+extern s32 disp_device_attached_and_enable(int disp_mgr, int disp_dev,
+				struct disp_device_config *config);
+
 static void dispdbg_process(void)
 {
 	int start = simple_strtoul(dispdbg_priv.start,NULL,0);
@@ -112,6 +115,26 @@ static void dispdbg_process(void)
 		}
 		if (!strncmp(dispdbg_priv.command,"getinfo",7)) {
 			mgr->dump(mgr, dispdbg_priv.info);
+		} else if (!strncmp(dispdbg_priv.command, "switch1", 7)) {
+			struct disp_device_config config;
+			tosearch = dispdbg_priv.param;
+			next = strsep(&tosearch, " ");
+			config.type = simple_strtoul(next, NULL, 0);
+			next = strsep(&tosearch, " ");
+			config.mode = simple_strtoul(next, NULL, 0);
+			next = strsep(&tosearch, " ");
+			config.format = simple_strtoul(next, NULL, 0);
+			next = strsep(&tosearch, " ");
+			config.bits = simple_strtoul(next, NULL, 0);
+			next = strsep(&tosearch, " ");
+			config.eotf = simple_strtoul(next, NULL, 0);
+			next = strsep(&tosearch, " ");
+			config.cs = simple_strtoul(next, NULL, 0);
+
+			pr_info("disp %d, type %d, mode%d, format%d, bits%d eotf%d cs%d",
+				disp, config.type, config.mode, config.format, config.bits, config.eotf, config.cs);
+			bsp_disp_device_set_config(disp, &config);
+
 		} else if (!strncmp(dispdbg_priv.command,"switch",6)) {
 			u32 type,mode;
 			tosearch = dispdbg_priv.param;
@@ -165,23 +188,11 @@ static void dispdbg_process(void)
 			count = sprintf(dispdbg_priv.info,"device:%d.%d fps\n", fps/10, fps%10);
 			//composer_dump(dispdbg_priv.info+count);
 		}
-#if defined(SUPPORT_TV)
 		else if (!strncmp(dispdbg_priv.command,"suspend",7)) {
-			if (mgr->device) {
-				if ((DISP_OUTPUT_TYPE_TV == mgr->device->type)) {
-				disp_tv_suspend(mgr->device);
-				}
-			}
-
+			disp_suspend(NULL);
 		} else if (!strncmp(dispdbg_priv.command,"resume",6)) {
-			if (mgr->device) {
-				if ((DISP_OUTPUT_TYPE_TV == mgr->device->type)) {
-					disp_tv_resume(mgr->device);
-				}
-			}
-
+			disp_resume(NULL);
 		}
-#endif
 		else if (!strncmp(dispdbg_priv.command,"vsync_enable",12)) {
 			u32 enable;
 
@@ -220,8 +231,6 @@ static void dispdbg_process(void)
 			area.x_bottom= simple_strtoul(next,NULL,0);
 			next = strsep(&tosearch, " ");
 			area.y_bottom = simple_strtoul(next,NULL,0);
-			if (eink_manager->eink_update)
-				eink_manager->eink_update(eink_manager, 0, mode, area);
 
 		} else if (!strncmp(dispdbg_priv.command,"disable",7)) {
 			if (eink_manager->disable)

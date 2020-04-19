@@ -18,11 +18,13 @@
 
 extern unsigned long totalram_pages;
 
+#ifndef CONFIG_ARCH_SUN7I
 struct __fb_addr_para {
-        unsigned int fb_paddr;
-        unsigned int fb_size;
+	unsigned int fb_paddr;
+	unsigned int fb_size;
 };
 extern void sunxi_get_fb_addr_para(struct __fb_addr_para *fb_addr_para);
+#endif /* CONFIG_ARCH_SUN7I */
 
 static void mali_gpu_utilization_callback(struct mali_gpu_utilization_data *data);
 
@@ -40,7 +42,7 @@ static struct mali_gpu_device_data mali_gpu_data = {
 #ifndef CONFIG_MALI_DT
 /* For Mali400, the number of maximum PP core is 4 */
 static struct resource mali_gpu_resources[] = {
-	AW_MALI_GPU_RESOURCES_MALI400_MPX_PMU(GPU_PBASE,
+	AW_MALI_GPU_RESOURCES_MALI400_MPX(GPU_PBASE,
 					IRQ_GPU_GP,
 					IRQ_GPU_GPMMU,
 					IRQ_GPU_PP0,
@@ -73,8 +75,8 @@ static struct platform_device mali_gpu_device = {
  ****************************************************************
  * Function   : get_gpu_clk
  * Description: Get gpu related clocks.
- * Input      : None.
- * Output     : None.
+ * Input      : None
+ * Output     : None
  ****************************************************************
  */
 static void get_gpu_clk(void)
@@ -82,6 +84,8 @@ static void get_gpu_clk(void)
 	int i;
 
 	for (i = 0; i < sizeof(aw_private.pm.clk)/sizeof(aw_private.pm.clk[0]); i++) {
+		if (!aw_private.pm.clk[i].clk_name)
+			continue;
 #ifdef CONFIG_MALI_DT
 		aw_private.pm.clk[i].clk_handle = of_clk_get(aw_private.np_gpu, i);
 #else
@@ -98,8 +102,8 @@ static void get_gpu_clk(void)
  ****************************************************************
  * Function   : put_gpu_clk
  * Description: Put gpu related clocks.
- * Input      : None.
- * Output     : None.
+ * Input      : None
+ * Output     : None
  ****************************************************************
  */
 static void put_gpu_clk(void)
@@ -114,8 +118,8 @@ static void put_gpu_clk(void)
  ****************************************************************
  * Function   : enable_gpu_clk
  * Description: Enable gpu related clocks.
- * Input      : None.
- * Output     : None.
+ * Input      : None
+ * Output     : None
  ****************************************************************
  */
 void enable_gpu_clk(void)
@@ -139,8 +143,8 @@ void enable_gpu_clk(void)
  ****************************************************************
  * Function   : disable_gpu_clk
  * Description: Disable gpu related clocks
- * Input      : None.
- * Output     : None.
+ * Input      : None
+ * Output     : None
  ****************************************************************
  */
 void disable_gpu_clk(void)
@@ -157,10 +161,57 @@ void disable_gpu_clk(void)
 
 /**
  ****************************************************************
+ * Function   : set_clk_parent
+ * Description: Set the parents of gpu related clocks
+ * Input      : None
+ * Output     : None
+ ****************************************************************
+ */
+static void set_clk_parent(void)
+{
+	int i;
+	for (i = 0; i < sizeof(aw_private.pm.clk)/sizeof(aw_private.pm.clk[0]); i++) {
+		if (aw_private.pm.clk[i].clk_handle) {
+			if (aw_private.pm.clk[i].parent_clk_num >= 0)
+				if (clk_set_parent(aw_private.pm.clk[i].clk_handle, aw_private.pm.clk[aw_private.pm.clk[i].parent_clk_num].clk_handle))
+					MALI_PRINT_ERROR(("Failed to set the parent of the clock %s to %s!\n",
+								aw_private.pm.clk[i].clk_name, aw_private.pm.clk[aw_private.pm.clk[i].parent_clk_num].clk_name));
+		} else {
+			MALI_PRINT_ERROR(("Invalid clock: %s!\n", aw_private.pm.clk[i].clk_name));
+		}
+	}
+}
+
+#ifdef CONFIG_ARCH_SUN7I
+/**
+ ****************************************************************
+ * Function   : clk_reset_wrap
+ * Description: Reset the clocks which need reset
+ * Input      : None
+ * Output     : None
+ ****************************************************************
+ */
+static void clk_reset_wrap(void)
+{
+	int i;
+	for (i = 0; i < sizeof(aw_private.pm.clk)/sizeof(aw_private.pm.clk[0]); i++) {
+		if (aw_private.pm.clk[i].need_reset) {
+			if (clk_reset(aw_private.pm.clk[i].clk_handle, AW_CCU_CLK_NRESET))
+				MALI_PRINT_ERROR(("Failed to reset the clock %s!\n",
+								aw_private.pm.clk[i].clk_name));
+		} else {
+			continue;
+		}
+	}
+}
+#endif /* CONFIG_ARCH_SUN7I */
+
+/**
+ ****************************************************************
  * Function   : set_freq
  * Description: Set the frequency of GPU related clocks.
  * Input      : freq, the frequency value to be set in MHz.
- * Output     : None.
+ * Output     : None
  ****************************************************************
  */
 static void set_freq(int freq)
@@ -190,7 +241,7 @@ static void set_freq(int freq)
  *		ing setting its frequency and resume after the freq-
  *		uency is changed.
  * Input      : freq, the frequency to be set in MHz.
- * Output     : None.
+ * Output     : None
  ****************************************************************
  */
 void set_freq_wrap(int freq)
@@ -213,8 +264,8 @@ void set_freq_wrap(int freq)
  ****************************************************************
  * Function   : enable_gpu_power
  * Description: Enable GPU power.
- * Input      : None.
- * Output     : None.
+ * Input      : None
+ * Output     : None
  ****************************************************************
  */
 static void enable_gpu_power(void)
@@ -240,8 +291,8 @@ static void enable_gpu_power(void)
  ****************************************************************
  * Function   : disable_gpu_power
  * Description: Disable GPU power.
- * Input      : None.
- * Output     : None.
+ * Input      : None
+ * Output     : None
  ****************************************************************
  */
 static void disable_gpu_power(void)
@@ -260,7 +311,7 @@ static void disable_gpu_power(void)
  * Function   : set_voltage
  * Description: Set the voltage of gpu.
  * Input      : vol, the voltage to be set in mV.
- * Output     : None.
+ * Output     : None
  ****************************************************************
  */
 void set_voltage(int vol)
@@ -296,7 +347,7 @@ void set_voltage(int vol)
  * Function   : dvfs_change
  * Description: Change the voltage and frequency of GPU
  * Input      : level, the level to be set.
- * Output     : None.
+ * Output     : None
  ****************************************************************
  */
 void dvfs_change(u8 level)
@@ -319,8 +370,8 @@ void dvfs_change(u8 level)
  ****************************************************************
  * Function   : aw_suspend
  * Description: Called during suspend.
- * Input      : None.
- * Output     : None.
+ * Input      : None
+ * Output     : None
  ****************************************************************
  */
 void aw_suspend(void)
@@ -333,8 +384,8 @@ void aw_suspend(void)
  ****************************************************************
  * Function   : aw_resume
  * Description: Called during resume.
- * Input      : None.
- * Output     : None.
+ * Input      : None
+ * Output     : None
  ****************************************************************
  */
 void aw_resume(void)
@@ -470,8 +521,8 @@ err_out:
  ****************************************************************
  * Function   : parse_sysconfig_fex
  * Description: Parse GPU parameters from sys_config.fex.
- * Input      : None.
- * Output     : None.
+ * Input      : None
+ * Output     : None
  ****************************************************************
  */
 static void parse_sysconfig_fex(void)
@@ -520,7 +571,7 @@ static void parse_sysconfig_fex(void)
  * Function   : aw_init
  * Description: Init the clocks of gpu.
  * Input      : device, a platform_device pointer.
- * Output     : None.
+ * Output     : None
  ****************************************************************
  */
 static void aw_init(struct platform_device *device)
@@ -528,14 +579,23 @@ static void aw_init(struct platform_device *device)
 	int i;
 	struct platform_device *pdev = device;
 
+#ifdef CONFIG_ARCH_SUN7I
+	mali_gpu_data.fb_start = ION_CARVEOUT_MEM_BASE;
+	mali_gpu_data.fb_size = sun7i_ion_carveout_size();
+#else /* CONFIG_ARCH_SUN7I */
+	struct __fb_addr_para fb_addr_para = {0};
+	sunxi_get_fb_addr_para(&fb_addr_para);
+	mali_gpu_data.fb_start = fb_addr_para.fb_paddr;
+	mali_gpu_data.fb_size = fb_addr_para.fb_size;
+#endif /* CONFIG_ARCH_SUN7I */
+	mali_gpu_data.shared_mem_size = totalram_pages * PAGE_SIZE; /* B */
+
 #ifdef CONFIG_MALI_DT
 	aw_private.np_gpu = of_find_compatible_node(NULL, NULL, "arm,mali-400");
 #endif /* CONFIG_MALI_DT */
 
 	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
 	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-
-	mali_gpu_data.shared_mem_size = totalram_pages * PAGE_SIZE; /* B */
 
 	parse_sysconfig_fex();
 
@@ -579,6 +639,12 @@ static void aw_init(struct platform_device *device)
 
 	set_freq(aw_private.pm.vf_table[aw_private.pm.begin_level].freq);
 
+	set_clk_parent();
+
+#ifdef CONFIG_ARCH_SUN7I
+	clk_reset_wrap();
+#endif /* CONFIG_ARCH_SUN7I */
+
 	enable_gpu_clk();
 
 	mutex_init(&aw_private.pm.dvfs_lock);
@@ -593,7 +659,7 @@ static void aw_init(struct platform_device *device)
  * Function   : aw_deinit
  * Description: Init the clocks of gpu.
  * Input      : device, a platform_device pointer.
- * Output     : None.
+ * Output     : None
  ****************************************************************
  */
 static void aw_deinit(struct platform_device *device)
@@ -666,11 +732,7 @@ int mali_platform_device_register(void)
 	}
 
 #ifdef CONFIG_PM_RUNTIME
-#ifdef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
 	pm_runtime_set_autosuspend_delay(&(pdev->dev), 1000);
-#else /* CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY */
-	pm_runtime_set_autosuspend_delay(&(pdev->dev), 2);
-#endif /* CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY */
 	pm_runtime_use_autosuspend(&(pdev->dev));
 	pm_runtime_enable(&(pdev->dev));
 #endif /* CONFIG_PM_RUNTIME */
@@ -697,7 +759,6 @@ int mali_platform_device_deinit(struct platform_device *device)
 int mali_platform_device_unregister(void)
 #endif /* CONFIG_MALI_DT */
 {
-	int err = 0;
 	struct platform_device *pdev;
 
 #ifdef CONFIG_MALI_DT
@@ -707,14 +768,12 @@ int mali_platform_device_unregister(void)
 #endif /* CONFIG_MALI_DT */
 
 #ifndef CONFIG_MALI_DT
-	err = platform_device_register(&mali_gpu_device);
-	if (err)
-		MALI_PRINT_ERROR(("platform_device_register failed!\n"));
+	platform_device_unregister(&mali_gpu_device);
 #endif /* CONFIG_MALI_DT */
 
 	aw_deinit(pdev);
 
-	return err;
+	return 0;
 }
 
 /**
@@ -722,7 +781,7 @@ int mali_platform_device_unregister(void)
  * Function   : aw_dvfs_queue_work
  * Description: Determine whether need to change GPU frequency.
  * Input      : work, a work_struct pointer.
- * Output     : None.
+ * Output     : None
  ****************************************************************
  */
 static void aw_dvfs_queue_work(struct work_struct *work)
@@ -759,7 +818,7 @@ static void aw_dvfs_queue_work(struct work_struct *work)
  * Description: Get Mali GPU utilization and start a queue work.
  * Input      : data, a mali_gpu_utilization_data pointer, which
  *		contains GPU GP and PP utilization.
- * Output     : None.
+ * Output     : None
  ****************************************************************
  */
 static void mali_gpu_utilization_callback(struct mali_gpu_utilization_data *data)

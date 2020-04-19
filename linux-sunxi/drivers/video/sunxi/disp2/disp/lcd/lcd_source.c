@@ -54,6 +54,26 @@ void sunxi_lcd_tcon_enable(u32 screen_id)
 }
 
 /**
+ * sunxi_lcd_dsi_close - stop dsi transition(will take care of dual dsi)
+ * @screen_id: The index of screen.
+ */
+void sunxi_lcd_dsi_close(u32 screen_id)
+{
+	if (g_lcd_drv.src_ops.sunxi_lcd_dsi_close)
+		g_lcd_drv.src_ops.sunxi_lcd_dsi_close(screen_id);
+}
+
+/**
+ * sunxi_lcd_dsi_open - start dsi transition(will take care of dual dsi)
+ * @screen_id: The index of screen.
+ */
+void sunxi_lcd_dsi_open(u32 screen_id)
+{
+	if (g_lcd_drv.src_ops.sunxi_lcd_dsi_open)
+		g_lcd_drv.src_ops.sunxi_lcd_dsi_open(screen_id);
+}
+
+/**
  * sunxi_lcd_tcon_disable - disable timing controller.
  * @screen_id: The index of screen.
  */
@@ -297,6 +317,22 @@ s32 sunxi_lcd_dsi_dcs_write_5para(u32 screen_id, u8 command, u8 para1, u8 para2,
 	tmp[3] = para4;
 	tmp[4] = para5;
 	sunxi_lcd_dsi_dcs_write(screen_id, command, tmp, 5);
+
+	return -1;
+}
+
+s32 sunxi_lcd_dsi_dcs_write_6para(u32 screen_id, u8 command, u8 para1, u8 para2,
+				  u8 para3, u8 para4, u8 para5, u8 para6)
+{
+	u8 tmp[6];
+
+	tmp[0] = para1;
+	tmp[1] = para2;
+	tmp[2] = para3;
+	tmp[3] = para4;
+	tmp[4] = para5;
+	tmp[5] = para6;
+	sunxi_lcd_dsi_dcs_write(screen_id, command, tmp, 6);
 
 	return -1;
 }

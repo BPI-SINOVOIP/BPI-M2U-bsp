@@ -40,32 +40,23 @@ extern int platform_axp_probe(sunxi_axp_dev_t* sunxi_axp_dev[], int max_dev);
 static sunxi_axp_dev_t  *sunxi_axp_dev[SUNXI_AXP_DEV_MAX]  = {NULL};
 
 __attribute__((section(".data")))
-static int pmu_nodeoffset_in_config = 0;
+static ulong pmu_nodeoffset_in_config = 0;
 
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
+#ifdef CONFIG_CHARGER_PMU
+	#define CHARGER_PMU 1
+#else
+	#define CHARGER_PMU 0
+#endif
+
+
 int axp_probe(void)
 {
 	int axp_num = 0;
 	memset(sunxi_axp_dev, 0, SUNXI_AXP_DEV_MAX * 4);
 
-	//pmu_nodeoffset = fdt_path_offset(working_fdt,PMU_SCRIPT_NAME);
 	pmu_nodeoffset_in_config = script_parser_offset(PMU_SCRIPT_NAME);
-	if(pmu_nodeoffset_in_config < 0)
+	if(pmu_nodeoffset_in_config == 0 )
 	{
 		printf("axp: get node[%s] error\n",PMU_SCRIPT_NAME);
 	}
@@ -75,22 +66,8 @@ int axp_probe(void)
 
 	return axp_num;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
+
 int axp_reinit(void)
 {
 	int i;
@@ -104,7 +81,7 @@ int axp_reinit(void)
 	}
 	//pmu_nodeoffset = fdt_path_offset(working_fdt,PMU_SCRIPT_NAME);
 	pmu_nodeoffset_in_config = script_parser_offset(PMU_SCRIPT_NAME);
-	if(pmu_nodeoffset_in_config < 0)
+	if(pmu_nodeoffset_in_config == 0)
 	{
 		printf("axp: get node[%s] error\n",PMU_SCRIPT_NAME);
 		return 0;
@@ -112,62 +89,17 @@ int axp_reinit(void)
 
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_get_power_vol_level(void)
 {
 	return gd->power_step_level;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_probe_startup_cause(void)
 {
-	return sunxi_axp_dev[0]->probe_this_poweron_cause();
+	return sunxi_axp_dev[CHARGER_PMU]->probe_this_poweron_cause();
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：axp_probe_startup_check_factory_mode
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：用于样机恢复出厂设置后，第一次启动系统要求，要在USB或火牛存在情况下才能按按键启动，启动后清除标志
-*
-*
-************************************************************************************************************
-*/
+
 int axp_probe_factory_mode(void)
 {
 	int buffer_value, status;
@@ -181,7 +113,6 @@ int axp_probe_factory_mode(void)
 		status = sunxi_axp_dev[0]->probe_power_status();
 		if(status > 0)  //has the dc or vbus
 		{
-			//获取 开机原因，是按键触发，或者插入电压触发
 			poweron_reason = sunxi_axp_dev[0]->probe_this_poweron_cause();
 			if(poweron_reason == AXP_POWER_ON_BY_POWER_KEY)
 			{
@@ -208,50 +139,20 @@ int axp_probe_factory_mode(void)
 
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
-int axp_set_hardware_poweron_vol(void) //设置开机之后，PMU硬件关机电压为2.9V
+
+int axp_set_hardware_poweron_vol(void)
 {
 	int vol_value = 0;
 
 	if(script_parser_fetch_by_offset(pmu_nodeoffset_in_config,"pmu_pwron_vol", (uint32_t*)&vol_value)<0)
 	{
-		puts("set power on vol to default\n");
+		pr_msg("set power on vol to default\n");
 	}
 
 	return sunxi_axp_dev[0]->set_power_onoff_vol(vol_value, 1);
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
-int axp_set_hardware_poweroff_vol(void) //设置关机之后，PMU硬件下次开机电压为3.3V
+
+int axp_set_hardware_poweroff_vol(void)
 {
 	int vol_value = 0;
 
@@ -262,365 +163,113 @@ int axp_set_hardware_poweroff_vol(void) //设置关机之后，PMU硬件下次�
 
 	return sunxi_axp_dev[0]->set_power_onoff_vol(vol_value, 0);
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int  axp_set_power_off(void)
 {
-	return sunxi_axp_dev[0]->set_power_off();
+	return sunxi_axp_dev[CHARGER_PMU]->set_power_off();
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_set_next_poweron_status(int value)
 {
 	return sunxi_axp_dev[0]->set_next_sys_mode(value);
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_probe_pre_sys_mode(void)
 {
-	return sunxi_axp_dev[0]->probe_pre_sys_mode();
+	return sunxi_axp_dev[CHARGER_PMU]->probe_pre_sys_mode();
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int  axp_power_get_dcin_battery_exist(int *dcin_exist, int *battery_exist)
 {
-	*dcin_exist    = sunxi_axp_dev[0]->probe_power_status();
-	*battery_exist = sunxi_axp_dev[0]->probe_battery_exist();
+	*dcin_exist    = sunxi_axp_dev[CHARGER_PMU]->probe_power_status();
+	*battery_exist = sunxi_axp_dev[CHARGER_PMU]->probe_battery_exist();
 
 	return 0;
 }
 
 int  axp_probe_battery_exist(void)
 {
-	return sunxi_axp_dev[0]->probe_battery_exist();
+	return sunxi_axp_dev[CHARGER_PMU]->probe_battery_exist();
+
 }
 
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：						axp_probe_power_source
-*
-*    参数列表：void
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
 int axp_probe_power_source(void)
 {
 	int status = 0;
-	status = sunxi_axp_dev[0]->probe_power_status();
+	status = sunxi_axp_dev[CHARGER_PMU]->probe_power_status();
 	return status;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int  axp_probe_battery_vol(void)
 {
-	return sunxi_axp_dev[0]->probe_battery_vol();
+	return sunxi_axp_dev[CHARGER_PMU]->probe_battery_vol();
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int  axp_probe_rest_battery_capacity(void)
 {
-	return sunxi_axp_dev[0]->probe_battery_ratio();
+	return sunxi_axp_dev[CHARGER_PMU]->probe_battery_ratio();
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int  axp_probe_key(void)
 {
 	return sunxi_axp_dev[0]->probe_key();
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int  axp_probe_charge_current(void)
 {
 	return sunxi_axp_dev[0]->probe_charge_current();
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int  axp_set_charge_current(int current)
 {
 	return sunxi_axp_dev[0]->set_charge_current(current);
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int  axp_set_charge_control(void)
 {
 	return sunxi_axp_dev[0]->set_charge_control();
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_set_vbus_limit_dc(void)
 {
+	script_parser_fetch_by_offset(pmu_nodeoffset_in_config,
+		"pmu_ac_vol", (uint32_t *)&gd->limit_vol);
+	script_parser_fetch_by_offset(pmu_nodeoffset_in_config,
+		"pmu_ac_cur", (uint32_t *)&gd->limit_cur);
 	sunxi_axp_dev[0]->set_vbus_vol_limit(gd->limit_vol);
 	sunxi_axp_dev[0]->set_vbus_cur_limit(gd->limit_cur);
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_set_vbus_limit_pc(void)
 {
+	script_parser_fetch_by_offset(pmu_nodeoffset_in_config,
+		"pmu_usbpc_vol", (uint32_t *)&gd->limit_pcvol);
+	script_parser_fetch_by_offset(pmu_nodeoffset_in_config,
+		"pmu_usbpc_cur", (uint32_t *)&gd->limit_pccur);
 	sunxi_axp_dev[0]->set_vbus_vol_limit(gd->limit_pcvol);
 	sunxi_axp_dev[0]->set_vbus_cur_limit(gd->limit_pccur);
 	return 0;
 }
 
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
 int axp_set_all_limit(void)
 {
-	script_parser_fetch_by_offset(pmu_nodeoffset_in_config,"pmu_ac_vol", (uint32_t*)&gd->limit_vol);
-	script_parser_fetch_by_offset(pmu_nodeoffset_in_config,"pmu_ac_cur", (uint32_t*)&gd->limit_cur);
-	script_parser_fetch_by_offset(pmu_nodeoffset_in_config,"pmu_usbpc_vol", (uint32_t*)&gd->limit_pcvol);
-	script_parser_fetch_by_offset(pmu_nodeoffset_in_config,"pmu_usbpc_cur", (uint32_t*)&gd->limit_pccur);
 
-	axp_set_vbus_limit_pc();
+	axp_set_vbus_limit_dc();
 
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_set_suspend_chgcur(void)
 {
 	return sunxi_axp_dev[0]->set_charge_current(gd->pmu_suspend_chgcur);
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_set_runtime_chgcur(void)
 {
 	return sunxi_axp_dev[0]->set_charge_current(gd->pmu_runtime_chgcur);
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_set_charge_vol_limit(void)
 {
 	int ret1;
@@ -644,114 +293,69 @@ int axp_set_charge_vol_limit(void)
 
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_set_power_supply_output(void)
 {
 	int   onoff;
-	uint power_supply_hd;
-	int power_index = 0, ret;
+	int power_index1 = 0,power_index2 = 0, ret;
 	char power_name[32];
 	int  power_vol;
 	int  power_vol_d;
 
-	power_supply_hd = script_parser_fetch_subkey_start("power_sply");
-	if(!power_supply_hd)
-	{
-		printf("unable to set power supply\n");
-		return -1;
-	}
 	do
 	{
 		memset(power_name, 0, 16);
-		ret = script_parser_fetch_subkey_next(power_supply_hd, power_name, &power_vol, &power_index);
+		ret = script_parser_fetch_subkey_next("power_sply", power_name, &power_vol, &power_index1,&power_index2);
 		if(ret < 0)
 		{
-			printf("find power_sply to end\n");
+			pr_msg("find power_sply to end\n");
 			return 0;
 		}
 
 		onoff = -1;
 		power_vol_d = 0;
 
-            if(power_vol > 10000)
-            {
-			onoff = 1;
-			power_vol_d = power_vol%10000;
-            }
-            else if(power_vol >= 0)
-            {
-			onoff = 0;
-			power_vol_d = power_vol;
-            }
+			if(power_vol > 10000)
+			{
+				onoff = 1;
+				power_vol_d = power_vol%10000;
+			}
+			else if(power_vol >= 0)
+			{
+				onoff = 0;
+				power_vol_d = power_vol;
+			}
 
-            printf("%s = %d, onoff=%d\n", power_name, power_vol_d, onoff);
+			pr_msg("%s = %d, onoff=%d\n", power_name, power_vol_d, onoff);
 
-            if(sunxi_axp_dev[0]->set_supply_status_byname(power_name, power_vol_d, onoff))
-            {
-                printf("axp set %s to %d failed\n", power_name, power_vol_d);
-            }
+			if(sunxi_axp_dev[0]->set_supply_status_byname(power_name, power_vol_d, onoff))
+			{
+				printf("axp set %s to %d failed\n", power_name, power_vol_d);
+			}
 	}while(1);
 
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_slave_set_power_supply_output(void)
 {
 	int  ret, onoff;
-	uint slave_power_sply;
 	char power_name[16];
-	int  power_vol, power_index = 0;
+	int  power_vol, power_index1 = 0,power_index2 = 0;
 	int  index = -1;
 	int  i;
 	int  power_vol_d;
-
-	slave_power_sply = script_parser_fetch_subkey_start("slave_power_sply");
-	if(!slave_power_sply)
-	{
-		printf("unable to set slave power supply\n");
-		return -1;
-	}
 
 	for(i=1;i<SUNXI_AXP_DEV_MAX;i++)
 	{
 		if(sunxi_axp_dev[i] != NULL)
 		{
-		    if(strcmp(sunxi_axp_dev[0]->pmu_name, sunxi_axp_dev[i]->pmu_name))
-		    {
-		        index = i;
+			if(strcmp(sunxi_axp_dev[0]->pmu_name, sunxi_axp_dev[i]->pmu_name))
+			{
+				index = i;
 
-		        break;
-		    }
+				break;
+			}
 		}
 	}
 	if(index == -1)
@@ -763,7 +367,7 @@ int axp_slave_set_power_supply_output(void)
 	do
 	{
 		memset(power_name, 0, 16);
-		ret = script_parser_fetch_subkey_next(slave_power_sply, power_name, &power_vol, &power_index);
+		ret = script_parser_fetch_subkey_next("slave_power_sply", power_name, &power_vol, &power_index1,&power_index2);
 		if(ret < 0)
 		{
 		      printf("find slave power sply to end\n");
@@ -801,22 +405,7 @@ int axp_slave_set_power_supply_output(void)
 
     return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_probe_power_supply_condition(void)
 {
 	int   dcin_exist, bat_vol;
@@ -840,7 +429,7 @@ int axp_probe_power_supply_condition(void)
 		sunxi_axp_dev[0]->set_coulombmeter_onoff(0);
 		sunxi_axp_dev[0]->set_coulombmeter_onoff(1);
 	}
-	//printf("bat_vol=%d, ratio=%d\n", bat_vol, ratio);
+	pr_msg("bat_vol=%d, ratio=%d\n", bat_vol, ratio);
 	if(ratio < 1)
 	{
 		if(dcin_exist)
@@ -866,120 +455,33 @@ int axp_probe_power_supply_condition(void)
 
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
-//static __u8 power_int_value[8];
+
+
 
 int axp_int_enable(__u8 *value)
 {
-	//sunxi_axp_dev[0]->probe_int_enable(power_int_value);
-	//sunxi_axp_dev[0]->set_int_enable(value);
-	//打开小cpu的中断使能
-	//*(volatile unsigned int *)(0x01f00c00 + 0x10) |= 1;
-	//*(volatile unsigned int *)(0x01f00c00 + 0x40) |= 1;
-
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_int_disable(void)
 {
-	//*(volatile unsigned int *)(0x01f00c00 + 0x10) |= 1;
-	//*(volatile unsigned int *)(0x01f00c00 + 0x40) &= ~1;
-	//return sunxi_axp_dev[0]->set_int_enable(power_int_value);
+
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    函数名称：
-*
-*    参数列表：
-*
-*    返回值  ：
-*
-*    说明    ：
-*
-*
-************************************************************************************************************
-*/
+
 int axp_int_query(__u8 *addr)
 {
-	int ret;
-
-	ret = sunxi_axp_dev[0]->probe_int_pending(addr);
-	//*(volatile unsigned int *)(0x01f00c00 + 0x10) |= 1;
-
-	return ret;
+	return 0;
 }
+
 /*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :  如果pmu_type = 0, 表示操作主PMU
-*                     如果合法的非零值，表示操作指定pmu
-*                     如果非法值，不执行任何操作
-*
-************************************************************************************************************
+pmu_type: 0- main pmu
 */
 int axp_set_supply_status(int pmu_type, int vol_name, int vol_value, int onoff)
 {
-	//调用不同的函数指针
 	return sunxi_axp_dev[pmu_type]->set_supply_status(vol_name, vol_value, onoff);
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
 int axp_set_supply_status_byname(char *pmu_type, char *vol_type, int vol_value, int onoff)
 {
 	int axp_index = 0;
@@ -997,46 +499,14 @@ int axp_set_supply_status_byname(char *pmu_type, char *vol_type, int vol_value, 
 
 	return -1;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
 int axp_probe_supply_status(int pmu_type, int vol_name, int vol_value)
 {
-	//调用不同的函数指针
 	return sunxi_axp_dev[pmu_type]->probe_supply_status(vol_name, 0, 0);
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
 int axp_probe_supply_status_byname(char *pmu_type, char *vol_type)
 {
-	//调用不同的函数指针
 	int   i;
 
 	for(i=0;i<SUNXI_AXP_DEV_MAX;i++)
@@ -1056,29 +526,29 @@ int axp_probe_supply_status_byname(char *pmu_type, char *vol_type)
 //example string  :    "axp81x_dcdc6 vdd-sys vdd-usb0-09 vdd-hdmi-09"
 static int find_regulator_str(const char* src, const char* des)
 {
-    int i,len_src, len_des ;
-    int token_index;
-    len_src = strlen(src);
-    len_des = strlen(des);
+	int i,len_src, len_des ;
+	int token_index;
+	len_src = strlen(src);
+	len_des = strlen(des);
 
-    if(len_des > len_src) return 0;
+	if(len_des > len_src) return 0;
 
-    token_index = 0;
-    for(i =0 ; i < len_src+1; i++)
-    {
-        if(src[i]==' ' || src[i] == '\t' || src[i] == '\0')
-        {
-            if(i-token_index == len_des)
-            {
-                if(memcmp(src+token_index,des,len_des) == 0)
-                {
-                    return 1;
-                }
-            }
-            token_index = i+1;
-        }
-    }
-    return 0;
+	token_index = 0;
+	for(i =0 ; i < len_src+1; i++)
+	{
+		if(src[i]==' ' || src[i] == '\t' || src[i] == '\0')
+		{
+			if(i-token_index == len_des)
+			{
+				if(memcmp(src+token_index,des,len_des) == 0)
+				{
+					return 1;
+				}
+			}
+			token_index = i+1;
+		}
+	}
+	return 0;
 }
 
 int axp_set_supply_status_byregulator(const char* id, int onoff)
@@ -1096,7 +566,7 @@ int axp_set_supply_status_byregulator(const char* id, int onoff)
 
 	do
 	{
-		strcpy(main_key,"regulator0");
+		strcpy(main_key,FDT_PATH_REGU);
 		main_hd = script_parser_fetch(main_key,"regulator_count",&ldo_count, 1);
 		if (main_hd != 0)
 		{
@@ -1164,22 +634,7 @@ int axp_set_supply_status_byregulator(const char* id, int onoff)
 
 	return ret;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
 int axp_probe_supply_pmu_name(char *axpname)
 {
 	static int current_pmu = -1;
@@ -1203,7 +658,7 @@ int axp_probe_supply_pmu_name(char *axpname)
 
 int axp_probe_vbus_cur_limit(void)
 {
-    return sunxi_axp_dev[0]->probe_vbus_cur_limit();
+	return sunxi_axp_dev[0]->probe_vbus_cur_limit();
 }
 
 int axp_set_coulombmeter_onoff(int onoff )
@@ -1211,4 +666,157 @@ int axp_set_coulombmeter_onoff(int onoff )
 	return sunxi_axp_dev[0]->set_coulombmeter_onoff(onoff);
 }
 
+
+__weak int axp_probe_vbus_type(void)
+{
+	return SUNXI_VBUS_PC;
+}
+
+
+#ifdef CONFIG_SUNXI_PIO_POWER_MODE
+struct sunxi_bias_set {
+	const char*  name;
+	u32  base;
+	u32  shift;
+};
+
+#define SUNXI_PIO_BIAS(_name, _shift)	\
+	{				\
+		.name = _name,		\
+		.base = SUNXI_PIO_BASE,	\
+		.shift = _shift,	\
+	}
+#define SUNXI_R_PIO_BIAS(_name, _shift)	\
+	{				\
+		.name = _name,		\
+		.base = SUNXI_RPIO_BASE,\
+		.shift = _shift,	\
+	}
+
+static const struct sunxi_bias_set gpio_bias_tlb[] = {
+	SUNXI_PIO_BIAS("pa_bias", 0),
+
+	SUNXI_PIO_BIAS("pc_bias", 2),
+	SUNXI_PIO_BIAS("pd_bias", 3),
+	SUNXI_PIO_BIAS("pe_bias", 4),
+	SUNXI_PIO_BIAS("pf_bias", 5),
+	SUNXI_PIO_BIAS("pg_bias", 6),
+
+	SUNXI_PIO_BIAS("pi_bias", 8),
+	SUNXI_PIO_BIAS("pj_bias", 9),
+
+	SUNXI_PIO_BIAS("vcc_bias", 12),
+
+
+	SUNXI_R_PIO_BIAS("pl_bias", 0),
+	SUNXI_R_PIO_BIAS("pm_bias", 1),
+};
+
+static char* __parse_axp_name(char *gpio_bias, int *offset)
+{
+	char *axp = gpio_bias + *offset;
+
+	while ( (axp[*offset]!=':') && (axp[*offset]!='\0') )
+		(*offset)++;
+
+	axp[(*offset)++]='\0';
+
+	return axp;
+}
+
+static char* __parse_supply_name(char *gpio_bias,int *offset)
+{
+	char *supply = gpio_bias + *offset;
+	while ( (gpio_bias[*offset]!=':') && (gpio_bias[*offset]!='\0') )
+		(*offset)++;
+	gpio_bias[(*offset)++]='\0';
+
+	return supply;
+}
+
+static u32 __parse_setting_vol(char *vol, char *gpio_bias,int *offset)
+{
+	vol = gpio_bias + *offset;
+	while ( (gpio_bias[*offset]!=':') && (gpio_bias[*offset]!='\0') )
+		(*offset)++;
+	return simple_strtoul(vol, NULL, 10);
+}
+
+static int __gpio_name_is_valid(char *gpio_name)
+{
+	int i,ret = -1;
+	for (i = 0; i<ARRAY_SIZE(gpio_bias_tlb); i++) {
+		if (!memcmp(gpio_bias_tlb[i].name,gpio_name,
+		            strlen(gpio_name))) {
+			ret = i;
+			break;
+		}
+	}
+	return ret;
+}
+
+static void __pio_power_mode_select(u32 vol, u32 index)
+{
+	int mode,val;
+
+	if (vol <= 1800)
+		mode = GPIO_1_8V_MODE;
+	else
+		mode = GPIO_3_3V_MODE;
+
+	val = readl(gpio_bias_tlb[index].base + GPIO_POW_MODE_REG);
+	val |= mode << gpio_bias_tlb[index].shift;
+	writel(val, gpio_bias_tlb[index].base + GPIO_POW_MODE_REG);
+}
+
+int set_sunxi_gpio_power_bias(void)
+{
+	char gpio_bias[GPIO_BIAS_MAX_LEN], gpio_name[GPIO_BIAS_MAX_LEN];
+	char *axp=NULL, *supply=NULL, *vol=NULL;
+	u32 bias_vol_set;
+	int port_index, supply_set;
+	int  index1 = 0,index2 = 0,offset = 0;
+
+	do {
+		offset = 0;
+		memset(gpio_bias, 0, GPIO_BIAS_MAX_LEN);
+		memset(gpio_name, 0, GPIO_BIAS_MAX_LEN);
+
+		if (script_parser_fetch_subkey_next(GPIO_BIAS_MAIN_NAME,
+		    gpio_name, (int *)gpio_bias, &index1,&index2))
+				break;
+
+			port_index =__gpio_name_is_valid(gpio_name);
+			if (port_index < 0) {
+				printf("Unsupport to set gpio %s\n",gpio_name);
+				break;
+			}
+
+		axp = __parse_axp_name(gpio_bias, &offset);
+		supply = __parse_supply_name(gpio_bias, &offset);
+		bias_vol_set = __parse_setting_vol(vol, gpio_bias, &offset);
+		supply_set = 0;
+		if (bias_vol_set > 10000) {
+			supply_set = 1;
+			bias_vol_set = bias_vol_set%10000;
+		} else if (bias_vol_set >= 0) {
+			supply_set = 0;
+
+		}
+		printf("set %s(%d) bias:%d\n", gpio_name,
+					port_index, bias_vol_set);
+		__pio_power_mode_select(bias_vol_set, port_index);
+
+		if (supply_set) {
+			printf("axp=%s, supply=%s, vol=%d\n", axp,
+				supply, bias_vol_set);
+			if (axp_set_supply_status_byname(axp, supply,
+							bias_vol_set, 1) < 0)
+				printf("pmu set fail!\n");
+			}
+		} while(1);
+
+		return 0;
+}
+#endif /*CONFIG_SUNXI_PIO_POWER_MODE*/
 

@@ -115,11 +115,18 @@ static int uvc_queue_init(struct uvc_video_queue *queue,
 	int ret;
 
 	queue->queue.type = type;
+#ifdef CONFIG_USB_SUNXI_G_WEBCAM
+	queue->queue.io_modes = VB2_MMAP | VB2_USERPTR | VB2_DMABUF;
+#else
 	queue->queue.io_modes = VB2_MMAP | VB2_USERPTR;
+#endif
 	queue->queue.drv_priv = queue;
 	queue->queue.buf_struct_size = sizeof(struct uvc_buffer);
 	queue->queue.ops = &uvc_queue_qops;
 	queue->queue.mem_ops = &vb2_vmalloc_memops;
+#ifdef CONFIG_USB_SUNXI_G_WEBCAM
+	queue->queue.timestamp_type = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
+#endif
 	ret = vb2_queue_init(&queue->queue);
 	if (ret)
 		return ret;

@@ -56,12 +56,21 @@ typedef struct
 	//for screen0/1/2
 	enum disp_output_type      output_type[DISP_SCREEN_NUM];
 	unsigned int          output_mode[DISP_SCREEN_NUM];
+	enum disp_csc_type      output_format[DISP_SCREEN_NUM];
+	enum disp_data_bits     output_bits[DISP_SCREEN_NUM];
+	enum disp_eotf          output_eotf[DISP_SCREEN_NUM];
+	enum disp_color_space   output_cs[DISP_SCREEN_NUM];
+	bool using_device_config[DISP_SCREEN_NUM];
+	unsigned int            reserve1;
+	unsigned int            reserve2;
 
 	//for fb0/1/2
 	unsigned int          buffer_num[DISP_SCREEN_NUM];
 	enum disp_pixel_format     format[DISP_SCREEN_NUM];
 	unsigned int          fb_width[DISP_SCREEN_NUM];
 	unsigned int          fb_height[DISP_SCREEN_NUM];
+
+	unsigned int chn_cfg_mode;
 }disp_init_para;
 
 typedef struct
@@ -195,12 +204,14 @@ extern s32 disp_unregister_sync_finish_proc(void (*proc)(u32));
 extern s32 disp_register_ioctl_func(unsigned int cmd, int (*proc)(unsigned int cmd, unsigned long arg));
 extern s32 disp_unregister_ioctl_func(unsigned int cmd);
 extern s32 disp_register_compat_ioctl_func(unsigned int cmd, int (*proc)(unsigned int cmd, unsigned long arg));
+extern s32 disp_unregister_compat_ioctl_func(unsigned int cmd);
 extern s32 disp_register_standby_func(int (*suspend)(void), int (*resume)(void));
 extern s32 disp_unregister_standby_func(int (*suspend)(void), int (*resume)(void));
 extern s32 composer_init(disp_drv_info *psg_disp_drv);
 extern unsigned int composer_dump(char* buf);
 extern s32 disp_tv_register(struct disp_tv_func * func);
 extern s32 disp_set_hdmi_detect(bool hpd);
+s32 disp_set_edp_func(struct disp_tv_func *func);
 
 extern disp_drv_info    g_disp_drv;
 
@@ -222,5 +233,11 @@ s32 Display_set_fb_timming(u32 sel);
 unsigned int disp_boot_para_parse(const char *name);
 const char *disp_boot_para_parse_str(const char *name);
 int disp_get_parameter_for_cmdlind(char *cmdline, char *name, char *value);
+int disp_suspend(struct device *dev);
+int disp_resume(struct device *dev);
+#if defined(CONFIG_SUNXI_IOMMU)
+#define DE_MASTOR_ID 0
+extern void sunxi_enable_device_iommu(unsigned int mastor_id, bool flag);
+#endif
 
 #endif

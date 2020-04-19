@@ -2,20 +2,18 @@
 # ARM CPU Frequency scaling drivers
 #
 
-config ARM_SUNXI_CPUFREQ
-	bool "SUNXI CPUFreq driver support"
-	depends on ARCH_SUN50I || ARCH_SUN8IW10 || ARCH_SUN8IW11
+config ARM_SUNXI_IKS_CPUFREQ
+	bool "SUNXI CPUFreq IKS driver support"
+	depends on ARCH_SUN9IW1 || ARCH_SUN8IW6 || ARCH_SUN8IW9 || ARCH_SUN8IW17
 	help
-	  This adds the CPUFreq driver for the Allwinner SUNXI SoC.
-
+	  This adds the CPUFreq driver for sunxi big.little soc.
 	  If in doubt, say N.
 
-config CPU_VOLTAGE_SCALING
-	bool "CPU voltage change with frequency"
-	depends on ARM_SUNXI_CPUFREQ && AW_AXP
-	depends on !SUNXI_ARISC
+config ARM_SUNXI_CPUFREQ
+	bool "SUNXI CPUFreq driver support"
+	depends on ARCH_SUN50I || ARCH_SUN8IW5 || ARCH_SUN8IW10 || ARCH_SUN8IW11
 	help
-	  This will allow cpu voltage dynamic changed when the frequency is changed.
+	  This adds the CPUFreq driver for the Allwinner SUNXI SoC.
 
 	  If in doubt, say N.
 

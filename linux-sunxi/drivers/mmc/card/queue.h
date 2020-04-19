@@ -67,6 +67,8 @@ extern void mmc_queue_resume(struct mmc_queue *);
 
 extern unsigned int mmc_queue_map_sg(struct mmc_queue *,
 				     struct mmc_queue_req *);
+extern unsigned int sd_mmc_queue_map_sg(struct mmc_queue *,
+				     struct mmc_queue_req *);
 extern void mmc_queue_bounce_pre(struct mmc_queue_req *);
 extern void mmc_queue_bounce_post(struct mmc_queue_req *);
 

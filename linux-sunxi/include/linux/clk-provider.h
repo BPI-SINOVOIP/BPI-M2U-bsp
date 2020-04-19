@@ -34,6 +34,7 @@
 #define CLK_IGNORE_DISABLE      BIT(11) /* for sunxi use */
 #define CLK_RATE_FLAT_FACTORS   BIT(12) /* for sunxi use */
 #define CLK_RATE_FLAT_DELAY     BIT(13) /* for sunxi use */
+#define CLK_IGNORE_ENABLE_DISABLE BIT(14) /* for sunxi use */
 struct clk_hw;
 
 /**

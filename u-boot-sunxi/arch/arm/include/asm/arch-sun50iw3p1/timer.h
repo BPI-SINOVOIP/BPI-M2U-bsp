@@ -77,11 +77,10 @@ struct sunxi_timer_reg {
 	volatile u32 tirqen;		/* 0x00 */
 	volatile u32 tirqsta;	/* 0x04 */
 	uint     res1[2];
-	struct sunxi_timer timer[6];	/* We have 6 timers */
-	uint  	 res2[4];
-	struct sunxi_avs avs;
-	uint     res3[4];
-	struct sunxi_wdog wdog[4];
+	struct sunxi_timer timer[6];		/* We have 6 timers */
+	uint  	 res2[12];			/* 0x70 */
+	struct sunxi_wdog wdog[1];		/* 0xa0 */
+	struct sunxi_avs avs;			/* 0xc0 */
 };
 
 struct timer_list

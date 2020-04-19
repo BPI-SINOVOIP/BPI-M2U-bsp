@@ -40,8 +40,7 @@
 #include <smc.h>
 #include <sunxi_board.h>
 #include <fdt_support.h>
-
-
+#include <sys_config_old.h>
 
 /* The sunxi internal brom will try to loader external bootloader
  * from mmc0, nannd flash, mmc2.
@@ -51,6 +50,7 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 extern void power_limit_init(void);
+extern s32 axp22_usb_vbus_output(int hight);
 
 #ifdef CONFIG_SUNXI_MODULE_AXP
 int power_source_init(void)
@@ -170,31 +170,20 @@ int sunxi_set_secure_mode(void)
 {
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
-int sunxi_get_securemode(void)
+
+s32 axp_usb_vbus_output(void)
 {
-	return gd->securemode;
+	int vbus_gpio,ret;
+	ret = script_parser_fetch("platform", "boot_usb0_drv_vbus_gpio",
+							(int *)&vbus_gpio, 1);
+	if(ret < 0) {
+		debug("%s:get boot_usb0_drv_vbus_gpio error\n",__func__);
+		vbus_gpio = 0;
+	}
+
+	if (axp22_usb_vbus_output(vbus_gpio) > 0)
+		return 1;
+
+	return 0;
 }
-
-int sunxi_probe_secure_monitor(void)
-{
-	return uboot_spare_head.boot_data.secureos_exist == SUNXI_SECURE_MODE_USE_SEC_MONITOR?1:0;
-}
-
-
 

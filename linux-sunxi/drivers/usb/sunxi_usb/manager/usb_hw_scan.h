@@ -16,6 +16,11 @@
 #ifndef  __USB_HW_SCAN_H__
 #define  __USB_HW_SCAN_H__
 
+#ifdef CONFIG_IO_EXPAND
+extern __u32 g_usb_drv_det_pin;
+extern __u32 g_usb_board_sel;
+#endif
+
 #define  USB_SCAN_INSMOD_DEVICE_DRIVER_DELAY	2
 #define  USB_SCAN_INSMOD_HOST_DRIVER_DELAY	1
 

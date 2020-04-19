@@ -577,7 +577,7 @@ config MMC_SH_MMCIF
 
 config MMC_SUNXI
 	tristate "Winner's(SUNXI) SD/Multimedia Card Interface support"
-	depends on MMC && (ARCH_SUN8I||ARCH_SUN9I||ARCH_SUN50I)
+	depends on MMC && (ARCH_SUN8I||ARCH_SUN9I||ARCH_SUN50I||ARCH_SUN3I)
 	default y
 	help
 	  This selects support for the SD/MMC controller on AllWinner SoCs.

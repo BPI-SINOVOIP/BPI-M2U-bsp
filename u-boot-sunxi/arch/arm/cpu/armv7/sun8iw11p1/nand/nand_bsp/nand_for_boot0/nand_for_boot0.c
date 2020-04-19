@@ -28,7 +28,6 @@
 #include "../nand_common.h"
 #include "bsp_nand.h"
 
-extern void NAND_Print( const char * str, ...);
 extern int  BOOT_NandGetPara(boot_nand_para_t *nand_info, __u32 size);
 /*
 ************************************************************************************************************************

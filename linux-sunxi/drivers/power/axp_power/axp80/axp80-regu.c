@@ -68,9 +68,9 @@ static struct axp_regulator_info axp80_regulator_info[] = {
 	AXP80_DCDC(B,      1000, 2550, 50,   DCDCB, 0, 5,  DCDCBEN, 0x02,
 		0x02,    0,     0,   0, 0, 0x1B, 0x02, 0x1C, 0, 0, 0),
 	AXP80_DCDC(C,       600, 1520, 10,   DCDCC, 0, 7,  DCDCCEN, 0x04,
-		0x04,    0,  1100,  20, 0, 0x1B, 0x04, 0x1C, 0, 0, 0),
+		0x04,    0,  1100,  20, 0, 0x1B, 0x04, 0x1C, 0x1a, 1, 0),
 	AXP80_DCDC(D,       600, 3300, 20,   DCDCD, 0, 6,  DCDCDEN, 0x08,
-		0x08,    0,  1500, 100, 0, 0x1B, 0x08, 0x1C, 0, 0, 0),
+		0x08,    0,  1500, 100, 0, 0x1B, 0x08, 0x1C, 0x1a, 2, 0),
 	AXP80_DCDC(E,      1100, 3400, 100,  DCDCE, 0, 5,  DCDCEEN, 0x10,
 		0x10,    0,     0,   0, 0, 0x1B, 0x10, 0x1C, 0, 0, 0),
 	AXP80_LDO(1,        700, 3300, 100,  ALDO1, 0, 5,  ALDO1EN, 0x20,
@@ -214,6 +214,9 @@ static struct regulator_init_data axp_regl_init_data[] = {
 			.max_uV = 3300000,
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE
 				| REGULATOR_CHANGE_STATUS,
+#ifdef CONFIG_ARCH_SUN50IW6
+			.always_on = 1,
+#endif
 		},
 	},
 	[VCC_LDO9] = {

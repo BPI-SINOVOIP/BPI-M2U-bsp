@@ -3,19 +3,19 @@
  * operation on ini file API used in kernel
  * parse ini file to mainkey and subkey value
  * Author: raymonxiu
- * 
+ *
  */
 
 #ifndef __CFG__OP__H__
 #define __CFG__OP__H__
-
+#include <linux/vmalloc.h>
 
 #define LINE_MAX_CHAR_NUM 512
-#define MAX_LINE_NUM      2048
+#define MAX_LINE_NUM      1024
 #define MAX_NAME_LEN      32
 #define MAX_VALUE_LEN     128
-#define MAX_MAINKEY_NUM   64
-#define MAX_SUBKEY_NUM    1024
+#define MAX_MAINKEY_NUM   16
+#define MAX_SUBKEY_NUM    512
 #define INI_MAX_CHAR_NUM (LINE_MAX_CHAR_NUM * MAX_LINE_NUM)
 #define BIN_MAX_SIZE			4096*4
 
@@ -32,19 +32,19 @@ enum cfg_key_flag {
 
 struct cfg_item {
   int                 val;
-  char                *str;
+  char                str[MAX_VALUE_LEN];
 };
 
 struct cfg_subkey {
   char                name[MAX_NAME_LEN];
-  struct cfg_item      *value;
+  struct cfg_item      value;
   enum cfg_item_type  type;
   enum cfg_key_flag   cfg_flag;
 };
 
 struct cfg_mainkey {
   char                name[MAX_NAME_LEN];
-  struct cfg_subkey   *subkey[MAX_SUBKEY_NUM];
+  struct cfg_subkey   subkey[MAX_SUBKEY_NUM];
   char                *subkey_name[MAX_SUBKEY_NUM];
   char                *subkey_value[MAX_SUBKEY_NUM];
   int                 subkey_cnt;

@@ -635,6 +635,7 @@ unsigned int __clk_get_enable_count(struct clk *clk)
 {
 	return !clk ? 0 : clk->enable_count;
 }
+EXPORT_SYMBOL(__clk_get_enable_count);
 
 unsigned int __clk_get_prepare_count(struct clk *clk)
 {

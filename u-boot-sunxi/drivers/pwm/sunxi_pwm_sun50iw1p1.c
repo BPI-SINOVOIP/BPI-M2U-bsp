@@ -24,6 +24,7 @@
 #include <pwm.h>
 #include <fdt_support.h>
 #include <malloc.h>
+#include<clk/clk.h>
 
 #define sys_get_wvalue(n)   (*((volatile uint *)(n)))          /* word input */
 #define sys_put_wvalue(n,c) (*((volatile uint *)(n))  = (c))   /* word output */
@@ -55,6 +56,13 @@ user_gpio_set_t pwm_gpio_info[PWM_NUM][2];
 #define SET_BITS(shift, width, reg, val) \
             (((reg) & CLRMASK(width, shift)) | (val << (shift)))
 
+#if ((defined CONFIG_ARCH_SUN50IW6P1IW12P1) ||\
+                       (defined CONFIG_ARCH_SUN8IW17P1) ||\
+                       (defined CONFIG_ARCH_SUN50IW6P1) ||\
+                       (defined CONFIG_ARCH_SUN50IW3P1))
+#define CLK_GATE_SUPPORT
+#endif
+
 struct sunxi_pwm_cfg {
 	unsigned int reg_busy_offset;
 	unsigned int reg_busy_shift;
@@ -79,7 +87,6 @@ struct sunxi_pwm_cfg {
 	unsigned int reg_prescal_offset;
 	unsigned int reg_prescal_shift;
 	unsigned int reg_prescal_width;
-
 };
 
 struct sunxi_pwm_chip {
@@ -90,6 +97,9 @@ struct sunxi_pwm_chip {
 	int                     pwm;
 	int 			pwm_base;
 	struct sunxi_pwm_cfg *config;
+#ifdef CLK_GATE_SUPPORT
+	struct clk *pwm_clk;
+#endif
 };
 
 static LIST_HEAD(pwm_list);
@@ -393,7 +403,9 @@ void sunxi_pwm_disable(struct sunxi_pwm_chip* pchip)
 	else
 		sprintf(pin_name, "pwm%d", pwm);
 	sunxi_pwm_pin_set_state(pin_name, PWM_PIN_STATE_SLEEP);
-
+#if defined CLK_GATE_SUPPORT
+	clk_disable(pchip->pwm_clk);
+#endif
 }
 
 void sunxi_pwm_init(void)
@@ -668,6 +680,18 @@ int pwm_request(int pwm, const char *label)
 		printf("fdt_getprop_u32 %s.%s fail\n", main_name, sub_name);
 		return -1;
 	}
+#if defined(CLK_GATE_SUPPORT)
+	pchip->pwm_clk = clk_get(NULL, "pwm");
+	if (pchip->pwm_clk == NULL) {
+		printf("%s: can't get pwm clk\n", __func__);
+		return -1;
+	}
+	ret = clk_prepare_enable(pchip->pwm_clk);
+	if (ret) {
+		printf("failed to enable pwm clock\n");
+		return -1;
+	}
+#endif
 
 
 	/* pwm is included is in pwm area.*/

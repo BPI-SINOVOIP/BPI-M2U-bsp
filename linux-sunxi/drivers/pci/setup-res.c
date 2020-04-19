@@ -26,7 +26,7 @@
 #include <linux/slab.h>
 #include "pci.h"
 
-
+#define PCIE_BASE_DEVIATION	0x10000
 void pci_update_resource(struct pci_dev *dev, int resno)
 {
 	struct pci_bus_region region;
@@ -135,7 +135,6 @@ EXPORT_SYMBOL(pci_claim_resource);
 void pci_disable_bridge_window(struct pci_dev *dev)
 {
 	dev_info(&dev->dev, "disabling bridge mem windows\n");
-
 	/* MMIO Base/Limit */
 	pci_write_config_dword(dev, PCI_MEMORY_BASE, 0x0000fff0);
 
@@ -238,7 +237,6 @@ static int _pci_assign_resource(struct pci_dev *dev, int resno,
 			break;
 		bus = bus->parent;
 	}
-
 	if (ret) {
 		if (res->flags & IORESOURCE_MEM)
 			if (res->flags & IORESOURCE_PREFETCH)
@@ -272,7 +270,14 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 
 	size = resource_size(res);
 	ret = _pci_assign_resource(dev, resno, size, align);
-
+#ifdef CONFIG_ARCH_SUN50IW6
+	if (res->flags & IORESOURCE_MEM_64) {
+		res->start |= PCIE_BASE_DEVIATION;
+		res->start = res->start - 0x100000;
+		res->end |= PCIE_BASE_DEVIATION;
+		res->end = res->end - 0x100000;
+	}
+#endif
 	/*
 	 * If we failed to assign anything, let's try the address
 	 * where firmware left it.  That at least has a chance of

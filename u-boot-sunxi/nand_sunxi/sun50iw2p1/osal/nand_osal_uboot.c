@@ -42,12 +42,12 @@ DECLARE_GLOBAL_DATA_PTR;
 extern int sunxi_get_securemode(void);
 __u32 get_wvalue(__u32 addr)
 {
-	return (smc_readl(addr));
+	return readl(addr);
 }
 
 void put_wvalue(__u32 addr,__u32 v)
 {
-	smc_writel(v, addr);
+	writel(v, addr);
 }
 
 __u32 NAND_GetNdfcVersion(void);

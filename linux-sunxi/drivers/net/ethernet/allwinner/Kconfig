@@ -49,32 +49,12 @@ config SUNXI_GMAC
           To compile this driver as a module, choose M here.  The module
           will be called sunxi-gmac.
 
-if SUNXI_GMAC
-config GETH_SCRIPT_SYS
-	bool "Use sunxi platform script"
+config SUNXI_EXT_PHY
+	bool "Use extern phy"
 	depends on SUNXI_GMAC
 	default y
 	---help---
-	 The gabit ethernet gpio request and control by the script
-	 of sunxi platform. Select it, by script. If not, ioremap
-	 by drivers itself.
-
-config GETH_CLK_SYS
-	bool "Clock use system interface"
-	depends on SUNXI_GMAC
-	default y
-	---help---
-	 It select the clock controler is system or the driver itself.
-	 If you want to use the system interface, select it. If not, the
-	 driver will control the clock by ioremap.
-
-config GETH_PHY_POWER
-	bool "External PHY power control"
-	depends on SUNXI_GMAC && REGULATOR
-	default y
-	---help---
-	 If external PHY power is exist, and it want to be controled,
-	 select it.  If not, it mean the power of PHY already on.
-endif
+	  Allwinnertech SOC support both internal & extern PHY, Say "Y" to
+	  choose use extern phy, Say "N" to use internal phy
 
 endif # NET_VENDOR_ALLWINNER

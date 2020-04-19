@@ -6,6 +6,9 @@
 #define AXP259_IC_TYPE             (0x03)
 #define AXP259_BUFFER1             (0x05)
 
+#define AXP259_GPIO1_CTL           (0x18)
+#define AXP259_GPIO2_CTL           (0x19)
+#define AXP259_GPIO1_SIGNAL        (0x1A)
 #define AXP259_CHARGE1             (0x20)
 #define AXP259_CHARGE2             (0x21)
 #define AXP259_CHARGE3             (0x22)

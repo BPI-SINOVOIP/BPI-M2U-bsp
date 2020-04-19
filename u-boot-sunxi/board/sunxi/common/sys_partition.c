@@ -27,6 +27,7 @@
 #include <sunxi_mbr.h>
 #include <boot_type.h>
 #include <u-boot/crc.h>
+#include <sys_partition.h>
 
 
 static char mbr_buf[SUNXI_MBR_SIZE];
@@ -199,31 +200,46 @@ int sunxi_partition_refresh(void *buf, uint bytes)
 	return 0;
 }
 
+int sunxi_partition_get_type(void)
+{
+	return PART_TYPE_AW;
+}
+
+
 int sunxi_partition_init(void)
 {
-    sunxi_mbr_t    *mbr;
+	sunxi_mbr_t    *mbr;
+	int mbr_offset = 0;
+	int i = 0;
 
-    if(!sunxi_flash_read(0, SUNXI_MBR_SIZE >> 9, mbr_buf))
+	for (i = 0; i < SUNXI_MBR_COPY_NUM; i++)
 	{
-		printf("read flash error\n");
+		if (!sunxi_flash_read(mbr_offset, SUNXI_MBR_SIZE >> 9, mbr_buf))
+		{
+			printf("read mbr copy[%d] failed\n", i);
+			mbr_offset += (SUNXI_MBR_SIZE >> 9);
+			continue;
+		}
 
-		return 0;
+		mbr = (sunxi_mbr_t*)mbr_buf;
+		if (!strncmp((const char*)mbr->magic, SUNXI_MBR_MAGIC, 8))
+		{
+			int crc = 0;
+
+			crc = crc32(0, (const unsigned char *)&mbr->version, SUNXI_MBR_SIZE-4);
+			if (crc == mbr->crc32)
+			{
+				printf("used mbr [%d], count = %d\n", i, mbr->PartCount);
+				mbr_status = 1;
+				gd->lockflag = mbr->lockflag;
+
+				return mbr->PartCount;
+			}
+		}
+
+		printf("crc mbr copy[%d] failed\n", i);
+		mbr_offset += (SUNXI_MBR_SIZE >> 9);
 	}
-	mbr = (sunxi_mbr_t*)mbr_buf;
-   	if(!strncmp((const char*)mbr->magic, SUNXI_MBR_MAGIC, 8))
-   	{
-        int crc = 0;
-
-        crc = crc32(0, (const unsigned char *)&mbr->version, SUNXI_MBR_SIZE-4);
-        if(crc == mbr->crc32)
-        {
-			debug("mbr part count = %d\n", mbr->PartCount);
-			mbr_status = 1;
-			gd->lockflag = mbr->lockflag;
-
-            return mbr->PartCount;
-        }
-   	}
 	mbr_status = 0;
 	debug("mbr crc error\n");
 

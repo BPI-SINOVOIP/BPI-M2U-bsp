@@ -26,17 +26,14 @@
 #define __BASE_PMU_H_
 
 
-int sunxi_rsb_init(u32 slave_id);
-int sunxi_rsb_config(u32 slave_id, u32 rsb_addr);
+int pmu_init(u8 power_mode);
 
-int axp_i2c_read(unsigned char chip, unsigned char addr, unsigned char *buffer);
-int axp_i2c_write(unsigned char chip, unsigned char addr, unsigned char data);
+s32 pmu_bus_init(void);
+s32 pmu_bus_read(u32 rtaddr, u32 daddr, u8 *data);
+s32 pmu_bus_write(u32 rtaddr, u32 daddr, u8 data);
 
-
-int pmu_init(void);
 int set_ddr_voltage(int set_vol);
 int set_pll_voltage(int set_vol);
-
 int probe_power_key(void);
 
 #endif  /* __BASE_PMU_H_ */

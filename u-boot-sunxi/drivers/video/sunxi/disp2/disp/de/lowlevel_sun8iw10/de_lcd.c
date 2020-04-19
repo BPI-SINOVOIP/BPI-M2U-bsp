@@ -357,11 +357,15 @@ static s32 tcon0_cfg_mode_auto(u32 sel, disp_panel_para * panel)
   {
 	if (panel->lcd_interlace){
 		lcd_dev[sel]->tcon0_basic0.bits.y = panel->lcd_y/2 - 1;
-		lcd_dev[sel]->tcon0_basic2.bits.vt = (panel->lcd_hv_syuv_fdly == LCD_HV_SRGB_FDLY_2LINE)? 525:625;
-			start_delay = panel->lcd_vt/2-panel->lcd_y/2-10;
+		lcd_dev[sel]->tcon0_basic2.bits.vt =
+		    (panel->lcd_hv_syuv_fdly == LCD_HV_SRGB_FDLY_2LINE) ? 625
+									: 525;
+		start_delay = panel->lcd_vt / 2 - panel->lcd_y / 2 - 10;
 	  } else {
 		lcd_dev[sel]->tcon0_basic0.bits.y = panel->lcd_y - 1;
-		lcd_dev[sel]->tcon0_basic2.bits.vt = (panel->lcd_hv_syuv_fdly == LCD_HV_SRGB_FDLY_2LINE)? 1050:1250;
+		lcd_dev[sel]->tcon0_basic2.bits.vt =
+		    (panel->lcd_hv_syuv_fdly == LCD_HV_SRGB_FDLY_2LINE) ? 1250
+									: 1050;
 	  }
 
       lcd_dev[sel]->tcon0_basic1.bits.ht = (panel->lcd_ht==0)? 0:(panel->lcd_ht*2-1);
@@ -585,6 +589,14 @@ s32 tcon0_tri_busy(u32 sel)
 	return lcd_dev[sel]->tcon0_cpu_ctl.bits.trigger_start;
 }
 
+s32 tcon0_cpu_set_auto_mode(u32 sel)
+{
+	/* trigger mode 0 */
+	lcd_dev[sel]->tcon0_cpu_ctl.bits.auto_ = 1;
+	/* trigger mode 1 */
+	lcd_dev[sel]->tcon0_cpu_ctl.bits.flush = 0;
+	return 0;
+}
 
 s32 tcon0_tri_start(u32 sel)
 {
@@ -689,6 +701,43 @@ s32 tcon0_cpu_wr_24b(u32 sel, u32 index, u32 data)
 s32 tcon0_cpu_rd_24b(u32 sel, u32 index, u32 *data)
 {
 	return -1;
+}
+
+s32 tcon0_cpu_rd_24b_data(u32 sel, u32 index, u32 *data, u32 size)
+{
+	u32 count = 0;
+	u32 tmp;
+	int i = 0;
+
+	tcon0_cpu_wr_24b_index(sel, tcon0_cpu_16b_to_24b(index));
+
+	count = 0;
+	while ((tcon0_cpu_busy(sel)) && (count < 50)) {
+		count++;
+		disp_delay_us(100);
+	}
+
+	lcd_dev[sel]->tcon0_cpu_ctl.bits.da = 0;
+	lcd_dev[sel]->tcon0_cpu_ctl.bits.ca = 1;
+	tmp = lcd_dev[sel]->tcon0_cpu_rd.bits.data_rd0;
+	lcd_dev[sel]->tcon0_cpu_ctl.bits.da = 1;
+
+	for (i = 0; i < size; i++) {
+		count = 0;
+		while ((tcon0_cpu_busy(sel)) && (count < 50)) {
+			count++;
+			disp_delay_us(100);
+		}
+
+		lcd_dev[sel]->tcon0_cpu_ctl.bits.da = 0;
+		lcd_dev[sel]->tcon0_cpu_ctl.bits.ca = 1;
+		tmp = lcd_dev[sel]->tcon0_cpu_rd.bits.data_rd0;
+		lcd_dev[sel]->tcon0_cpu_ctl.bits.da = 1;
+
+		*data++ = tcon0_cpu_24b_to_16b(tmp);
+	}
+
+	return 0;
 }
 
 s32 tcon0_cpu_wr_16b(u32 sel, u32 index, u32 data)
@@ -1278,4 +1327,3 @@ s32 tcon_cmap(u32 sel, u32 mode,unsigned int lcd_cmap_tbl[2][3][4])
 	}
     return 0;
 }
-

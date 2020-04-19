@@ -21,67 +21,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-#if defined(CONFIG_ARCH_SUN8I)
-#define GETH_BASE		0x01c30000
-#elif defined(CONFIG_ARCH_SUN9I)
-#define GETH_BASE		0x00830000
-#endif
-
-/******************************************************************************
- *
- * the system register for geth.
- *
- *****************************************************************************/
-#if defined(CONFIG_ARCH_SUN8I)
-#define GPIO_BASE		0x01C20800
-#elif defined(CONFIG_ARCH_SUN9I)
-#define GPIO_BASE		0x06000800
-#endif
-#define PA_CFG0			(0x00)
-#define PA_CFG1			(0x04)
-#define PA_CFG2			(0x08)
-#define PA_CFG3			(0x0C)
-
-/* Clk control */
-#if defined(CONFIG_ARCH_SUN8I) \
-	|| defined(CONFIG_ARCH_SUN50I)
-
-#define CCMU_BASE		0x01c20000
-#define AHB1_GATING		(0x60)
-#define AHB1_MOD_RESET		(0x2c0)
-
-#if defined(CONFIG_ARCH_SUN8IW1)
-#define SYS_CTL_BASE		CCMU_BASE
-#define GETH_CLK_REG		0x00D0
-#define GETH_CLK_GPIT		0x00000004
-#elif defined(CONFIG_ARCH_SUN8IW11)
-#define SYS_CTL_BASE		0x01c20000
-#define GETH_CLK_REG		0x0164
-#define GETH_CLK_GPIT		0x00000004
-#else
-#define SYS_CTL_BASE		0x01c00000
-#define GETH_CLK_REG		0x0030
-#define GETH_CLK_GPIT		0x00000004
-#endif
-
-#elif defined(CONFIG_ARCH_SUN9I)
-
-#define CCMU_BASE		0x06000400
-#define AHB1_GATING		(0x0184)
-#define AHB1_MOD_RESET		(0x01A4)
-
-#define SYS_CTL_BASE		0x00800000
-#define GETH_CLK_REG		0x0030
-#define GETH_CLK_GPIT		0x00000004
-
-#endif
-
-#define GETH_RESET_BIT		0x00020000
-#define GETH_AHB_BIT		0x00020000
-
-#define PLL1_CFG		0x00
-#define PLL6_CFG		0x28
-
 /* GETH_FRAME_FILTER  register value */
 #define GETH_FRAME_FILTER_PR	0x00000001	/* Promiscuous Mode */
 #define GETH_FRAME_FILTER_HUC	0x00000002	/* Hash Unicast */
@@ -305,6 +244,10 @@ int desc_rx_frame_len(struct dma_desc *desc);
 
 int sunxi_mac_reset(void *iobase, void (*mdelay)(int), int n);
 int sunxi_geth_register(void *iobase, int version, unsigned int div);
+
+#if defined(CONFIG_SUNXI_EPHY)
+extern int ephy_is_enable(void);
+#endif
 
 #if defined(CONFIG_ARCH_SUN8IW3) \
 	|| defined(CONFIG_ARCH_SUN9IW1) \

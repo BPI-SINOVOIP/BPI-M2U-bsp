@@ -57,8 +57,10 @@ extern int nand_secure_storage_read(int item, unsigned char *buf,
 extern int nand_secure_storage_write(int item, unsigned char *buf,
 				     unsigned int len);
 
-extern int NAND_BurnBoot0(uint length, void *buf);
-extern int NAND_BurnBoot1(uint length, void *buf);
+extern int NAND_ReadBoot0(unsigned int length, void *buf);
+extern int NAND_ReadBoot1(unsigned int length, void *buf);
+extern int NAND_BurnBoot0(unsigned int length, void *buf);
+extern int NAND_BurnBoot1(unsigned int length, void *buf);
 
 extern struct _nand_info *p_nand_info;
 
@@ -413,6 +415,8 @@ static void nand_release(struct gendisk *disk, fmode_t mode)
 #define DISABLE_READ            _IO('V', 2)
 #define ENABLE_READ             _IO('V', 3)
 #define DRAGON_BOARD_TEST       _IO('V', 55)
+#define BLKREADBOOT0            _IO('v', 125)
+#define BLKREADBOOT1            _IO('v', 126)
 #define BLKBURNBOOT0            _IO('v', 127)
 #define BLKBURNBOOT1            _IO('v', 128)
 #define SECBLK_READ				_IO('V', 20)
@@ -479,11 +483,37 @@ static int nand_ioctl(struct block_device *bdev, fmode_t mode, unsigned int cmd,
 		dev->writeonly = 1;
 		return 0;
 
+	case BLKREADBOOT0:
+		nand_dbg_err("start BLKREADBOOT0...\n");
+		down(&nandr->nand_ops_mutex);
+		IS_IDLE = 0;
+		ret = NAND_ReadBoot0(burn_param->length, burn_param->buffer);
+		if (ret != 0)
+			nand_dbg_err("BLKREADBOOT0 failed\n");
+		up(&(nandr->nand_ops_mutex));
+		nand_dbg_err("do BLKREADBOOT0!\n");
+		IS_IDLE = 1;
+		return ret;
+
+	case BLKREADBOOT1:
+		nand_dbg_err("start BLKREADBOOT1...\n");
+		down(&nandr->nand_ops_mutex);
+		IS_IDLE = 0;
+		ret = NAND_ReadBoot1(burn_param->length, burn_param->buffer);
+		if (ret != 0)
+			nand_dbg_err("BLKREADBOOT1 failed\n");
+		up(&(nandr->nand_ops_mutex));
+		nand_dbg_err("do BLKREADBOOT1!\n");
+		IS_IDLE = 1;
+		return ret;
+
 	case BLKBURNBOOT0:
 		nand_dbg_err("start BLKBURNBOOT0...\n");
 		down(&nandr->nand_ops_mutex);
 		IS_IDLE = 0;
 		ret = NAND_BurnBoot0(burn_param->length, burn_param->buffer);
+		if (ret != 0)
+			nand_dbg_err("BLKBURNBOOT0 failed\n");
 		up(&(nandr->nand_ops_mutex));
 		nand_dbg_err("do BLKBURNBOOT0!\n");
 		IS_IDLE = 1;
@@ -495,6 +525,8 @@ static int nand_ioctl(struct block_device *bdev, fmode_t mode, unsigned int cmd,
 		down(&nandr->nand_ops_mutex);
 		IS_IDLE = 0;
 		ret = NAND_BurnBoot1(burn_param->length, burn_param->buffer);
+		if (ret != 0)
+			nand_dbg_err("BLKBURNBOOT1 failed\n");
 		up(&(nandr->nand_ops_mutex));
 		nand_dbg_err("do BLKBURNBOOT1!\n");
 		IS_IDLE = 1;
@@ -570,7 +602,7 @@ static int nand_ioctl(struct block_device *bdev, fmode_t mode, unsigned int cmd,
 }
 
 #ifdef CONFIG_COMPAT
-int nand_burnboot0_compat(struct block_device *bdev, fmode_t mode,
+int nand_readboot_compat(struct block_device *bdev, fmode_t mode,
 			  unsigned int cmd, struct burn_param_t32 __user *arg)
 {
 	struct burn_param_t32 burn_param32;
@@ -592,10 +624,14 @@ int nand_burnboot0_compat(struct block_device *bdev, fmode_t mode,
 	if (ret < 0)
 		return ret;
 
+	if (copy_in_user(&arg->buffer, &burn_param->buffer, sizeof(arg->buffer)) ||
+	    copy_in_user(&arg->length, &burn_param->length, sizeof(arg->length)))
+		return -EFAULT;
+
 	return 0;
 }
 
-int nand_burnboot1_compat(struct block_device *bdev, fmode_t mode,
+int nand_burnboot_compat(struct block_device *bdev, fmode_t mode,
 			  unsigned int cmd, struct burn_param_t32 __user *arg)
 {
 	struct burn_param_t32 burn_param32;
@@ -705,11 +741,13 @@ static int nand_compat_ioctl(struct block_device *bdev, fmode_t mode,
 	case HDIO_GETGEO:
 		return nand_getgeo_compat(bdev, mode, cmd, compat_ptr(arg));
 
-	case BLKBURNBOOT0:
-		return nand_burnboot0_compat(bdev, mode, cmd, compat_ptr(arg));
+	case BLKREADBOOT0:
+	case BLKREADBOOT1:
+		return nand_readboot_compat(bdev, mode, cmd, compat_ptr(arg));
 
+	case BLKBURNBOOT0:
 	case BLKBURNBOOT1:
-		return nand_burnboot1_compat(bdev, mode, cmd, compat_ptr(arg));
+		return nand_burnboot_compat(bdev, mode, cmd, compat_ptr(arg));
 
 	case DRAGON_BOARD_TEST:
 		return nand_drangonboard_compat(bdev, mode, cmd,

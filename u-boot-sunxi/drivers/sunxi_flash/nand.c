@@ -75,6 +75,9 @@ int  nand_init_for_boot(int workmode)
 	sunxi_flash_size_pt  = sunxi_flash_nand_size;
 	sunxi_flash_exit_pt  = sunxi_flash_nand_exit;
 	sunxi_flash_flush_pt = sunxi_flash_nand_flush;
+
+	sunxi_secstorage_read_pt  = nand_secure_storage_read;
+	sunxi_secstorage_write_pt = nand_secure_storage_write;
 	
 	sunxi_sprite_read_pt  = sunxi_flash_read_pt;
 	sunxi_sprite_write_pt = sunxi_flash_write_pt;
@@ -97,8 +100,10 @@ int nand_init_for_sprite(int workmode)
 	sunxi_sprite_size_pt  = sunxi_flash_nand_size;
 	sunxi_sprite_flush_pt = sunxi_flash_nand_flush;
 	sunxi_sprite_force_erase_pt = sunxi_flash_nand_force_erase;
-	debug("sunxi sprite has installed nand function\n");
-	uboot_spare_head.boot_data.storage_type = 0;
+
+	sunxi_secstorage_read_pt  = nand_secure_storage_read;
+	sunxi_secstorage_write_pt = nand_secure_storage_write;
+
 	if(workmode == 0x30)
 	{
 		if(sunxi_sprite_init(1))
@@ -107,7 +112,7 @@ int nand_init_for_sprite(int workmode)
 			return -1;
 		}
 	}
-	uboot_spare_head.boot_data.storage_type = 0;
+	set_boot_storage_type(STORAGE_NAND);
 	return 0;
 }
 

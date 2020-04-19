@@ -26,6 +26,7 @@
 #define	_DMA_H_
 
 #include <asm/arch/intc.h>
+#define SUNXI_DMA_LINK_NULL       (0x1ffff800)
 
 //================================
 //======    DMA 配置     =========

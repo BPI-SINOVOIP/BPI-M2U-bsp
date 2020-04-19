@@ -49,7 +49,10 @@
 
 #define CONFIG_STORAGE_MEDIA_NAND
 #define CONFIG_STORAGE_MEDIA_MMC
-
+#define CONFIG_SUNXI_MULITCORE_BOOT
+#define CONFIG_LZMA
+#define CONFIG_SUNXI_CORE_VOL         1260
+#define CONFIG_BOOT0_CPU1_STACK_SIZE  0x1000
 
 #define CONFIG_SYS_GENERIC_BOARD
 
@@ -66,14 +69,15 @@
 
 #define CONFIG_SUNXI_SECURE_STORAGE
 #define CONFIG_SUNXI_SECURE_SYSTEM
-#define CONFIG_SUNXI_HDCP_IN_SECURESTORAGE
+//#define CONFIG_SUNXI_HDCP_IN_SECURESTORAGE
 
 #define CONFIG_SYS_SRAM_BASE               (0x10000)
 #define CONFIG_SYS_SRAMA1_BASE             (0x10000)
 #define CONFIG_SYS_SRAMA1_SIZE             (0x8000)
 #define CONFIG_SYS_SRAMA2_BASE             (0x40000)
 #define CONFIG_SYS_SRAMA2_SIZE             (0x14000)
-
+#define CONFIG_SYS_SRAMC_BASE              (0x18000)
+#define CONFIG_SYS_SRAMC_END               (0x34000)
 
 #define PLAT_SDRAM_BASE                      0x40000000
 //trusted dram area
@@ -86,8 +90,8 @@
 
 //toco mmu
 #define TOC0_MMU_BASE_ADDRESS            (CONFIG_SYS_SDRAM_BASE + 0x2800000)
-//boot0 stack
-#define CONFIG_BOOT0_STACK_BOTTOM        (CONFIG_SYS_SRAMA1_BASE+CONFIG_SYS_SRAMA1_SIZE-0x10)
+//boot0 stack, in sramc, the high 4K for cpu1 stack.
+#define CONFIG_BOOT0_STACK_BOTTOM        (CONFIG_SYS_SRAMC_END-CONFIG_BOOT0_CPU1_STACK_SIZE)
 
 //dram base for uboot
 #define CONFIG_SYS_SDRAM_BASE                (PLAT_SDRAM_BASE)
@@ -98,6 +102,7 @@
 #define SCP_SRAM_SIZE                        (CONFIG_SYS_SRAMA2_SIZE)
 #define SCP_DRAM_BASE                        (PLAT_TRUSTED_DRAM_BASE+BL31_SIZE)
 #define SCP_DRAM_SIZE                        (0x4000)
+#define SCP_CODE_DRAM_OFFSET		     (0x18000)
 
 //fdt addr for kernel
 #define CONFIG_SUNXI_FDT_ADDR                (CONFIG_SYS_SDRAM_BASE+0x04000000)
@@ -154,8 +159,13 @@
 #define SUNXI_DISPLAY_FRAME_BUFFER_ADDR  (CONFIG_SYS_SDRAM_BASE + 0x06400000)
 #define SUNXI_DISPLAY_FRAME_BUFFER_SIZE  0x01000000
 
-#define SUNXI_BOOTLOGO_SOURCE_SIZE        (0x43200000)
-#define SUNXI_BOOTLOGO_SOURCE_BUFFER      (SUNXI_BOOTLOGO_SOURCE_SIZE + 16)
+#define SUNXI_LOGO_COMPRESSED_LOGO_SIZE_ADDR        		(0x43000000)
+#define SUNXI_LOGO_COMPRESSED_LOGO_BUFF     			(0x43000000 + 16)
+#define SUNXI_SHUTDOWN_CHARGE_COMPRESSED_LOGO_SIZE_ADDR  	(0x43100000)
+#define SUNXI_SHUTDOWN_CHARGE_COMPRESSED_LOGO_BUFF  		(0x43100000 + 16)
+#define SUNXI_ANDROID_CHARGE_COMPRESSED_LOGO_SIZE_ADDR   	(0x43200000)
+#define SUNXI_ANDROID_CHARGE_COMPRESSED_LOGO_BUFF   		(0x43200000 + 16)
+
 /*
 * define const value
 */
@@ -186,15 +196,17 @@
 /*																						*/
 /****************************************************************************************/
 #define CONFIG_SBROMSW_BASE              (CONFIG_SYS_SRAM_BASE)
-//#define CONFIG_STACK_BASE                (CONFIG_SYS_SRAMA2_BASE + CONFIG_SYS_SRAMA2_SIZE - 0x10)
-#define CONFIG_STACK_BASE                (0x34000)
+#define CONFIG_PRINT_SIZE                (8*1024)
+#define CONFIG_STACK_BASE                (CONFIG_SYS_SRAMC_END-CONFIG_BOOT0_CPU1_STACK_SIZE -CONFIG_PRINT_SIZE)
+#define CONFIG_BOOT0_CPU1_STACK_BOTTOM   (CONFIG_SYS_SRAMC_END-CONFIG_PRINT_SIZE)
+#define CONFIG_DEBUG_BASE                (CONFIG_BOOT0_CPU1_STACK_BOTTOM)
+#define CONFIG_NORMAL_DEBUG_BASE         (CONFIG_SYS_SRAMC_BASE)
 #define CONFIG_HEAP_BASE                 (CONFIG_SYS_SDRAM_BASE + 0x800000)
 #define CONFIG_HEAP_SIZE                 (16 * 1024 * 1024)
 #define CONFIG_TOC0_RET_ADDR             (0)
 #define CONFIG_TOC0_RUN_ADDR             (0x10480)
 #define CONFIG_TOC0_CONFIG_ADDR          (CONFIG_SBROMSW_BASE + 0x80)
 #define CONFIG_TOC1_STORE_IN_DRAM_BASE   (CONFIG_SYS_SDRAM_BASE + 0x2e00000)
-#define PAGE_BUF_FOR_BOOT0               (CONFIG_SYS_SDRAM_BASE + 16 * 1024 * 1024)
 #define SUNXI_FEL_ADDR_IN_SECURE         (0x00000064)
 /****************************************************************************************/
 /*																						*/
@@ -325,8 +337,8 @@
 #define BOARD_LATE_INIT		      /* init the fastboot partitions */
 //#define CONFIG_SUNXI_KEY_BURN
 
-#define CONFIG_SUNXI_I2C_NULL
-//#define CONFIG_SUNXI_I2C
+#define CONFIG_USE_SECURE_I2C
+#define CONFIG_SUNXI_I2C
 //#define CONFIG_CPUS_I2C
 #define CONFIG_AXP_USE_I2C
 #define CONFIG_SYS_I2C_SPEED 400000
@@ -433,7 +445,7 @@
 #define CONFIG_SUNXI_SPINOR
 #define CONFIG_SPINOR_LOGICAL_OFFSET        ((512 - 16) * 1024/512)
 #define UBOOT_START_SECTOR_IN_SPINOR        (24*1024/512)
-#define SPINOR_STORE_BUFFER_SIZE            (8<<20)
+#define SPINOR_STORE_BUFFER_SIZE            (2<<20)
 #endif
 
 #ifdef CONFIG_SUNXI_MODULE_USB
@@ -456,5 +468,19 @@
 #endif
 
 //#define CONFIG_SYS_DCACHE_OFF
+
+/* net support */
+//#define CONFIG_SUNXI_GETH
+#ifdef CONFIG_SUNXI_GETH
+//#define CONFIG_SUNXI_EXT_PHY
+#define CONFIG_CMD_NET
+#define CONFIG_CMD_PING
+#define CONFIG_CMD_MII
+//#define CONFIG_ETHADDR 	72:D6:05:4F:B9:3B
+//#define CONFIG_IPADDR   	192.168.200.254
+//#define CONFIG_SERVERIP      	192.168.200.20
+//#define CONFIG_NETMASK       	255.255.255.0
+//#define CONFIG_GATEWAYIP     	192.168.200.1
+#endif
 
 #endif /* __CONFIG_H */

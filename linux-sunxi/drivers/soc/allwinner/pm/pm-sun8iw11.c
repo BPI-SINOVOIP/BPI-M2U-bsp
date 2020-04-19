@@ -85,9 +85,9 @@ void init_wakeup_src(unsigned int event, unsigned int gpio_enable_bitmap, unsign
 		mem_enable_int(INT_SOURCE_IR1);
 	}
 
-	if (event & CPU0_WAKEUP_USB) {
+	if (event & CPUS_WAKEUP_USBMOUSE) {
 		if (unlikely(debug_mask & PM_STANDBY_PRINT_STANDBY))
-			pr_info("enable CPU0_WAKEUP_USB.\n");
+			pr_info("enable CPUS_WAKEUP_USBMOUSE.\n");
 		mem_usb_init();
 		mem_enable_int(INT_SOURCE_USBOTG);
 		mem_enable_int(INT_SOURCE_USBEHCI0);

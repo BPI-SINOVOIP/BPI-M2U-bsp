@@ -2,8 +2,10 @@
 
 struct disp_capture_info_list
 {
-	struct disp_capture_info info;
+	struct disp_capture_info_inner info;
 	struct list_head list;
+	bool done;
+	struct dmabuf_item *item;
 };
 
 struct disp_capture_private_data
@@ -13,7 +15,13 @@ struct disp_capture_private_data
 	u32 applied;
 	s32 status;//0: finish; other: fail/err
 
+	u32 done_sum;
 	struct list_head req_list;
+	u32 req_cnt;
+	struct list_head runing_list;
+	u32 runing_cnt;
+	struct list_head done_list;
+	u32 done_cnt;
 	s32 (*shadow_protect)(u32 sel, bool protect);
 
 	struct clk *clk;
@@ -170,6 +178,9 @@ s32 disp_capture_start(struct disp_capture *cptr)
 s32 disp_capture_stop(struct disp_capture *cptr)
 {
 	struct disp_capture_private_data *cptrp = disp_capture_get_priv(cptr);
+	unsigned long flags;
+	struct disp_capture_info_list *info_list, *temp;
+	struct list_head drop_list;
 
 	if (NULL == cptr || NULL == cptrp)
 	{
@@ -178,37 +189,130 @@ s32 disp_capture_stop(struct disp_capture *cptr)
 	}
 	DE_INF("cap %d\n", cptr->disp);
 
+	INIT_LIST_HEAD(&drop_list);
 	mutex_lock(&cptrp->mlock);
 	if (1 == cptrp->enabled) {
 		disp_al_capture_exit(cptr->disp);
 		disp_capture_clk_disable(cptr);
 		cptrp->enabled = 0;
 	}
+	spin_lock_irqsave(&cptrp->data_lock, flags);
+	list_for_each_entry_safe(info_list, temp, &cptrp->runing_list, list) {
+		list_del(&info_list->list);
+		list_add_tail(&info_list->list, &drop_list);
+		cptrp->runing_cnt--;
+	}
+	list_for_each_entry_safe(info_list, temp, &cptrp->done_list, list) {
+		list_del(&info_list->list);
+		list_add_tail(&info_list->list, &drop_list);
+		cptrp->done_cnt--;
+	}
+	list_for_each_entry_safe(info_list, temp, &cptrp->req_list, list) {
+		list_del(&info_list->list);
+		list_add_tail(&info_list->list, &drop_list);
+		cptrp->req_cnt--;
+	}
+	spin_unlock_irqrestore(&cptrp->data_lock, flags);
+	list_for_each_entry_safe(info_list, temp, &drop_list, list) {
+		list_del(&info_list->list);
+		if (info_list->item)
+			disp_dma_unmap(info_list->item);
+		kfree(info_list);
+	}
 	mutex_unlock(&cptrp->mlock);
 
 	return 0;
 }
 
+static void
+__disp_capture_info_transfer(struct disp_capture_info_inner *info_inner,
+			    struct disp_capture_info *info)
+{
+	memcpy(&info_inner->window, &info->window, sizeof(struct disp_rect));
+	info_inner->out_frame.format = info->out_frame.format;
+	memcpy(info_inner->out_frame.size,
+	       info->out_frame.size,
+	       sizeof(struct disp_rectsz) * 3);
+	memcpy(&info_inner->out_frame.crop,
+	       &info->out_frame.crop,
+	       sizeof(struct disp_rect));
+	memcpy(info_inner->out_frame.addr,
+	       info->out_frame.addr,
+	       sizeof(long long) * 3);
+}
+
+static void
+__disp_capture_info2_transfer(struct disp_capture_info_inner *info_inner,
+			    struct disp_capture_info2 *info)
+{
+	memcpy(&info_inner->window, &info->window, sizeof(struct disp_rect));
+	info_inner->out_frame.format = info->out_frame.format;
+	memcpy(info_inner->out_frame.size,
+	       info->out_frame.size,
+	       sizeof(struct disp_rectsz) * 3);
+	memcpy(&info_inner->out_frame.crop,
+	       &info->out_frame.crop,
+	       sizeof(struct disp_rect));
+	info_inner->out_frame.fd = info->out_frame.fd;
+}
+
 s32 disp_capture_commit(struct disp_capture *cptr, struct disp_capture_info *info)
 {
 	struct disp_capture_private_data *cptrp = disp_capture_get_priv(cptr);
-	int fd = -1;
 	struct disp_manager *mgr;
-	struct disp_capture_info_list *info_list;
+	struct disp_device *dispdev = NULL;
+	struct disp_capture_info_list *info_list, *temp;
 	unsigned long flags;
+	enum disp_csc_type cs = DISP_CSC_TYPE_RGB;
+	struct list_head done_list;
+	int ret = -1;
 
-	if (NULL == cptr || NULL == cptrp)
-	{
+	INIT_LIST_HEAD(&done_list);
+	if (NULL == cptr || NULL == cptrp) {
 		DE_WRN("NULL hdl!\n");
 		return -1;
 	}
 	DE_INF("cap %d\n", cptr->disp);
 
 	mgr = cptr->manager;
-  if ((NULL == mgr) || (0 == mgr->is_enabled(mgr))){
+	if ((NULL == mgr) || (0 == mgr->is_enabled(mgr))) {
 		DE_WRN("manager disable!\n");
 		return -1;
-  }
+	}
+
+	dispdev = mgr->device;
+	if (NULL == dispdev) {
+		DE_WRN("disp device is NULL!\n");
+		return -1;
+	}
+
+	if (dispdev->get_input_csc)
+		cs = dispdev->get_input_csc(dispdev);
+#ifdef SUPPORT_YUV_BLEND
+	if ((DISP_CSC_TYPE_RGB != cs) &&
+			((info->out_frame.format == DISP_FORMAT_ARGB_8888) ||
+			 (info->out_frame.format == DISP_FORMAT_ABGR_8888) ||
+			 (info->out_frame.format == DISP_FORMAT_RGBA_8888) ||
+			 (info->out_frame.format == DISP_FORMAT_BGRA_8888) ||
+			 (info->out_frame.format == DISP_FORMAT_RGB_888) ||
+			 (info->out_frame.format == DISP_FORMAT_BGR_888))) {
+		DE_WRN("in_fmt and out_fmt not match!\n");
+		return -1;
+	}
+#endif
+	if ((DISP_CSC_TYPE_YUV444 == cs) || (DISP_CSC_TYPE_YUV422 == cs) ||
+			(DISP_CSC_TYPE_YUV420 == cs)) {
+		if ((info->out_frame.format != DISP_FORMAT_YUV420_P) &&
+			(info->out_frame.format != DISP_FORMAT_YUV420_SP_UVUV)
+			&& (info->out_frame.format !=
+						DISP_FORMAT_YUV420_SP_VUVU)
+			&& (info->out_frame.format !=
+						DISP_FORMAT_YUV444_I_AYUV)) {
+			DE_WRN("out_format is not support!\n");
+			return -1;
+		}
+	}
+
 	DE_INF("disp%d, format %d, stride<%d,%d,%d>, crop<%d,%d,%d,%d>, address<0x%llx,0x%llx,0x%llx>\n",
 		cptr->disp, info->out_frame.format,
 		info->out_frame.size[0].width, info->out_frame.size[1].width, info->out_frame.size[2].width,
@@ -218,23 +322,114 @@ s32 disp_capture_commit(struct disp_capture *cptr, struct disp_capture_info *inf
 	mutex_lock(&cptrp->mlock);
 	if (0 == cptrp->enabled) {
 		DE_WRN("capture %d is disabled!\n", cptr->disp);
-		mutex_unlock(&cptrp->mlock);
-		return -1;
+		goto exit;
 	}
 	info_list = kmalloc(sizeof(struct disp_capture_info_list), GFP_KERNEL | __GFP_ZERO);
 	if (NULL == info_list) {
 		DE_WRN("malloc fail!\n");
-		mutex_unlock(&cptrp->mlock);
-		return -1;
+		goto exit;
 	}
-	memcpy(&info_list->info, info, sizeof(struct disp_capture_info));
+	__disp_capture_info_transfer(&info_list->info, info);
 	spin_lock_irqsave(&cptrp->data_lock, flags);
 	list_add_tail(&info_list->list, &cptrp->req_list);
+	cptrp->req_cnt++;
+
+	list_for_each_entry_safe(info_list, temp, &cptrp->done_list, list) {
+		list_del(&info_list->list);
+		list_add_tail(&info_list->list, &done_list);
+		cptrp->done_cnt--;
+	}
 	spin_unlock_irqrestore(&cptrp->data_lock, flags);
+
+	list_for_each_entry_safe(info_list, temp, &done_list, list) {
+		list_del(&info_list->list);
+		if (info_list->item)
+			disp_dma_unmap(info_list->item);
+		kfree(info_list);
+	}
+	ret = 0;
+exit:
 	mutex_unlock(&cptrp->mlock);
 
-	return fd;
+	return ret;
 }
+
+static s32 disp_capture_commit2(struct disp_capture *cptr,
+			struct disp_capture_info2 *info)
+{
+	struct disp_capture_private_data *cptrp = disp_capture_get_priv(cptr);
+	struct disp_manager *mgr;
+	struct disp_capture_info_list *info_list, *temp;
+	unsigned long flags;
+	struct dmabuf_item *item;
+	int ret = -1;
+	struct list_head done_list;
+	struct fb_address_transfer fb;
+
+	INIT_LIST_HEAD(&done_list);
+	if (NULL == cptr || NULL == cptrp) {
+		DE_WRN("NULL hdl!\n");
+		return -1;
+	}
+	DE_INF("cap %d\n", cptr->disp);
+
+	mgr = cptr->manager;
+	if ((NULL == mgr) || (0 == mgr->is_enabled(mgr))) {
+		DE_WRN("manager disable!\n");
+		return -1;
+	}
+
+	mutex_lock(&cptrp->mlock);
+	if (0 == cptrp->enabled) {
+		DE_WRN("capture %d is disabled!\n", cptr->disp);
+		goto exit;
+	}
+	info_list = kmalloc(sizeof(struct disp_capture_info_list),
+			    GFP_KERNEL | __GFP_ZERO);
+	if (NULL == info_list) {
+		DE_WRN("malloc fail!\n");
+		goto exit;
+	}
+	__disp_capture_info2_transfer(&info_list->info, info);
+	item = disp_dma_map(info_list->info.out_frame.fd);
+	if (item == NULL) {
+		DE_WRN("disp dma map fail!\n");
+		kfree(info_list);
+		goto exit;
+	}
+	fb.format = info_list->info.out_frame.format;
+	memcpy(fb.size, info_list->info.out_frame.size,
+	       sizeof(struct disp_rectsz) * 3);
+	fb.dma_addr = item->dma_addr;
+	disp_set_fb_info(&fb, true);
+	memcpy(info_list->info.out_frame.addr,
+	       fb.addr,
+	       sizeof(long long) * 3);
+
+	info_list->item = item;
+	spin_lock_irqsave(&cptrp->data_lock, flags);
+	list_add_tail(&info_list->list, &cptrp->req_list);
+	cptrp->req_cnt++;
+
+	list_for_each_entry_safe(info_list, temp, &cptrp->done_list, list) {
+		list_del(&info_list->list);
+		list_add_tail(&info_list->list, &done_list);
+		cptrp->done_cnt--;
+	}
+	spin_unlock_irqrestore(&cptrp->data_lock, flags);
+
+	list_for_each_entry_safe(info_list, temp, &done_list, list) {
+		list_del(&info_list->list);
+		if (info_list->item)
+			disp_dma_unmap(info_list->item);
+		kfree(info_list);
+	}
+	ret = 0;
+exit:
+	mutex_unlock(&cptrp->mlock);
+	return ret;
+}
+
 
 s32 disp_capture_query(struct disp_capture *cptr)
 {
@@ -273,28 +468,48 @@ s32 disp_capture_sync(struct disp_capture *cptr)
 	}
 
 	if (1 == cptrp->enabled){
-		struct disp_capture_info_list *info_list = NULL;
+		struct disp_capture_info_list *info_list = NULL, *temp;
+		struct disp_capture_info_list *running = NULL;
 		bool find = false;
+		bool run = false;
 
-		ret = disp_al_capture_get_status(cptr->disp);
-		cptrp->status = ret;
-		if (0 == ret){
-
-		}
 		spin_lock_irqsave(&cptrp->data_lock, flags);
-		list_for_each_entry(info_list, &cptrp->req_list, list) {
+		list_for_each_entry_safe(running, temp, &cptrp->runing_list, list) {
+			list_del(&running->list);
+			cptrp->runing_cnt--;
+
+			list_add_tail(&running->list, &cptrp->done_list);
+			cptrp->done_cnt++;
+			cptrp->done_sum++;
+			run = true;
+			break;
+		}
+
+		list_for_each_entry_safe(info_list, temp, &cptrp->req_list, list) {
 			list_del(&info_list->list);
+			cptrp->req_cnt--;
+
+			list_add_tail(&info_list->list, &cptrp->runing_list);
+			cptrp->runing_cnt++;
 			find = true;
 			break;
 		}
 		spin_unlock_irqrestore(&cptrp->data_lock, flags);
+
+		ret = disp_al_capture_get_status(cptr->disp);
+		cptrp->status = ret;
+		if (run)
+			running->done = (ret == 0) ? true : false;
+
 		if (find) {
 			struct disp_capture_config config;
 			enum disp_csc_type cs = DISP_CSC_TYPE_RGB;
 			u32 width = 0, height = 0;
 
 			memset(&config, 0, sizeof(struct disp_capture_config));
-			memcpy(&config.out_frame, &info_list->info.out_frame, sizeof(struct disp_s_frame));
+			memcpy(&config.out_frame,
+			       &info_list->info.out_frame,
+			       sizeof(struct disp_s_frame_inner));
 			config.disp = cptr->disp;
 			memcpy(&config.in_frame.crop, &info_list->info.window, sizeof(struct disp_rect));
 			if (dispdev->get_input_csc) {
@@ -302,8 +517,12 @@ s32 disp_capture_sync(struct disp_capture *cptr)
 			}
 			if (DISP_CSC_TYPE_RGB == cs)
 				config.in_frame.format = DISP_FORMAT_ARGB_8888;
+			else if (DISP_CSC_TYPE_YUV444  == cs)
+				config.in_frame.format = DISP_FORMAT_YUV444_P;
+			else if (DISP_CSC_TYPE_YUV422 == cs)
+				config.in_frame.format = DISP_FORMAT_YUV422_P;
 			else
-				config.in_frame.format = DISP_FORMAT_YUV444_P;//FIXME, how to diff  TV/HDMI yuv
+				config.in_frame.format = DISP_FORMAT_YUV420_P;
 			if (dispdev->get_resolution) {
 				dispdev->get_resolution(dispdev, &width, &height);
 			}
@@ -319,7 +538,6 @@ s32 disp_capture_sync(struct disp_capture *cptr)
 			}
 			disp_al_capture_apply(cptr->disp, &config);
 			disp_al_capture_sync(cptr->disp);
-			kfree((void*)info_list);
 		}
 	}
 
@@ -379,6 +597,24 @@ s32 disp_capture_resume(struct disp_capture *cptr)
 
 	return 0;
 
+}
+static s32 disp_capture_dump(struct disp_capture *cptr, char *buf)
+{
+	struct disp_capture_private_data *cptrp = disp_capture_get_priv(cptr);
+	unsigned int count = 0;
+
+	if ((NULL == cptr) || (NULL == cptrp)) {
+		DE_WRN("capture NULL hdl!\n");
+		return -1;
+	}
+
+	count += sprintf(buf + count,
+	    "capture: %3s req[%u] runing[%u] done[%d,%u]\n",
+	    (cptrp->enabled == 1) ? "en" : "dis",
+	    cptrp->req_cnt, cptrp->runing_cnt, cptrp->done_cnt,
+	    cptrp->done_sum);
+
+	return count;
 }
 
 s32 disp_capture_init(struct disp_capture *cptr)
@@ -468,8 +704,12 @@ s32 disp_init_capture(disp_bsp_init_para *para)
 		capture->init = disp_capture_init;
 		capture->exit = disp_capture_exit;
 		capture->commmit = disp_capture_commit;
+		capture->commmit2 = disp_capture_commit2;
 		capture->query = disp_capture_query;
+		capture->dump = disp_capture_dump;
 		INIT_LIST_HEAD(&capturep->req_list);
+		INIT_LIST_HEAD(&capturep->runing_list);
+		INIT_LIST_HEAD(&capturep->done_list);
 
 		disp_capture_init(capture);
 	}

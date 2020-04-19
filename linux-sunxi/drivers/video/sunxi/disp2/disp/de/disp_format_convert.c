@@ -99,22 +99,52 @@ static s32 disp_format_convert_disable(unsigned int id)
 	return 0;
 }
 
-static s32 disp_format_convert_start(unsigned int id, struct image_format *src, struct image_format *dest)
+struct disp_manager_data mdata;
+struct disp_layer_config_data ldata[16];
+
+static s32 disp_format_convert_start(unsigned int id,
+					struct disp_layer_config *config,
+					unsigned int layer_num,
+					struct image_format *dest)
 {
 	struct format_manager *mgr = &fmt_mgr[id];
-	s32 ret = -1;
+	s32 ret = -1, k = 0;
+	u32 lay_total_num = 0;
 
 	long timerout = (100 * HZ)/1000;		/*100ms*/
 
-	if ((NULL == src) || (NULL == dest) || (NULL == mgr)) {
+	if ((NULL == dest) || (NULL == mgr)) {
 		__wrn(KERN_WARNING"input param is null\n");
 		return -1;
 	}
 
-	if ((DISP_FORMAT_ARGB_8888 == src->format) && (DISP_FORMAT_8BIT_GRAY == dest->format)) {
-		__debug("src_addr = 0x%p, dest_addr = 0x%p\n",(void*)src->addr1, (void*)dest->addr1);
-		disp_al_rtmx_set_addr(mgr->disp, (unsigned int)src->addr1);
-		disp_al_set_eink_wb_param(mgr->disp, src->width, src->height, (unsigned int)dest->addr1);
+	if ((DISP_FORMAT_8BIT_GRAY == dest->format)) {
+		__debug("dest_addr = 0x%p\n", (void *)dest->addr1);
+
+		lay_total_num = de_feat_get_num_layers(mgr->disp);
+		memset((void *)&mdata, 0, sizeof(struct disp_manager_data));
+		memset((void *)ldata, 0, 16 * sizeof(ldata[0]));
+
+		mdata.flag = MANAGER_ALL_DIRTY;
+		mdata.config.enable = 1;
+		mdata.config.interlace = 0;
+		mdata.config.blank = 0;
+		mdata.config.size.x = 0;
+		mdata.config.size.y = 0;
+		mdata.config.size.width = dest->width;
+		mdata.config.size.height = dest->height;
+
+		for (k = 0; k < layer_num; k++) {
+			ldata[k].flag = LAYER_ALL_DIRTY;
+			__disp_config_transfer2inner(&ldata[k].config,
+						   &config[k]);
+		}
+		disp_al_manager_apply(mgr->disp, &mdata);
+		disp_al_layer_apply(mgr->disp, ldata, layer_num);
+		disp_al_manager_sync(mgr->disp);
+		disp_al_manager_update_regs(mgr->disp);
+		disp_al_set_eink_wb_param(mgr->disp, dest->width, dest->height,
+						(unsigned int)dest->addr1);
 
 		/* enable inttrrupt */
 		disp_al_enable_eink_wb_interrupt(mgr->disp);
@@ -141,7 +171,8 @@ static s32 disp_format_convert_start(unsigned int id, struct image_format *src, 
 		disp_al_disable_eink_wb(mgr->disp);
 		ret = 0;
 	} else {
-		__wrn("src_format(0x%x), dest_format(0x%x) is not support\n", src->format, dest->format);
+		__wrn("src_format(), dest_format(0x%x) is not support\n",
+			dest->format);
 	}
 
 	return ret;
@@ -165,8 +196,6 @@ s32 disp_init_format_convert_manager(disp_bsp_init_para * para)
 		mgr->disable = disp_format_convert_disable;
 		mgr->start_convert = disp_format_convert_start;
 		mgr->clk = para->mclk[DISP_MOD_DE];
-
-		disp_al_set_rtmx_base(i, para->reg_base[DISP_MOD_DE]);
 		disp_al_set_eink_wb_base(i, para->reg_base[DISP_MOD_DE]);
 	}
 

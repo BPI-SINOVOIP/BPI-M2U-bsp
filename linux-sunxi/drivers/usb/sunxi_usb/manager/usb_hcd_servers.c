@@ -37,7 +37,12 @@ int sunxi_usb_disable_hcd(__u32 usbc_no)
 {
 #ifndef  SUNXI_USB_FPGA
 	if (usbc_no == 0) {
-
+#if defined(CONFIG_ARCH_SUN8IW6) || defined(CONFIG_ARCH_SUN3IW1) \
+	|| defined(CONFIG_ARCH_SUN8IW5)
+		#if defined(CONFIG_USB_SUNXI_HCD0)
+			sunxi_usb_disable_hcd0();
+		#endif
+#else
 		#if defined(CONFIG_USB_SUNXI_EHCI0)
 			sunxi_usb_disable_ehci(usbc_no);
 		#endif
@@ -45,7 +50,7 @@ int sunxi_usb_disable_hcd(__u32 usbc_no)
 		#if defined(CONFIG_USB_SUNXI_OHCI0)
 			sunxi_usb_disable_ohci(usbc_no);
 		#endif
-
+#endif
 	} else if (usbc_no == HCI0_USBC_NO) {
 		#if defined(CONFIG_USB_SUNXI_EHCI0)
 			sunxi_usb_disable_ehci(usbc_no);
@@ -91,6 +96,12 @@ int sunxi_usb_enable_hcd(__u32 usbc_no)
 {
 #ifndef  SUNXI_USB_FPGA
 	if (usbc_no == 0) {
+#if defined(CONFIG_ARCH_SUN8IW6) || defined(CONFIG_ARCH_SUN3IW1) \
+	|| defined(CONFIG_ARCH_SUN8IW5)
+		#if defined(CONFIG_USB_SUNXI_HCD0)
+			sunxi_usb_enable_hcd0();
+		#endif
+#else
 		#if defined(CONFIG_USB_SUNXI_EHCI0)
 			sunxi_usb_enable_ehci(usbc_no);
 		#endif
@@ -98,6 +109,7 @@ int sunxi_usb_enable_hcd(__u32 usbc_no)
 		#if defined(CONFIG_USB_SUNXI_OHCI0)
 			sunxi_usb_enable_ehci(usbc_no);
 		#endif
+#endif
 	} else if (usbc_no == HCI0_USBC_NO) {
 		#if defined(CONFIG_USB_SUNXI_EHCI0)
 			sunxi_usb_enable_ehci(usbc_no);

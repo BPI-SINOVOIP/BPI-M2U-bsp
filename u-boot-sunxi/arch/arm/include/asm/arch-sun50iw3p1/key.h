@@ -53,12 +53,25 @@ struct sunxi_lradc {
 #define ADC0_KEYUP_PENDING        (1 << 4)    /* key up */
 
 
-extern int sunxi_key_init(void);
+#define GP_CTRL        (SUNXI_GPADC_BASE+0x04)
+#define GP_CS_EN       (SUNXI_GPADC_BASE+0x08)
+#define GP_DATA_INTC   (SUNXI_GPADC_BASE+0x28)
+#define GP_DATA_INTS   (SUNXI_GPADC_BASE+0x38)
+#define GP_CH0_DATA    (SUNXI_GPADC_BASE+0x80)
 
-extern int sunxi_key_exit(void);
+#define GPADC0_DATA_PENDING		(1 << 0)	/* gpadc0 has data */
 
-extern int sunxi_key_read(void);
 
-extern int sunxi_key_probe(void);
+int sunxi_key_init(void);
+
+int sunxi_key_exit(void);
+
+int sunxi_key_read(void);
+
+int sunxi_key_probe(void);
+
+int sunxi_key_clock_open(void);
+
+int sunxi_key_clock_close(void);
 
 #endif

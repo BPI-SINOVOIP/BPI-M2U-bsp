@@ -62,6 +62,7 @@
 #define   BOOT_POWER806_CLDO3OUT_VOL                    (0x26)
 
 #define   BOOT_POWER806_VOFF_SETTING                    (0x31)
+#define   BOOT_POWER806_DIASBLE				(0x32)
 #define   BOOT_POWER806_POK_SETTING                     (0x36)
 
 #define   BOOT_POWER806_INTEN1              			(0x40)

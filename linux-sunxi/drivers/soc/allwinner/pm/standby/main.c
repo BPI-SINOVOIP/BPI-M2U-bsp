@@ -99,10 +99,12 @@ int standby_main(struct aw_pm_info *arg)
 	standby_clk_init();
 	mem_clk_init(1);
 	save_mem_status(STANDBY_START | 0X03);
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/* init uart for print */
 	if (unlikely
 	    (pm_info.standby_para.debug_mask & PM_STANDBY_PRINT_STANDBY))
 		serial_init_manager();
+#endif
 
 	/* calc dram checksum */
 	if (standby_dram_crc_enable(&(extended_standby_para_info.soc_dram_state))) {
@@ -114,7 +116,9 @@ int standby_main(struct aw_pm_info *arg)
 	/* cpu reduce frequency */
 	cpu_enter_lowfreq();
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	standby_twi_init(pm_info.pmu_arg.twi_port);
+#endif
 
 	/* process standby */
 	if (unlikely
@@ -158,7 +162,11 @@ int standby_main(struct aw_pm_info *arg)
 	/* cpu enter sleep, wait wakeup by interrupt */
 	/*
 	 */
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	__asm__ volatile ("mcr	p15, 0, r0, c7, c0, 4");
+#else
 	asm("WFI");
+#endif
 	/* bus freq resume */
 	bus_freq_resume(&extended_standby_para_info);
 
@@ -179,15 +187,18 @@ int standby_main(struct aw_pm_info *arg)
 		cache_count_output();
 	}
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	standby_twi_exit();
+#endif
 	/* cpu freq resume */
 	cpu_freq_resume();
 	save_mem_status(RESUME0_START | 0X04);
 
-
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	if (unlikely
 	    (pm_info.standby_para.debug_mask & PM_STANDBY_PRINT_STANDBY))
 		serial_exit_manager();
+#endif
 
 	/* restore stack pointer register, switch stack back to dram */
 	restore_sp(sp_backup);
@@ -239,7 +250,11 @@ static int dram_exit_selfresh(extended_standby_t *para)
 {
 	s32 ret = -1;
 
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	ret = dram_power_up_process(NULL);
+#else
 	ret = dram_power_up_process(&(pm_info.dram_para));
+#endif
 
 	if (standby_dram_crc_enable(&(para->soc_dram_state))) {
 		after_crc = standby_dram_crc(&(para->soc_dram_state));
@@ -251,6 +266,7 @@ static int dram_exit_selfresh(extended_standby_t *para)
 			asm("b .");
 		}
 	}
+
 	dram_enable_all_master();
 	return ret;
 }
@@ -310,8 +326,10 @@ static int bus_enter_lowfreq(extended_standby_t *para)
 	tmp_clk_div.apb2_pre_div = 0;
 	standby_clk_setdiv(&tmp_clk_div);
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/* swtich apb2 to losc from 24M */
 	standby_clk_apb2losc();
+#endif
 	change_runtime_env();
 	/* delay_ms(1); */
 	standby_clk_plldisable();
@@ -320,11 +338,13 @@ static int bus_enter_lowfreq(extended_standby_t *para)
 	/* switch cpu to 32k */
 	save_mem_status(STANDBY_START | 0x0d);
 	standby_clk_core2losc();
+#ifdef CONFIG_AW_AXP
 	if (NULL != losc_enter_ss) {
 		save_mem_status((__u32) losc_enter_ss);
 		losc_enter_ss();
 		asm("b .");
 	}
+#endif
 	save_mem_status(STANDBY_START | 0x0f);
 	if (1 == para->soc_dram_state.selfresh_flag) {
 		/* printk("disable HOSC, and disable LDO\n"); */
@@ -357,8 +377,10 @@ static int bus_freq_resume(extended_standby_t *para)
 	standby_clk_core2hosc();
 	standby_clk_unset_keyfield();
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/* swtich apb2 to hosc */
 	standby_clk_apb2hosc();
+#endif
 
 	/* enable pll */
 	standby_clk_pllenable();

@@ -1,0 +1,10 @@
+#
+# embedded vision engine device configuration
+#
+config SUNXI_EVE
+	tristate "EVE driver"
+	default n
+	---help---
+	This is the driver for allwinner platform embedded vision engine(EVE) module.
+	To compile this driver as a module, choose M here: the
+	module will be called sunxi_eve.

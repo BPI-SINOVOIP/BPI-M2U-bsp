@@ -31,7 +31,11 @@ static int sunxi_snddsd_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int ret = 0;
+#ifdef CONFIG_AHUB_FREQ_REQ
+	int freq = 90316800;
+#else
 	int freq = 22579200;
+#endif
 
 	switch (params_rate(params)) {
 		case 8000:
@@ -44,7 +48,11 @@ static int sunxi_snddsd_hw_params(struct snd_pcm_substream *substream,
 		case 48000:
 		case 96000:
 		case 192000:
-			freq = 24576000;
+#ifdef CONFIG_AHUB_FREQ_REQ
+		freq = 98304000;
+#else
+		freq = 24576000;
+#endif
 			break;
 	}
 

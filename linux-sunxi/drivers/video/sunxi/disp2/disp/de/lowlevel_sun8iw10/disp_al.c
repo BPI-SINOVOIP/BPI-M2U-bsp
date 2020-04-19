@@ -343,7 +343,7 @@ int disp_al_manager_disable_irq(unsigned int disp)
 
 int disp_al_enhance_apply(unsigned int disp, struct disp_enhance_config *config)
 {
-	if (config->flags & ENHANCE_MODE_DIRTY) {
+	if (config->flags & ENH_MODE_DIRTY) {
 		struct disp_csc_config csc_config;
 		de_dcsc_get_config(disp, &csc_config);
 		csc_config.enhance_mode = (config->info.mode >> 16);
@@ -370,12 +370,16 @@ int disp_al_enhance_tasklet(unsigned int disp)
 
 int disp_al_capture_init(unsigned int disp)
 {
-	return de_clk_enable(DE_CLK_WB);
+	de_clk_enable(DE_CLK_WB);
+	/*WB_eink_DeReset(disp);*/
+	return 0;
 }
 
 int disp_al_capture_exit(unsigned int disp)
 {
-	return de_clk_disable(DE_CLK_WB);
+	/*WB_eink_Reset(disp);*/
+	de_clk_disable(DE_CLK_WB);
+	return 0;
 }
 
 int disp_al_write_back_clk_init(unsigned int disp)
@@ -544,6 +548,13 @@ int disp_al_lcd_cfg(u32 screen_id, disp_panel_para * panel, panel_extend_para *e
 	return 0;
 }
 
+int disp_al_lcd_cfg_ext(u32 screen_id, panel_extend_para *extend_panel)
+{
+	tcon0_cfg_ext(screen_id, extend_panel);
+
+	return 0;
+}
+
 int disp_al_lcd_enable(u32 screen_id, disp_panel_para * panel)
 {
 	tcon0_open(screen_id, panel);
@@ -693,7 +704,9 @@ int disp_al_tv_cfg(u32 screen_id, struct disp_video_timings *video_info)
 	return 0;
 }
 
-int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info, struct disp_vdevice_interface_para *para)
+int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info,
+			struct disp_vdevice_interface_para *para,
+			u8 config_tcon_only)
 {
 	struct lcd_clk_info clk_info;
 	disp_panel_para info;
@@ -905,4 +918,3 @@ int disp_al_get_display_size(unsigned int screen_id, unsigned int *width, unsign
 
 	return 0;
 }
-

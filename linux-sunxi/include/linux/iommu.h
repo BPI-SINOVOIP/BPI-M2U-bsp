@@ -22,6 +22,7 @@
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/types.h>
+#include <linux/scatterlist.h>
 
 #define IOMMU_READ	(1)
 #define IOMMU_WRITE	(2)
@@ -65,6 +66,8 @@ enum iommu_attr {
 	DOMAIN_ATTR_MAX,
 };
 
+extern struct dentry *iommu_debugfs_top;
+
 #ifdef CONFIG_IOMMU_API
 
 /**
@@ -92,6 +95,8 @@ struct iommu_ops {
 		   phys_addr_t paddr, size_t size, int prot);
 	size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
 		     size_t size);
+	size_t (*map_sg)(struct iommu_domain *domain, unsigned long iova,
+			 struct scatterlist *sg, size_t size, int prot);
 	phys_addr_t (*iova_to_phys)(struct iommu_domain *domain, dma_addr_t iova);
 	int (*domain_has_cap)(struct iommu_domain *domain,
 			      unsigned long cap);
@@ -111,6 +116,10 @@ struct iommu_ops {
 	int (*domain_set_windows)(struct iommu_domain *domain, u32 w_count);
 	/* Get the numer of window per domain */
 	u32 (*domain_get_windows)(struct iommu_domain *domain);
+	unsigned long (*reg_read)(struct iommu_domain *domain,
+				  unsigned long offset);
+	void (*reg_write)(struct iommu_domain *domain, unsigned long val,
+			  unsigned long offset);
 
 	unsigned long pgsize_bitmap;
 };
@@ -122,6 +131,7 @@ struct iommu_ops {
 #define IOMMU_GROUP_NOTIFY_UNBIND_DRIVER	5 /* Pre Driver unbind */
 #define IOMMU_GROUP_NOTIFY_UNBOUND_DRIVER	6 /* Post Driver unbind */
 
+extern struct iommu_domain *global_single_domain;
 extern int bus_set_iommu(struct bus_type *bus, struct iommu_ops *ops);
 extern bool iommu_present(struct bus_type *bus);
 extern struct iommu_domain *iommu_domain_alloc(struct bus_type *bus);
@@ -140,6 +150,10 @@ extern int iommu_domain_has_cap(struct iommu_domain *domain,
 				unsigned long cap);
 extern void iommu_set_fault_handler(struct iommu_domain *domain,
 			iommu_fault_handler_t handler, void *token);
+extern unsigned long iommu_reg_read(struct iommu_domain *domain,
+				    unsigned long offset);
+extern void iommu_reg_write(struct iommu_domain *domain, unsigned long offset,
+			    unsigned long val);
 
 extern int iommu_attach_group(struct iommu_domain *domain,
 			      struct iommu_group *group);
@@ -214,6 +228,13 @@ static inline int report_iommu_fault(struct iommu_domain *domain,
 	return ret;
 }
 
+static inline size_t iommu_map_sg(struct iommu_domain *domain,
+				  unsigned long iova, struct scatterlist *sg,
+				  size_t size, int prot)
+{
+	return domain->ops->map_sg(domain, iova, sg, size, prot);
+}
+
 #else /* CONFIG_IOMMU_API */
 
 struct iommu_ops {};
@@ -256,6 +277,13 @@ static inline int iommu_unmap(struct iommu_domain *domain, unsigned long iova,
 	return -ENODEV;
 }
 
+static inline size_t iommu_map_sg(struct iommu_domain *domain,
+				  unsigned long iova, struct scatterlist *sg,
+				  size_t size, int prot)
+{
+	return -ENODEV;
+}
+
 static inline int iommu_domain_window_enable(struct iommu_domain *domain,
 					     u32 wnd_nr, phys_addr_t paddr,
 					     u64 size, int prot)
@@ -284,6 +312,17 @@ static inline void iommu_set_fault_handler(struct iommu_domain *domain,
 {
 }
 
+
+static inline unsigned long iommu_reg_read(struct iommu_domain *domain,
+					   unsigned long offset)
+{
+	return 0;
+}
+
+static inline void iommu_reg_write(struct iommu_domain *domain,
+				   unsigned long val, unsigned long offset)
+{
+}
 static inline int iommu_attach_group(struct iommu_domain *domain,
 				     struct iommu_group *group)
 {

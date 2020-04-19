@@ -112,14 +112,27 @@ int fdt_subnode_offset(const void *fdt, int parentoffset,
 {
 	return fdt_subnode_offset_namelen(fdt, parentoffset, name, strlen(name));
 }
-
+#ifdef CONFIG_SUNXI_MULITCORE_BOOT
+#include <common.h>
+extern int get_core_pos(void);
+#endif
 int fdt_path_offset(const void *fdt, const char *path)
 {
 	const char *end = path + strlen(path);
 	const char *p = path;
 	int offset = 0;
+#ifdef CONFIG_SUNXI_MULITCORE_BOOT
+	int cpu_id = get_core_pos();
+	char  *fdt_base = (char *)working_fdt;
 
 	FDT_CHECK_HEADER(fdt);
+	if(cpu_id)
+		fdt_base += fdt_totalsize(fdt);
+#else
+	const void *fdt_base = fdt;
+
+	FDT_CHECK_HEADER(fdt);
+#endif
 
 	/* see if we have an alias */
 	if (*path != '/') {
@@ -128,10 +141,10 @@ int fdt_path_offset(const void *fdt, const char *path)
 		if (!q)
 			q = end;
 
-		p = fdt_get_alias_namelen(fdt, p, q - p);
+		p = fdt_get_alias_namelen(fdt_base, p, q - p);
 		if (!p)
 			return -FDT_ERR_BADPATH;
-		offset = fdt_path_offset(fdt, p);
+		offset = fdt_path_offset(fdt_base, p);
 
 		p = q;
 	}
@@ -147,7 +160,7 @@ int fdt_path_offset(const void *fdt, const char *path)
 		if (! q)
 			q = end;
 
-		offset = fdt_subnode_offset_namelen(fdt, offset, p, q-p);
+		offset = fdt_subnode_offset_namelen(fdt_base, offset, p, q-p);
 		if (offset < 0)
 			return offset;
 

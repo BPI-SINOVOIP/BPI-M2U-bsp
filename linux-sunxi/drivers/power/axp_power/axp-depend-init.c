@@ -35,7 +35,7 @@ const bitmap_name_mapping_t pwr_dm_bitmap_name_mapping[] = {
 	{VDD_TEST_BIT   ,    "vdd-test"         },
 	{VDD_RES1_BIT   ,    "vdd-res1-bit"     },
 	{VDD_RES2_BIT   ,    "vdd-res2-bit"     },
-#if (defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW11))
+#if (defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW11) || defined(CONFIG_ARCH_SUN50IW6P1))
 	{VCC_PC_BIT     ,    "vcc-pc"           },
 #else
 	{VDD_RES3_BIT   ,    "vdd-res3-bit"     },

@@ -16,3 +16,9 @@
 static const struct firmware_ops default_firmware_ops;
 
 const struct firmware_ops *firmware_ops = &default_firmware_ops;
+
+static const struct firmware_secure_ops default_firmware_secure_ops;
+
+const struct firmware_secure_ops *firmware_secure_ops =
+	&default_firmware_secure_ops;
+EXPORT_SYMBOL(firmware_secure_ops);

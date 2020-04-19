@@ -36,6 +36,12 @@
 
 #define	DRV_NAME	"sunxi-dmic"
 
+#ifdef CONFIG_ARCH_SUN50IW6
+#undef	DMIC_AUDIO_DEMAND
+#else
+#define DMIC_AUDIO_DEMAND
+#endif
+
 struct dmic_rate {
 	unsigned int samplerate;
 	unsigned int rate_bit;
@@ -132,7 +138,7 @@ static int sunxi_dmic_hw_params(struct snd_pcm_substream *substream,
 
 	for (i = 0; i < ARRAY_SIZE(dmic_rate_s); i++) {
 		if (dmic_rate_s[i].samplerate == params_rate(params)) {
-			regmap_update_bits(sunxi_dmic->regmap, SUNXI_DMIC_CTR,
+			regmap_update_bits(sunxi_dmic->regmap, SUNXI_DMIC_SR,
 			(7<<DMIC_SR), (dmic_rate_s[i].rate_bit<<DMIC_SR));
 			break;
 		}
@@ -250,7 +256,7 @@ static int sunxi_dmic_suspend(struct snd_soc_dai *cpu_dai)
 			return ret;
 		}
 	}
-	if (sunxi_dmic->pinctrl !=NULL)
+	if (sunxi_dmic->pinctrl != NULL)
 		devm_pinctrl_put(sunxi_dmic->pinctrl);
 	sunxi_dmic->pinctrl = NULL;
 	sunxi_dmic->pinstate = NULL;
@@ -289,7 +295,7 @@ static int sunxi_dmic_resume(struct snd_soc_dai *cpu_dai)
 			return -EINVAL;
 		}
 	}
-	if (!sunxi_dmic->pinstate){
+	if (!sunxi_dmic->pinstate) {
 		sunxi_dmic->pinstate = pinctrl_lookup_state(sunxi_dmic->pinctrl, PINCTRL_STATE_DEFAULT);
 		if (IS_ERR_OR_NULL(sunxi_dmic->pinstate)) {
 			pr_warn("[dmic]lookup pin default state failed\n");
@@ -297,7 +303,7 @@ static int sunxi_dmic_resume(struct snd_soc_dai *cpu_dai)
 		}
 	}
 
-	if (!sunxi_dmic->pinstate_sleep){
+	if (!sunxi_dmic->pinstate_sleep) {
 		sunxi_dmic->pinstate_sleep = pinctrl_lookup_state(sunxi_dmic->pinctrl, PINCTRL_STATE_SLEEP);
 		if (IS_ERR_OR_NULL(sunxi_dmic->pinstate_sleep)) {
 			pr_warn("[dmic]lookup pin sleep state failed\n");
@@ -370,6 +376,7 @@ static int  sunxi_dmic_dev_probe(struct platform_device *pdev)
 	sunxi_dmic->dai = sunxi_dmic_dai;
 	sunxi_dmic->dai.name = dev_name(&pdev->dev);
 
+#ifdef DMIC_AUDIO_DEMAND
 	sunxi_dmic->power_supply = regulator_get(&pdev->dev, "audio-33");
 	if (IS_ERR(sunxi_dmic->power_supply)) {
 		dev_err(&pdev->dev, "Failed to get sunxi dmic power supply\n");
@@ -387,8 +394,9 @@ static int  sunxi_dmic_dev_probe(struct platform_device *pdev)
 			goto err_regulator_put;
 		}
 	}
+#endif
 
-	ret = of_address_to_resource(np, 0 , &res);
+	ret = of_address_to_resource(np, 0, &res);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to get sunxi dmic resource\n");
 		ret = -EINVAL;
@@ -421,7 +429,7 @@ static int  sunxi_dmic_dev_probe(struct platform_device *pdev)
 
 	sunxi_dmic->pllclk = of_clk_get(np, 0);
 	sunxi_dmic->moduleclk = of_clk_get(np, 1);
-	if (IS_ERR(sunxi_dmic->pllclk) || IS_ERR(sunxi_dmic->moduleclk)){
+	if (IS_ERR(sunxi_dmic->pllclk) || IS_ERR(sunxi_dmic->moduleclk)) {
 		dev_err(&pdev->dev, "Can't get dmic pll clocks\n");
 		if (IS_ERR(sunxi_dmic->pllclk)) {
 			ret = PTR_ERR(sunxi_dmic->pllclk);
@@ -432,7 +440,7 @@ static int  sunxi_dmic_dev_probe(struct platform_device *pdev)
 		}
 	} else {
 		if (clk_set_parent(sunxi_dmic->moduleclk, sunxi_dmic->pllclk)) {
-			pr_err("try to set parent of sunxi_dmic->moduleclk to sunxi_dmic->pllclk failed! line = %d\n",__LINE__);
+			pr_err("try to set parent failed! line = %d\n", __LINE__);
 		}
 		clk_prepare_enable(sunxi_dmic->pllclk);
 		clk_prepare_enable(sunxi_dmic->moduleclk);
@@ -440,7 +448,7 @@ static int  sunxi_dmic_dev_probe(struct platform_device *pdev)
 
 	/* FIXME */
 	sunxi_dmic->capture_dma_param.dma_addr = res.start + SUNXI_DMIC_DATA;
-	sunxi_dmic->capture_dma_param.dma_drq_type_num = DRQSRC_DMIC_RX;
+	sunxi_dmic->capture_dma_param.dma_drq_type_num = DRQSRC_DMIC;
 	sunxi_dmic->capture_dma_param.src_maxburst = 8;
 	sunxi_dmic->capture_dma_param.dst_maxburst = 8;
 
@@ -453,7 +461,7 @@ static int  sunxi_dmic_dev_probe(struct platform_device *pdev)
 			goto err_moduleclk_put;
 		}
 	}
-	if (!sunxi_dmic->pinstate){
+	if (!sunxi_dmic->pinstate) {
 		sunxi_dmic->pinstate = pinctrl_lookup_state(sunxi_dmic->pinctrl, PINCTRL_STATE_DEFAULT);
 		if (IS_ERR_OR_NULL(sunxi_dmic->pinstate)) {
 			dev_err(&pdev->dev, "lookup pin default state failed\n");
@@ -462,7 +470,7 @@ static int  sunxi_dmic_dev_probe(struct platform_device *pdev)
 		}
 	}
 
-	if (!sunxi_dmic->pinstate_sleep){
+	if (!sunxi_dmic->pinstate_sleep) {
 		sunxi_dmic->pinstate_sleep = pinctrl_lookup_state(sunxi_dmic->pinctrl, PINCTRL_STATE_SLEEP);
 		if (IS_ERR_OR_NULL(sunxi_dmic->pinstate_sleep)) {
 			dev_err(&pdev->dev, "lookup pin sleep state failed\n");
@@ -470,7 +478,12 @@ static int  sunxi_dmic_dev_probe(struct platform_device *pdev)
 			goto err_pinctrl_put;
 		}
 	}
-
+	/*only until this step , can the pinctrl system find pin conlict*/
+	ret = pinctrl_select_state(sunxi_dmic->pinctrl, sunxi_dmic->pinstate);
+	if (ret) {
+		dev_err(&pdev->dev, "pin select state failed\n");
+		goto err_pinctrl_put;
+	}
 	ret = snd_soc_register_component(&pdev->dev, &sunxi_dmic_component,
 				   &sunxi_dmic->dai, 1);
 	if (ret) {
@@ -479,7 +492,7 @@ static int  sunxi_dmic_dev_probe(struct platform_device *pdev)
 		goto err_pinctrl_put;
 	}
 
-	ret = asoc_dma_platform_register(&pdev->dev,0);
+	ret = asoc_dma_platform_register(&pdev->dev, 0);
 	if (ret) {
 		dev_err(&pdev->dev, "Could not register PCM: %d\n", ret);
 		ret = -ENOMEM;
@@ -499,8 +512,10 @@ err_pllclk_put:
 err_iounmap:
 	iounmap(sunxi_dmic_membase);
 err_regulator_put:
+#ifdef DMIC_AUDIO_DEMAND
 	regulator_put(sunxi_dmic->power_supply);
 err_devm_kfree:
+#endif
 	devm_kfree(&pdev->dev, sunxi_dmic);
 err_node_put:
 	of_node_put(np);

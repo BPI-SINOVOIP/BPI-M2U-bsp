@@ -12,14 +12,10 @@
 #define __OS_EBASE_SYSTEM__
 #define __OS_NAND_DBG__
 
-#define NAND_IO_BASE_ADDR  0x01c03000
-#define   NAND_IO_BASE_ADDR0   0x1c03000
+#define NAND_IO_BASE_ADDR  0x04011000
 
-#ifndef   CONFIG_ARCH_SUN9IW1P1
-#define   NAND_IO_BASE_ADDR1   0x1c05000
-#else
-#define   NAND_IO_BASE_ADDR1   0x1c04000
-#endif
+#define   NAND_IO_BASE_ADDR0   0x04011000
+#define   NAND_IO_BASE_ADDR1   0x04012000
 
 extern void *NAND_IORemap(unsigned int base_addr, unsigned int size);
 

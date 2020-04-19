@@ -132,6 +132,12 @@ u8 pat_seed_pair[8][2] = {
 #define TUNING_PAT_SIZE_8BIT 128
 #define TUNING_PAT_SIZE_4BIT 64
 
+__weak
+int get_mmc_gpio_bias(void)
+{
+	return 3300;
+}
+
 int gen_pat_bus4_1bit(u8 *dat, int bit_no, int pat_size)
 {
 	int p;
@@ -600,8 +606,10 @@ static int _get_best_sdly(int sdly_cnt, u8 win_th, u8 *p)
 	* we check and choose best sample delay from these two sections. it will reduce impact on sample delay
 	* caused by temperature and voltage variation partly.
 	*/
+	/*
 	if (group > 2)
 		group = 2;
+	*/
 
 	/* get max window */
 	j = 0;
@@ -710,7 +718,7 @@ static int sunxi_tuning_speed_mode(struct mmc *mmc, int speed_mode, int tuning_m
 	MMCMSG(mmc, "speed mode: %s\n", spd_name[speed_mode]);
 	for (i=0; i<freq_index; i++)
 	{
-		MMCMSG(mmc, "---%dHz: \n", sunxi_select_freq(mmc, speed_mode, i));
+		MMCMSG(mmc, "---%uHz: \n", sunxi_select_freq(mmc, speed_mode, i));
 		#if 0
 		for (j=0; j<sdly_cnt; j++)
 		{
@@ -846,7 +854,7 @@ static int sunxi_tuning_hs400_cmd(struct mmc *mmc, int speed_mode, int tuning_mo
 	MMCMSG(mmc, "speed mode: %s\n", spd_name[speed_mode]);
 	for (i=0; i<freq_index; i++)
 	{
-		MMCMSG(mmc, "---%dHz: \n", sunxi_select_freq(mmc, speed_mode, i));
+		MMCMSG(mmc, "---%uHz: \n", sunxi_select_freq(mmc, speed_mode, i));
 		#if 0
 		for (j=0; j<sdly_cnt; j++)
 		{
@@ -1319,10 +1327,19 @@ int sunxi_switch_to_best_bus(struct mmc *mmc)
 	u32 tm = host->timing_mode;
 	u8 *p = NULL, *pds=NULL;
 
-	if (IS_SD(mmc) || (host->mmc_no == 0))
+#if (defined CONFIG_ARCH_SUN8IW6P1) || (defined CONFIG_ARCH_SUN8IW5P1)
+	/* don't check and swtich to best bus on sun8iw6
+		--smhc0/1: SUNXI_MMC_TIMING_MODE_0
+		--smhc2: SUNXI_MMC_TIMING_MODE_1
+	*/
+	return 0;
+#else
+	if (IS_SD(mmc) || ((host->mmc_no == 3) || (host->mmc_no == 0)))
 	{
 		return 0;
 	}
+#endif
+
 #ifdef BPI
 #else
 	if (host->mmc_no == 2) {
@@ -1382,7 +1399,9 @@ int sunxi_switch_to_best_bus(struct mmc *mmc)
 	} else if (tm == SUNXI_MMC_TIMING_MODE_4) {
 		p = &host->tm4.sdly[0];
 		pds = &host->tm4.dsdly[0];
-	} else {
+	} else if (tm == SUNXI_MMC_TIMING_MODE_1) {
+		p = &host->tm1.sdly[0];
+	} else{
 		MMCINFO("%s: err timing mode %d\n", __FUNCTION__, tm);
 		goto OUT;
 	}
@@ -1391,8 +1410,12 @@ int sunxi_switch_to_best_bus(struct mmc *mmc)
 		== (MMC_MODE_HS400|MMC_MODE_8BIT))
 	{
 		imd = HS400;
-		for (ifreq=5; ifreq>=2; ifreq--) /*1-25MHz; 2-50MHz; 3-100MHz; 4-150MHz; 5-200MHz*/
-		{
+		if (host->cfg.platform_caps.tm4_tune_hs400_max_freq)
+			ifreq = 5;
+		else
+			ifreq = 3;
+		/*ifreq value 1-25MHz; 2-50MHz; 3-100MHz; 4-150MHz; 5-200MHz*/
+		for (; ifreq >= 2; ifreq--) {
 			imd = HS200_SDR104;
 			sdly = p[imd*MAX_CLK_FREQ_NUM+ifreq];
 			imd = HS400;
@@ -1404,8 +1427,11 @@ int sunxi_switch_to_best_bus(struct mmc *mmc)
 	if (mmc->card_caps & MMC_MODE_HS200)
 	{
 		imd = HS200_SDR104;
-		for (ifreq=5; ifreq>=4; ifreq--) /*1-25MHz; 2-50MHz; 3-100MHz; 4-150MHz; 5-200MHz*/
-		{
+		if (host->cfg.platform_caps.tm4_tune_hs200_max_freq)
+			ifreq = 5;
+		else
+			ifreq = 4;
+		for (; ifreq >= 4; ifreq--) {
 			sdly = p[imd*MAX_CLK_FREQ_NUM+ifreq];
 			if (sdly != 0xFF)
 				goto START_SWITCH;
@@ -1452,7 +1478,7 @@ START_SWITCH:
 		goto OUT;
 	}
 
-	MMCINFO("========best spd md: %d-%s, freq: %d-%d\n", imd, spd_name[imd], ifreq, freq);
+	MMCINFO("Best spd md: %d-%s, freq: %d-%d\n", imd, spd_name[imd], ifreq, freq);
 
 	if (mmc->card_caps & MMC_MODE_8BIT)
 		bus_width = 8;
@@ -1487,7 +1513,7 @@ START_SWITCH:
 	}
 
 	mmc_set_clock(mmc, mmc->tran_speed);
-
+	MMCINFO("Bus width %d\n", bus_width);
 OUT:
 
 	return ret;
@@ -1496,15 +1522,16 @@ OUT:
 int mmc_request_update_boot0(int dev_num)
 {
 	struct mmc *mmc = find_mmc_device(dev_num);
-	if(mmc!=NULL){
-		if ((mmc->cfg->platform_caps.sample_mode == AUTO_SAMPLE_MODE)
-			&& (mmc->tuning_end)) {
-			MMCINFO("mmc request udpate boot0\n");
-			return 1;
-		} else
-			return 0;
-	}
-	return 0;
+
+	if (mmc == NULL)
+		return 0;
+
+	if ((mmc->cfg->platform_caps.sample_mode == AUTO_SAMPLE_MODE)
+		&& (mmc->tuning_end)) {
+		MMCINFO("mmc request udpate boot0\n");
+		return 1;
+	} else
+		return 0;
 }
 
 int mmc_write_info(int dev_num, void *buffer, u32 buffer_size)
@@ -1550,6 +1577,11 @@ int mmc_write_info(int dev_num, void *buffer, u32 buffer_size)
 			priv_info.card_type = CARD_TYPE_SD;
 		else
 			priv_info.card_type = CARD_TYPE_MMC;
+
+		if (get_mmc_gpio_bias()==1800)
+			priv_info.ext_para1 |= EXT_PARA1_1V8_GPIO_BIAS;
+		else
+			MMCDBG("not bias set\n");
 
 		/*
 		----- normal

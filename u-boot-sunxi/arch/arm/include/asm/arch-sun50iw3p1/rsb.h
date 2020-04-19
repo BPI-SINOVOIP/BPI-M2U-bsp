@@ -31,7 +31,7 @@
 //#define RSB_USE_INT
 
 #ifndef R_RSB_BASE
-#define R_RSB_BASE	(0x01f03400)//should modified acorrding to environment
+#define R_RSB_BASE	(0x07083000)
 #endif
 
 

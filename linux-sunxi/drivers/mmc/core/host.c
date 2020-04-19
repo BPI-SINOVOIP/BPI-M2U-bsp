@@ -465,6 +465,10 @@ void mmc_of_parse(struct mmc_host *host)
 
 	if (of_find_property(np, "mmc-cache-ctrl", &len))
 		host->caps2 |= MMC_CAP2_CACHE_CTRL;	
+	if (of_property_read_bool(np, "mmc-high-capacity-erase-size"))
+		host->caps2 |= MMC_CAP2_HC_ERASE_SZ;
+	if (of_find_property(np, "cap-cmd23", &len))
+		host->caps |= MMC_CAP_CMD23;
 }
 
 EXPORT_SYMBOL(mmc_of_parse);

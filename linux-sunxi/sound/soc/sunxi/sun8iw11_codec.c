@@ -533,9 +533,9 @@ static void sunxi_codec_init(struct snd_soc_codec *codec)
 	snd_soc_update_bits(codec, SUNXI_ADC_FIFO_CTR,
 			(7<<ADCDFEN), (7<<ADCDFEN));
 
-	/* Enable Hardware ZeroCross overcomm volume update clicks noise */
+	/* disable Hardware ZeroCross overcomm volume update clicks noise */
 	snd_soc_update_bits(codec, SUNXI_ADDA_APT2,
-			(1<<ZERO_CROSS_EN), (1<<ZERO_CROSS_EN));
+			(1<<ZERO_CROSS_EN), (0<<ZERO_CROSS_EN));
 
 	/* FIXME, When Enable Headphone PA fast setup mode, arise click noise,
 	 * so just cut down this way. In PA slow setup mode, the pop noise

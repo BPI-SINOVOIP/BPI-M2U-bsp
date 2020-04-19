@@ -24,7 +24,13 @@
 #define HDMI3840_2160P_30   (1+0x100)
 #define HDMI3840_2160P_25   (2+0x100)
 #define HDMI3840_2160P_24   (3+0x100)
+#define HDMI4096_2160P_24   (4+0x100)
 #define HDMI_EDID_LEN 1024
+
+#define HDMI1280_1024       (1+0x110)
+#define HDMI1024_768        (2+0x110)
+#define HDMI900_540         (3+0x110)
+#define HDMI1920_720        (4 + 0x110)
 
 #define HDMI_State_Idle 			 0x00
 #define HDMI_State_Wait_Hpd			 0x02
@@ -98,6 +104,7 @@ extern u32 is_exp;
 extern void hdmi_delay_ms(unsigned long ms);
 extern void hdmi_delay_us(unsigned long us);
 extern unsigned int hdmi_get_soc_version(void);
+extern unsigned int hdmi_clk_get_div(void);
 
 #endif
 

@@ -295,13 +295,12 @@ static int ac_speaker_event(struct snd_soc_dapm_widget *w,
 			    (0x1 << LMIXMUTEDACL), (0x1 << LMIXMUTEDACL));
 
 		if (sunxi_internal_codec->spkenable != true) {
-			snd_soc_update_bits(codec, PAEN_CTR, (0x1 << LINEOUTEN),
-				    (0x1 << LINEOUTEN));
 			snd_soc_update_bits(codec, MIC2G_LINEOUT_CTR,
-				    (0x1 << LINEOUTL_EN), (0x1 << LINEOUTL_EN));
+				(0x1 << LINEOUTL_EN), (0x1 << LINEOUTL_EN));
 			snd_soc_update_bits(codec, MIC2G_LINEOUT_CTR,
-				    (0x1 << LINEOUTR_EN), (0x1 << LINEOUTR_EN));
-			msleep(270);
+				(0x1 << LINEOUTR_EN), (0x1 << LINEOUTR_EN));
+			snd_soc_update_bits(codec, PAEN_CTR,
+				(0x1 << LINEOUTEN), (0x1 << LINEOUTEN));
 			sunxi_internal_codec->spkenable = true;
 		}
 		msleep(50);
@@ -311,6 +310,8 @@ static int ac_speaker_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_PRE_PMD:
 		if (spk_gpio.cfg)
 			gpio_set_value(spk_gpio.gpio, 0);
+		snd_soc_update_bits(codec, PAEN_CTR, (0x1 << LINEOUTEN),
+				(0x0 << LINEOUTEN));
 		snd_soc_update_bits(codec, ROMIXSC,
 				    (0x1 << RMIXMUTEDACR), (0x0 << RMIXMUTEDACR));
 		snd_soc_update_bits(codec, LOMIXSC,

@@ -17,6 +17,7 @@
 #include <asm/uaccess.h>
 #include "de/bsp_display.h"
 #include "de/disp_tv.h"
+#include "dev_disp.h"
 
 int dispdbg_init(void);
 int dispdbg_exit(void);

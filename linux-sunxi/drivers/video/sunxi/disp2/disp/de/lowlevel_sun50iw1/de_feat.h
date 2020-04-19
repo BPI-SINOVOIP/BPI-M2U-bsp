@@ -18,6 +18,20 @@
 #define SUPPORT_LVDS
 //#define SUPPORT_TV
 //#define LVDS_REVERT
+/*common macro define*/
+
+#ifndef CLK_NUM_PER_DSI
+#define CLK_NUM_PER_DSI 1
+#endif
+
+#if defined(DEVICE_DSI_NUM)
+/* total number of DSI clk */
+#define CLK_DSI_NUM  (CLK_NUM_PER_DSI * DEVICE_DSI_NUM)
+#else
+#define CLK_DSI_NUM  CLK_NUM_PER_DSI
+#define DEVICE_DSI_NUM 1
+#endif /*endif DEVICE_DSI_NUM */
+
 
 struct de_feat {
 	const int num_screens;//indicate layer manager number

@@ -263,7 +263,7 @@ not_used:
 
 	.align	5
 irq:
-	get_irq_stack
+	@get_irq_stack
 	irq_save_user_regs
 	bl	do_irq
 	irq_restore_user_regs

@@ -132,6 +132,20 @@ s32 wb_ebios_update_regs(u32 sel)
 	return 0;
 }
 
+s32 wb_ebios_reset(u32 sel)
+{
+	wb_dev[sel]->gctrl.dwval = 0x20000010;
+
+	return 0;
+}
+
+s32 wb_ebios_dereset(u32 sel)
+{
+	wb_dev[sel]->gctrl.dwval = 0x00000000;
+
+	return 0;
+}
+
 /**
  *	function       : wb_ebios_set_para(u32 sel,disp_capture_config *cfg)
  *	description    : setup write-back controller parameters

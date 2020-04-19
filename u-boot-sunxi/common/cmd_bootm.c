@@ -21,6 +21,10 @@
 #include <linux/ctype.h>
 #include <linux/err.h>
 #include <u-boot/zlib.h>
+#ifdef CONFIG_SUNXI_MULITCORE_BOOT
+#include <cputask.h>
+#endif
+#include <fdtdec.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -125,6 +129,11 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 		relocated = 1;
 	}
+#endif
+
+#ifdef CONFIG_SUNXI_MULITCORE_BOOT
+	sunxi_secondary_cpu_poweroff();
+	sunxi_fdt_reflush_all();
 #endif
 
 	/* determine if we have a sub command */

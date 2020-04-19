@@ -26,6 +26,7 @@
 #include <linux/power/aw_pm.h>
 #include <linux/power/scenelock.h>
 static struct scene_lock  ehci_standby_lock[4];
+static void sunxi_ehci_resume_work(struct work_struct *work);
 #endif
 
 #include "sunxi_hci.h"
@@ -61,7 +62,6 @@ static struct sunxi_hci_hcd *g_sunxi_ehci[4];
 static u32 ehci_first_probe[4] = {1, 1, 1, 1};
 static u32 ehci_enable[4] = {1, 1, 1, 1};
 
-extern int usb_disabled(void);
 int sunxi_usb_disable_ehci(__u32 usbc_no);
 int sunxi_usb_enable_ehci(__u32 usbc_no);
 
@@ -413,6 +413,13 @@ static void sunxi_hcd_board_set_vbus(struct sunxi_hci_hcd *sunxi_ehci, int is_on
 	return;
 }
 
+static void sunxi_hcd_board_set_passby(struct sunxi_hci_hcd *sunxi_ehci,
+						int is_on)
+{
+	sunxi_ehci->usb_passby(sunxi_ehci, is_on);
+	return;
+}
+
 static int open_ehci_clock(struct sunxi_hci_hcd *sunxi_ehci)
 {
 	return sunxi_ehci->open_clock(sunxi_ehci, 0);
@@ -426,15 +433,14 @@ static int close_ehci_clock(struct sunxi_hci_hcd *sunxi_ehci)
 static void sunxi_start_ehci(struct sunxi_hci_hcd *sunxi_ehci)
 {
 	open_ehci_clock(sunxi_ehci);
-	sunxi_ehci->usb_passby(sunxi_ehci, 1);
-	//sunxi_ehci_port_configure(sunxi_ehci, 1);
+	sunxi_hcd_board_set_passby(sunxi_ehci, 1);
 	sunxi_hcd_board_set_vbus(sunxi_ehci, 1);
 }
 
 static void sunxi_stop_ehci(struct sunxi_hci_hcd *sunxi_ehci)
 {
 	sunxi_hcd_board_set_vbus(sunxi_ehci, 0);
-	sunxi_ehci->usb_passby(sunxi_ehci, 0);
+	sunxi_hcd_board_set_passby(sunxi_ehci, 0);
 	close_ehci_clock(sunxi_ehci);
 }
 
@@ -562,9 +568,10 @@ int sunxi_insmod_ehci(struct platform_device *pdev)
 
 	sunxi_ehci->probe = 1;
 #ifdef CONFIG_PM
-	if(sunxi_ehci->wakeup_suspend){
+	if (sunxi_ehci->wakeup_suspend)
 		scene_lock_init(&ehci_standby_lock[sunxi_ehci->usbc_no], SCENE_USB_STANDBY,  "ehci_standby");
-	}
+	else
+		INIT_WORK(&sunxi_ehci->resume_work, sunxi_ehci_resume_work);
 #endif
 	/* Disable ehci, when driver probe */
 	if(sunxi_ehci->host_init_state == 0){
@@ -653,7 +660,7 @@ static int sunxi_ehci_hcd_probe(struct platform_device *pdev)
 	ret = init_sunxi_hci(pdev, SUNXI_USB_EHCI);
 	if(ret != 0){
 		dev_err(&pdev->dev, "init_sunxi_hci is fail\n");
-		return 0;
+		return -1;
 	}
 
 	sunxi_insmod_ehci(pdev);
@@ -715,22 +722,24 @@ static void sunxi_ehci_hcd_shutdown(struct platform_device* pdev)
 		return;
 	}
 
-	DMSG_INFO("[%s]: ehci shutdown start\n", sunxi_ehci->hci_name);
+	pr_debug("[%s]: ehci shutdown start\n", sunxi_ehci->hci_name);
 #ifdef CONFIG_PM
 	if(sunxi_ehci->wakeup_suspend){
 		scene_lock_destroy(&ehci_standby_lock[sunxi_ehci->usbc_no]);
 	}
 #endif
+	sunxi_hcd_board_set_vbus(sunxi_ehci, 0);
+
 	usb_hcd_platform_shutdown(pdev);
 
 	/* disable usb otg INTUSBE, To solve usb0 device mode catch audio udev on reboot system is fail*/
-	if(sunxi_ehci->otg_vbase){
-		USBC_Writel(0, (sunxi_ehci->otg_vbase + SUNXI_USBC_REG_INTUSBE));
-	}
+	if (sunxi_ehci->usbc_no == 0)
+		if (sunxi_ehci->otg_vbase) {
+			writel(0, (sunxi_ehci->otg_vbase
+						+ SUNXI_USBC_REG_INTUSBE));
+		}
 
-	sunxi_stop_ehci(sunxi_ehci);
-
-	DMSG_INFO("[%s]: ehci shutdown end\n", sunxi_ehci->hci_name);
+	pr_debug("[%s]: ehci shutdown end\n", sunxi_ehci->hci_name);
 
 	return ;
 }
@@ -785,9 +794,23 @@ static int sunxi_ehci_hcd_suspend(struct device *dev)
 
 		ehci_suspend(hcd, device_may_wakeup(dev));
 		sunxi_stop_ehci(sunxi_ehci);
+
+		cancel_work_sync(&sunxi_ehci->resume_work);
 	}
 
 	return 0;
+}
+
+static void sunxi_ehci_resume_work(struct work_struct *work)
+{
+	struct sunxi_hci_hcd *sunxi_ehci = NULL;
+
+	sunxi_ehci = container_of(work, struct sunxi_hci_hcd, resume_work);
+
+	/* Waiting hci to resume. */
+	msleep(5000);
+
+	sunxi_hcd_board_set_vbus(sunxi_ehci, 1);
 }
 
 static int sunxi_ehci_hcd_resume(struct device *dev)
@@ -832,12 +855,12 @@ static int sunxi_ehci_hcd_resume(struct device *dev)
 		disable_wakeup_src(CPUS_USBMOUSE_SRC, 0);
 	}else{
 		DMSG_INFO("[%s]: sunxi_ehci_hcd_resume\n", sunxi_ehci->hci_name);
-#ifdef  SUNXI_USB_FPGA
-		fpga_config_use_hci(sunxi_ehci);
-#endif
-		sunxi_start_ehci(sunxi_ehci);
 
+		open_ehci_clock(sunxi_ehci);
+		sunxi_hcd_board_set_passby(sunxi_ehci, 1);
 		ehci_resume(hcd, false);
+
+		schedule_work(&sunxi_ehci->resume_work);
 	}
 
 	return 0;

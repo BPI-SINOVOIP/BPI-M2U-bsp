@@ -449,7 +449,7 @@ int sunxi_clock_get_axi(void)
 int sunxi_clock_get_ahb(void)
 {
 	unsigned int reg_val;
-	int factor;
+	int factor,div;
 	int clock;
 	int src = 0;
 
@@ -466,8 +466,9 @@ int sunxi_clock_get_ahb(void)
 		clock   = sunxi_clock_get_axi()>>factor;
 		break;
 	case 3://src is pll6
-		factor  = (reg_val >> 6) & 0x03;
-		clock   = sunxi_clock_get_pll6()/(factor+1);
+		factor  = ((reg_val >> 6) & 0x03) + 1;
+		div = 1<<((reg_val >> 4) & 0x03);
+		clock   = sunxi_clock_get_pll6()/(factor*div);
 	break;
 	}
 
@@ -600,6 +601,24 @@ int sunxi_clock_set_corepll(int frequency, int core_vol)
 
     return  0;
 }
+
+void set_pll_periph0_ahb_apb(void)
+{
+	//change ahb src before set pll6
+	writel((0x01 << 12) | (readl(CCMU_AHB1_APB1_CFG_REG)&(~(0x3<<12))), CCMU_AHB1_APB1_CFG_REG);
+
+	//set AHB1/APB1 clock  divide ratio
+	//ahb1 clock src is PLL6,                           (0x03<< 12)
+	//apb1 clk src is ahb1 clk src, divide  ratio is 2  (1<<8)
+	//ahb1 pre divide  ratio is 3:    0:1  , 1:2,  2:3,   3:4 (2<<6)
+	//ahb1 divide  ratio is 1:        0:1  , 1:2,  2:4,   3:8 (0<<4)
+	//PLL6:AHB1:APB1 = 600M:200M:100M
+
+	writel((1<<8) | (2<<6) | (0<<4), CCMU_AHB1_APB1_CFG_REG);
+	writel((0x03 << 12)|readl(CCMU_AHB1_APB1_CFG_REG), CCMU_AHB1_APB1_CFG_REG);
+	__msdelay(1);
+}
+
 
 int sunxi_clock_get_pll6(void)
 {

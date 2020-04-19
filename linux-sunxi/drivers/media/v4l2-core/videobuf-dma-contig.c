@@ -22,7 +22,10 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <media/videobuf-dma-contig.h>
+
+#if !defined(CONFIG_SUNXI_IOMMU)
 #define SUNXI_MEM
+#endif
 
 #ifdef SUNXI_MEM
 #include <linux/ion.h>          //for all "ion api"

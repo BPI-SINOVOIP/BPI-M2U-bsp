@@ -196,4 +196,30 @@ __s32 hwspin_unlock_nommu(__u32 hwid)
 	return 0;
 }
 
+#elif defined(CONFIG_ARCH_SUN3IW1P1)
+
+__s32 hwspinlock_init(__u32 mmu_flag)
+{
+	return 0;
+}
+
+__s32 hwspin_lock_timeout(__u32 hwid, __u32 timeout)
+{
+	return 0;
+}
+
+__s32 hwspin_unlock(__u32 hwid)
+{
+	return 0;
+}
+
+__s32 hwspin_lock_timeout_nommu(__u32 hwid, __u32 timeout)
+{
+	return 0;
+}
+
+__s32 hwspin_unlock_nommu(__u32 hwid)
+{
+	return 0;
+}
 #endif

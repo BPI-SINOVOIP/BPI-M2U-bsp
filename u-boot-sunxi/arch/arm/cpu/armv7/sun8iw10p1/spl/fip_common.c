@@ -9,6 +9,7 @@
 #include <private_uboot.h>
 #include <asm/io.h>
 #include <private_toc.h>
+#include <sunxi_cfg.h>
 
 
 //**********************************************************************
@@ -102,6 +103,14 @@ int load_fip(int *use_monitor)
 		if(strncmp(toc1_item->name, ITEM_UBOOT_NAME, sizeof(ITEM_UBOOT_NAME)) == 0)
 		{
 			toc1_flash_read(toc1_item->data_offset/512, (toc1_item->data_len+511)/512, (void *)CONFIG_SYS_TEXT_BASE);
+		}
+		else if(strncmp(toc1_item->name, ITEM_DTB_NAME, sizeof(ITEM_DTB_NAME)) == 0)
+		{
+			toc1_flash_read(toc1_item->data_offset/512, (toc1_item->data_len+511)/512, (void *)CONFIG_DTB_STORE_IN_DRAM_BASE);
+		}
+		else if(strncmp(toc1_item->name, ITEM_SOCCFG_NAME, sizeof(ITEM_SOCCFG_NAME)) == 0)
+		{
+			toc1_flash_read(toc1_item->data_offset/512, (toc1_item->data_len+511)/512, (void *)CONFIG_SOCCFG_STORE_IN_DRAM_BASE);
 		}
 		else
 		{

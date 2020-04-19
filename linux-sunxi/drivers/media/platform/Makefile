@@ -47,10 +47,12 @@ obj-$(CONFIG_VIDEO_SH_VOU)		+= sh_vou.o
 obj-$(CONFIG_SOC_CAMERA)		+= soc_camera/
 
 obj-y	+= davinci/
+obj-$(CONFIG_SUNXI_EVE)	+= sunxi-eve/
 
 obj-$(CONFIG_ARCH_OMAP)	+= omap/
 
 obj-$(CONFIG_VIDEO_SUNXI_VFE) += sunxi-vfe/
 obj-$(CONFIG_VIDEO_SUNXI_VIN) += sunxi-vin/
 obj-$(CONFIG_VIDEO_SUNXI_TVD) += sunxi-tvd/
+obj-$(CONFIG_VIDEO_SUNXI_TVD) += sunxi-4in1tvd/
 ccflags-y += -I$(srctree)/drivers/media/i2c

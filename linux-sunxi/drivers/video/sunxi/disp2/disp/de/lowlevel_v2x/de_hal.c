@@ -288,6 +288,27 @@ int de_al_lyr_apply_direct_show(unsigned int screen_id,
 	return 0;
 }
 
+static enum de_color_space __cs_transform(enum disp_color_space cs)
+{
+	enum de_color_space cs_inner;
+
+	switch (cs) {
+	case DISP_BT709:
+	case DISP_BT709_F:
+		cs_inner = DE_BT709;
+		break;
+	case DISP_BT601:
+	case DISP_BT601_F:
+		cs_inner = DE_BT601;
+		break;
+	default:
+		cs_inner = DE_BT601;
+		break;
+	}
+
+	return cs_inner;
+}
+
 int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 		    unsigned int layer_num, bool direct_show)
 {
@@ -304,7 +325,7 @@ int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 	false}, chn_dirty[CHN_NUM] = {
 	false};
 	bool chn_is_yuv[CHN_NUM] = { false };
-	enum disp_color_space cs[CHN_NUM];
+	enum de_color_space cs[CHN_NUM];
 	unsigned char layer_zorder[CHN_NUM] = { 0 }, chn_index;
 	unsigned char pipe_used[CHN_NUM] = { 0 };
 	unsigned int pipe_sel[CHN_NUM] = { 0 };
@@ -328,8 +349,8 @@ int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 			if (data1->config.info.fb.format >=
 			    DISP_FORMAT_YUV444_I_AYUV) {
 				chn_is_yuv[data1->config.channel] = true;
-				cs[data1->config.channel] =
-				    data1->config.info.fb.color_space;
+				cs[data1->config.channel] = __cs_transform(
+				    data1->config.info.fb.color_space);
 			}
 			if (data1->flag)
 				chn_dirty[data1->config.channel] = true;
@@ -342,7 +363,7 @@ int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 
 	data1 = data;
 	for (i = 0; i < layer_num; i++) {
-		if (data1->config.enable && chn_dirty[data1->config.channel])
+		if (chn_dirty[data1->config.channel])
 			data1->flag = LAYER_ALL_DIRTY;
 		data1++;
 	}
@@ -390,8 +411,9 @@ int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 	for (j = 0, k = 0; j < vi_chn; j++) {
 		format[j] = 0;
 		for (i = 0; i < layno; i++) {
-			if (data[k].config.info.fb.format >=
-			    DISP_FORMAT_YUV422_I_YVYU)
+			if ((data[k].config.enable == 1) &&
+			    (data[k].config.info.fb.format >=
+			     DISP_FORMAT_YUV422_I_YVYU))
 				format[j] = data[k].config.info.fb.format;
 			k++;
 		}
@@ -414,9 +436,9 @@ int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 			 */
 			if (direct_show) {
 				csc_cfg.in_fmt = DE_YUV;
-				csc_cfg.in_mode = DISP_BT601;
+				csc_cfg.in_mode = DE_BT601;
 				csc_cfg.out_fmt = DE_YUV;
-				csc_cfg.out_mode = DISP_BT601;
+				csc_cfg.out_mode = DE_BT601;
 
 				color = (16 << 16) | (128 << 8) | (128 << 0);
 			} else {
@@ -424,7 +446,7 @@ int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 				    DE_YUV : DE_RGB;
 				csc_cfg.in_mode = cs[j];
 				csc_cfg.out_fmt = DE_RGB;
-				csc_cfg.out_mode = DISP_BT601;
+				csc_cfg.out_mode = DE_BT601;
 
 				color = 0;
 			}
@@ -611,7 +633,7 @@ int de_al_mgr_apply_color(unsigned int screen_id, struct disp_csc_config *cfg)
 
 	de_dcsc_get_config(screen_id, &csc_cfg);
 	csc_cfg.in_fmt = DISP_CSC_TYPE_RGB;
-	csc_cfg.in_mode = DISP_BT601;
+	csc_cfg.in_mode = DE_BT601;
 
 	csc_cfg.out_fmt = cfg->out_fmt;
 	csc_cfg.out_mode = cfg->out_mode;
@@ -643,9 +665,9 @@ int de_al_mgr_apply(unsigned int screen_id, struct disp_manager_data *data)
 		    (DISP_CSC_TYPE_RGB == data->config.cs) ? DE_RGB : DE_YUV;
 		if ((data->config.size.width < 1280)
 		    && (data->config.size.height < 720))
-			csc_cfg.out_mode = DISP_BT601;
+			csc_cfg.out_mode = DE_BT601;
 		else
-			csc_cfg.out_mode = DISP_BT709;
+			csc_cfg.out_mode = DE_BT709;
 		csc_cfg.out_color_range = data->config.color_range;
 		de_al_mgr_apply_color(screen_id, &csc_cfg);
 	}

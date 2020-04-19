@@ -46,7 +46,7 @@ enum {
 #define AXP22_LDO3          AXP22_ALDO2OUT_VOL
 #define AXP22_LDO4          AXP22_ALDO3OUT_VOL
 #define AXP22_SW0           AXP22_STATUS
-#define AXP22_DC1SW         AXP22_STATUS
+#define AXP22_DC1SW         AXP22_DC1OUT_VOL
 
 #define AXP22_LDO1EN        AXP22_STATUS
 #define AXP22_LDO2EN        AXP22_LDO_DC_EN1

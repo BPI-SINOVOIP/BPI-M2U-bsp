@@ -23,7 +23,12 @@
 obj-y	+= sunxi_debug.o
 obj-y	+= sys_config.o
 obj-y	+= sys_config_old.o
+ifdef CONFIG_SUNXI_GPT
+obj-y	+= sys_partition_gpt.o
+else
 obj-y	+= sys_partition.o
+endif
+
 obj-y   += sunxi_string.o
 obj-$(CONFIG_SUNXI_MODULE_AXP)   += power_probe.o power_check.o
 obj-y   += sunxi_debug.o
@@ -32,17 +37,18 @@ obj-y   += debug_mode.o
 obj-$(CONFIG_SUNXI_KEY_BURN)   += key_burn.o
 obj-$(CONFIG_SUNXI_SERIAL)   += sunxi_serial.o
 
+obj-y	  +=de_weak.o
 obj-$(CONFIG_VIDEO_SUNXI_V1)   += de_v1.o
 obj-$(CONFIG_VIDEO_SUNXI_V2)   += de_v2.o
 obj-$(CONFIG_VIDEO_SUNXI_V3)   += de_v3.o
 
+obj-y += grallocator.o
 obj-$(CONFIG_BOOT_GUI)   += bootGUI/
 
 ifdef CONFIG_SUNXI_MULITCORE_BOOT
-obj-y   += board_common_smp.o
 obj-y   += secondary_main.o
-else
-obj-y   += board_common.o
 endif
+
+obj-y   += board_common.o
 
 

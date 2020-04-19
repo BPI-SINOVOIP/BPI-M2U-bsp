@@ -31,7 +31,7 @@ extern int axp806_set_supply_status(int vol_name, int vol_value, int onoff);
 extern int axp806_set_supply_status_byname(char *vol_name, int vol_value, int onoff);
 extern int axp806_probe_supply_status(int vol_name, int vol_value, int onoff);
 extern int axp806_probe_supply_status_byname(char *vol_name);
-
+static int axp806_ap_reset_enable(void);
 
 int axp806_probe(void)
 {
@@ -48,6 +48,7 @@ int axp806_probe(void)
 	{
 		/* pmu type AXP806 */
 		tick_printf("PMU: AXP806\n");
+		axp806_ap_reset_enable();
 		return 0;
 	}
 	return -1;
@@ -196,6 +197,24 @@ int axp806_set_int_enable(uchar *addr)
 	return 0;
 }
 
+static int axp806_ap_reset_enable(void)
+{
+	u8	 reg_value;
+
+	if (uboot_spare_head.boot_data.work_mode == WORK_MODE_BOOT)
+		return 0;
+
+	if (axp_i2c_read(CONFIG_SYS_I2C_SLAVE,
+				BOOT_POWER806_DIASBLE, &reg_value))
+		return -1;
+
+	reg_value |= 1 << 4;
+	if (axp_i2c_write(CONFIG_SYS_I2C_SLAVE,
+				BOOT_POWER806_DIASBLE, reg_value))
+		return -1;
+
+	return 0;
+}
 
 sunxi_axp_module_init("axp806", SUNXI_AXP_806);
 

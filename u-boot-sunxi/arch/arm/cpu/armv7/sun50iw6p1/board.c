@@ -1,25 +1,9 @@
 /*
- * (C) Copyright 2007-2013
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- * Jerry Wang <wangflord@allwinnertech.com>
+ * (C) Copyright 2017-2020
+ *Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+ *zhouhuacai <zhouhuacai@allwinnertech.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -51,12 +35,11 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 extern void power_limit_init(void);
-
-
 extern int sunxi_arisc_probe(void);
+
 int power_source_init(void)
 {
-	//int pll_cpux;
+	int pll_cpux;
 	int axp_exist = 0;
 
 	printf("u0:%x\n", readl(0x44000));
@@ -72,30 +55,27 @@ int power_source_init(void)
 		{
 			printf("axp_probe_power_supply_condition error\n");
 		}
+		gd->vbus_status = axp_probe_vbus_type();
+		set_sunxi_gpio_power_bias();
+		axp_set_charge_vol_limit();
+		axp_set_all_limit();
+		axp_set_hardware_poweron_vol();
+		axp_set_power_supply_output();
+
 	}
 	else
 	{
 		printf("axp_probe error\n");
 	}
 
-	if(axp_exist)
-	{
-		axp_set_charge_vol_limit();
-		axp_set_all_limit();
-		axp_set_hardware_poweron_vol();
-		axp_set_power_supply_output();
-		//power_config_gpio_bias();
-		power_limit_init();
-	}
-
 	sunxi_clock_set_corepll(uboot_spare_head.boot_data.run_clock);
 
-	//pll_cpux = sunxi_clock_get_corepll();
-	//tick_printf("PMU: cpux %d Mhz,AXI=%d Mhz\n", pll_cpux,sunxi_clock_get_axi());
-	//printf("PLL6=%d Mhz,AHB1=%d Mhz, APB1=%dMhz MBus=%dMhz\n", sunxi_clock_get_pll6(),
-	//	sunxi_clock_get_ahb(),
-	//	sunxi_clock_get_apb1(),
-	//	sunxi_clock_get_mbus());
+	pll_cpux = sunxi_clock_get_corepll();
+	tick_printf("PMU: cpux %d Mhz,AXI=%d Mhz\n", pll_cpux,sunxi_clock_get_axi());
+	printf("PLL6=%d Mhz,AHB1=%d Mhz, APB1=%dMhz MBus=%dMhz\n", sunxi_clock_get_pll6(),
+		sunxi_clock_get_ahb(),
+		sunxi_clock_get_apb1(),
+		sunxi_clock_get_mbus());
 
 	return 0;
 }
@@ -179,7 +159,8 @@ int sunxi_set_secure_mode(void)
 {
 	int mode;
 
-	if((gd->securemode == SUNXI_NORMAL_MODE) && (gd->bootfile_mode = SUNXI_BOOT_FILE_TOC))
+	if ((gd->securemode == SUNXI_NORMAL_MODE) &&
+		(gd->bootfile_mode == SUNXI_BOOT_FILE_TOC))
 	{
 		mode = sid_probe_security_mode();
 		if(!mode)
@@ -191,30 +172,3 @@ int sunxi_set_secure_mode(void)
 
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
-int sunxi_get_securemode(void)
-{
-	return gd->securemode;
-}
-
-int sunxi_probe_secure_monitor(void)
-{
-	return uboot_spare_head.boot_data.secureos_exist == SUNXI_SECURE_MODE_USE_SEC_MONITOR?1:0;
-}
-
-

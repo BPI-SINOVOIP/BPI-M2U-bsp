@@ -30,8 +30,18 @@
 #define __io(a)		__typesafe_io(a)
 
 #if !defined(SUNXI_IO_PBASE)
+#if defined(CONFIG_ARCH_SUN3IW1)
+#define SUNXI_IO_PBASE		UL(0x01c00000)
+#else
 #define SUNXI_IO_PBASE		UL(0x01000000)
+#endif
+#if defined(CONFIG_ARCH_SUN8IW17)
+#define SUNXI_IO_SIZE		UL(0x0a000000 - 0x01000000)
+#elif defined(CONFIG_ARCH_SUN3IW1)
+#define SUNXI_IO_SIZE		(SZ_2M + SZ_1M)
+#else
 #define SUNXI_IO_SIZE		SZ_16M
+#endif
 #endif
 
 #if !defined(IO_ADDRESS)

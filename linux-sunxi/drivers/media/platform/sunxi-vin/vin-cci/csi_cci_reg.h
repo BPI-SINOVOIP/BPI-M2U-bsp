@@ -18,7 +18,7 @@
 #ifndef __CSI__CCI__REG__H__
 #define __CSI__CCI__REG__H__
 
-#define MAX_CSI 2
+#define MAX_CSIC_CCI_NUM 4
 #define CCI_HCLK (24*1000*1000)
 #define FIFO_DEPTH 64
 

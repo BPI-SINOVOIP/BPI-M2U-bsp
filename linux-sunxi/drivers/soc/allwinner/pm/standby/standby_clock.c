@@ -16,18 +16,24 @@ static __ccmu_reg_list_t *CmuReg;
 /*==============================================================================*/
 /* CLOCK SET FOR SYSTEM STANDBY*/
 /*==============================================================================*/
-#ifdef CONFIG_ARCH_SUN8I
+#if defined(CONFIG_ARCH_SUN8I) || defined(CONFIG_ARCH_SUN3I)
 static __ccmu_pll1_reg0000_t CmuReg_Pll1Ctl_tmp;
 static __ccmu_sysclk_ratio_reg0050_t CmuReg_SysClkDiv_tmp;
-#define PIO_INT_DEB_REG (AW_GPIO_BASE_PA + 0x258)
+
 static __u32 pio_int_deb_back;
 static __ccmu_ahb1_ratio_reg0054_t CmuReg_ahb1_tmp;
 static __ccmu_ahb1_ratio_reg0054_t CmuReg_ahb1_backup;
+#ifndef CONFIG_ARCH_SUN3IW1P1
 static __ccmu_apb2_ratio_reg0058_t CmuReg_apb2_tmp;
 static __ccmu_apb2_ratio_reg0058_t CmuReg_apb2_backup;
+#endif
 #ifdef CONFIG_ARCH_SUN8IW10P1
 static __u32 CmuReg_ee_backup;
 static __u32 CmuReg_de_backup;
+#endif
+#ifdef CONFIG_ARCH_SUN3IW1P1
+static __u32 CmuReg_fe_backup;
+static __u32 CmuReg_be_backup;
 #endif
 /*
 *********************************************************************************************************
@@ -105,7 +111,11 @@ __s32 standby_clk_core2losc(void)
 __s32 standby_clk_core2hosc(void)
 {
 	CmuReg_SysClkDiv_tmp.dwval = CmuReg->SysClkDiv.dwval;
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	CmuReg_SysClkDiv_tmp.bits.CpuClkSrc = AC320_CLKSRC_HOSC;/*24M OSC */
+#else
 	CmuReg_SysClkDiv_tmp.bits.CpuClkSrc = AC327_CLKSRC_HOSC;	/*26M OSC */
+#endif
 	CmuReg->SysClkDiv.dwval = CmuReg_SysClkDiv_tmp.dwval;
 
 	return 0;
@@ -125,7 +135,11 @@ __s32 standby_clk_core2hosc(void)
 __s32 standby_clk_core2pll(void)
 {
 	CmuReg_SysClkDiv_tmp.dwval = CmuReg->SysClkDiv.dwval;
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	CmuReg_SysClkDiv_tmp.bits.CpuClkSrc = AC320_CLKSRC_PLL1;/*pll cpu */
+#else
 	CmuReg_SysClkDiv_tmp.bits.CpuClkSrc = AC327_CLKSRC_PLL1;	/*pll cpu */
+#endif
 	CmuReg->SysClkDiv.dwval = CmuReg_SysClkDiv_tmp.dwval;
 
 	return 0;
@@ -161,6 +175,8 @@ __s32 standby_clk_plldisable(void)
 	tmp = readl(&(CmuReg->Pll6Ctl));
 	tmp &= (~(0x80000000));
 	writel(tmp, &(CmuReg->Pll6Ctl));
+
+#ifndef CONFIG_ARCH_SUN3IW1P1
 #ifndef CONFIG_ARCH_SUN8IW11P1
 	/*pll9: periph 1 */
 	tmp = readl(&(CmuReg->Pll9Ctl));
@@ -172,13 +188,38 @@ __s32 standby_clk_plldisable(void)
 	tmp &= (~(0x80000000));
 	writel(tmp, &(CmuReg->Pll24M));
 #else
+	/* ohci 12M divided from 24M */
+	tmp = readl(&(CmuReg->UsbClk));
+	tmp = (tmp & (~(0x3 << 20))) | (0x1 << 20);
+	tmp = (tmp & (~(0x3 << 22))) | (0x1 << 22);
+	tmp = (tmp & (~(0x3 << 24))) | (0x1 << 24);
+	writel(tmp, &(CmuReg->UsbClk));
+
 	/*pll9: periph 1 */
 	tmp = readl(&(CmuReg->Pll7Ctl));
 	tmp &= (~(0x80000000));
 	writel(tmp, &(CmuReg->Pll7Ctl));
+
+	/* pll mipi */
+	tmp = readl(&(CmuReg->PllMipi));
+	tmp &= (~(0x80000000));
+	writel(tmp, &(CmuReg->PllMipi));
+#endif
 #endif
 
-#ifdef CONFIG_ARCH_SUN8IW10P1
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	/*pll2: for audio */
+	tmp = readl(&(CmuReg->Pll2Ctl));
+	tmp &= (~(0x80000000));
+	writel(tmp, &(CmuReg->Pll2Ctl));
+
+	/*pll3: for video */
+	tmp = readl(&(CmuReg->Pll3Ctl));
+	tmp &= (~(0x80000000));
+	writel(tmp, &(CmuReg->Pll3Ctl));
+#endif
+
+#if defined CONFIG_ARCH_SUN8IW10P1 || defined CONFIG_ARCH_SUN8IW11P1
 	/*pll2: for audio */
 	tmp = readl(&(CmuReg->Pll2Ctl));
 	tmp &= (~(0x80000000));
@@ -224,7 +265,7 @@ __s32 standby_clk_plldisable(void)
 __s32 standby_clk_pllenable(void)
 {
 	unsigned int tmp;
-#ifndef CONFIG_ARCH_SUN8IW11P1
+#if !defined(CONFIG_ARCH_SUN8IW11P1) && !defined(CONFIG_ARCH_SUN3IW1P1)
 	/*pll 24M: */
 	tmp = readl(&(CmuReg->Pll24M));
 	tmp |= ((0x80000000));
@@ -239,6 +280,8 @@ __s32 standby_clk_pllenable(void)
 	tmp = readl(&(CmuReg->Pll6Ctl));
 	tmp |= ((0x80000000));
 	writel(tmp, &(CmuReg->Pll6Ctl));
+
+#ifndef CONFIG_ARCH_SUN3IW1P1
 #ifndef CONFIG_ARCH_SUN8IW11P1
 	/*pll9: periph 1 */
 	tmp = readl(&(CmuReg->Pll9Ctl));
@@ -255,6 +298,30 @@ __s32 standby_clk_pllenable(void)
 	tmp |= ((0x80000000));
 	writel(tmp, &(CmuReg->Pll7Ctl));
 #endif
+#endif
+
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	/*pll2: for audio */
+	tmp = readl(&(CmuReg->Pll2Ctl));
+	tmp |= ((0x80000000));
+	writel(tmp, &(CmuReg->Pll2Ctl));
+
+	/*pll3: for video */
+	tmp = readl(&(CmuReg->Pll3Ctl));
+	tmp |= ((0x80000000));
+	writel(tmp, &(CmuReg->Pll3Ctl));
+
+	/*pll4: for ve */
+	tmp = readl(&(CmuReg->Pll4Ctl));
+	tmp |= ((0x80000000));
+	writel(tmp, &(CmuReg->Pll4Ctl));
+
+	/*pll5: for ddr */
+	tmp = readl(&(CmuReg->Pll5Ctl));
+	tmp |= ((0x80000000));
+	writel(tmp, &(CmuReg->Pll5Ctl));
+#endif
+
 #if 0
 	/*pll2: for audio */
 	tmp = readl(&(CmuReg->Pll2Ctl));
@@ -319,10 +386,10 @@ void standby_clk_set_keyfield(void)
 {
 	unsigned int tmp;
 	/*keyfield set to: 0xa7 */
-	tmp = readl((void *)(0xf1c00000 + 0xf4));
+	tmp = readl((void *)(IO_ADDRESS(PLL_CTRL_REG1)));
 	tmp &= (~(0xff000000));
 	tmp |= ((0xa7000000));
-	writel(tmp, (0xf1c00000 + 0xf4));
+	writel(tmp, IO_ADDRESS(PLL_CTRL_REG1));
 }
 
 /*
@@ -338,9 +405,9 @@ void standby_clk_unset_keyfield(void)
 {
 	unsigned int tmp;
 	/*keyfield set to: 0 */
-	tmp = readl((0xf1c00000 + 0xf4));
+	tmp = readl(IO_ADDRESS(PLL_CTRL_REG1));
 	tmp &= (~(0xff000000));
-	writel(tmp, (0xf1c00000 + 0xf4));
+	writel(tmp, IO_ADDRESS(PLL_CTRL_REG1));
 
 }
 
@@ -359,6 +426,7 @@ __s32 standby_clk_hoscdisable(void)
 {
 	unsigned int tmp;
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/*disable dcxo: band gap */
 	tmp = readl((0xf1c20328));
 	tmp &= (~(0x80000000));
@@ -368,16 +436,17 @@ __s32 standby_clk_hoscdisable(void)
 	tmp = readl((0xf1c20324));
 	tmp &= (~(0x80020000));
 	writel(tmp, (0xf1c20324));
+#endif
 
-	/*0xf1c00000 + 0xf4 (system_ctrl: pll ctrl reg1) */
+	/*0xf0000000 + PLL_CTRL_REG1 (system_ctrl: pll ctrl reg1) */
 	/*bit2: hosc; */
 	/*bit1: ldo for analog; */
 	/*bit0: ldo for digital */
 
 	/*disable hosc */
-	tmp = readl((0xf1c00000 + 0xf4));
+	tmp = readl(IO_ADDRESS(PLL_CTRL_REG1));
 	tmp &= (~(0x00000004));
-	writel(tmp, (0xf1c00000 + 0xf4));
+	writel(tmp, IO_ADDRESS(PLL_CTRL_REG1));
 
 	return 0;
 }
@@ -396,16 +465,17 @@ __s32 standby_clk_hoscdisable(void)
 __s32 standby_clk_hoscenable(void)
 {
 	unsigned int tmp;
-	/*0xf1c00000 + 0xf4 (system_ctrl: pll ctrl reg1) */
+	/*0xf0000000 + PLL_CTRL_REG1 (system_ctrl: pll ctrl reg1) */
 	/*bit2: hosc; */
 	/*bit1: ldo for analog; */
 	/*bit0: ldo for digital */
 
 	/*enable hosc */
-	tmp = readl((0xf1c00000 + 0xf4));
+	tmp = readl(IO_ADDRESS(PLL_CTRL_REG1));
 	tmp |= ((0x00000004));
-	writel(tmp, (0xf1c00000 + 0xf4));
+	writel(tmp, IO_ADDRESS(PLL_CTRL_REG1));
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/*enable dcxo */
 	tmp = readl((0xf1c20324));
 	tmp |= (0x80020000);
@@ -415,6 +485,7 @@ __s32 standby_clk_hoscenable(void)
 	tmp = readl((0xf1c20328));
 	tmp |= (0x80000000);
 	writel(tmp, (0xf1c20328));
+#endif
 
 	return 0;
 }
@@ -433,15 +504,15 @@ __s32 standby_clk_hoscenable(void)
 __s32 standby_clk_ldodisable(void)
 {
 	unsigned int tmp;
-	/*0xf1c00000 + 0xf4 (system_ctrl: pll ctrl reg1) */
+	/*0xf0000000 + PLL_CTRL_REG1 (system_ctrl: pll ctrl reg1) */
 	/*bit2: hosc; */
 	/*bit1: ldo for analog; */
 	/*bit0: ldo for digital */
 
 	/*disable ldo */
-	tmp = readl((0xf1c00000 + 0xf4));
+	tmp = readl(IO_ADDRESS(PLL_CTRL_REG1));
 	tmp &= (~(0x00000003));
-	writel(tmp, (0xf1c00000 + 0xf4));
+	writel(tmp, IO_ADDRESS(PLL_CTRL_REG1));
 
 	return 0;
 }
@@ -460,15 +531,15 @@ __s32 standby_clk_ldodisable(void)
 __s32 standby_clk_ldoenable(void)
 {
 	unsigned int tmp;
-	/*0xf1c00000 + 0xf4 (system_ctrl: pll ctrl reg1) */
+	/*0xf0000000 + PLL_CTRL_REG1 (system_ctrl: pll ctrl reg1) */
 	/*bit2: hosc; */
 	/*bit1: ldo for analog; */
 	/*bit0: ldo for digital */
 
 	/*enable ldo */
-	tmp = readl((0xf1c00000 + 0xf4));
+	tmp = readl(IO_ADDRESS(PLL_CTRL_REG1));
 	tmp |= ((0x00000003));
-	writel(tmp, (0xf1c00000 + 0xf4));
+	writel(tmp, IO_ADDRESS(PLL_CTRL_REG1));
 
 	return 0;
 }
@@ -499,6 +570,7 @@ __s32 standby_clk_setdiv(struct standby_clk_div_t *clk_div)
 	CmuReg_ahb1_tmp.bits.Apb1Div = clk_div->apb_div;
 	CmuReg->Ahb1Div.dwval = CmuReg_ahb1_tmp.dwval;
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/*axi */
 	CmuReg_SysClkDiv_tmp.dwval = CmuReg->SysClkDiv.dwval;
 	CmuReg_SysClkDiv_tmp.bits.AXIClkDiv = clk_div->axi_div;
@@ -509,7 +581,7 @@ __s32 standby_clk_setdiv(struct standby_clk_div_t *clk_div)
 	CmuReg_apb2_tmp.bits.DivM = clk_div->apb2_div;
 	CmuReg_apb2_tmp.bits.DivN = clk_div->apb2_pre_div;
 	CmuReg->Apb2Div.dwval = CmuReg_apb2_tmp.dwval;
-
+#endif
 	return 0;
 }
 
@@ -530,9 +602,11 @@ __s32 standby_clk_getdiv(struct standby_clk_div_t *clk_div)
 		return -1;
 	}
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/*axi */
 	CmuReg_SysClkDiv_tmp.dwval = CmuReg->SysClkDiv.dwval;
 	clk_div->axi_div = CmuReg_SysClkDiv_tmp.bits.AXIClkDiv;
+#endif
 
 	/*ahb1 */
 	CmuReg_ahb1_tmp.dwval = CmuReg->Ahb1Div.dwval;
@@ -540,10 +614,12 @@ __s32 standby_clk_getdiv(struct standby_clk_div_t *clk_div)
 	clk_div->apb_div = CmuReg_ahb1_tmp.bits.Apb1Div;
 	clk_div->ahb_pre_div = CmuReg_ahb1_tmp.bits.Ahb1PreDiv;
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/*apb2 */
 	CmuReg_apb2_tmp.dwval = CmuReg->Apb2Div.dwval;
 	clk_div->apb2_div = CmuReg_apb2_tmp.bits.DivM;
 	clk_div->apb2_pre_div = CmuReg_apb2_tmp.bits.DivN;
+#endif
 
 	return 0;
 }
@@ -613,6 +689,7 @@ __s32 standby_clk_get_pll_factor(struct pll_factor_t *pll_factor)
 	return 0;
 }
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 /*
 *********************************************************************************************************
 *                                     standby_clk_apb2losc
@@ -658,6 +735,7 @@ __s32 standby_clk_apb2hosc(void)
 
 	return 0;
 }
+#endif
 
 /*
 *********************************************************************************************************
@@ -676,13 +754,21 @@ __s32 standby_clk_bus_src_backup(void)
 	/*backup bus src cfg */
 	/* backup ahb clk src */
 	CmuReg_ahb1_backup.dwval = CmuReg->Ahb1Div.dwval;
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/* backup apb clk src */
 	CmuReg_apb2_backup.dwval = CmuReg->Apb2Div.dwval;
+#endif
 
 #ifdef CONFIG_ARCH_SUN8IW10P1
 	/* backup de/ee clk src */
 	CmuReg_de_backup = CmuReg->De0;
 	CmuReg_ee_backup = CmuReg->Ee0;
+#endif
+
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	/* backup be/fe clk src */
+	CmuReg_be_backup = CmuReg->Be0;
+	CmuReg_fe_backup = CmuReg->Fe0;
 #endif
 	return 0;
 }
@@ -730,14 +816,21 @@ __s32 standby_clk_bus_src_restore(void)
 {
 	/* restore ahb clk src */
 	CmuReg->Ahb1Div.dwval = CmuReg_ahb1_backup.dwval;
-
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/* restore apb clk src */
 	CmuReg->Apb2Div.dwval = CmuReg_apb2_backup.dwval;
+#endif
 
 #ifdef CONFIG_ARCH_SUN8IW10P1
 	/* retore de/ee clk */
 	CmuReg->De0 = CmuReg_de_backup;
 	CmuReg->Ee0 = CmuReg_ee_backup;
+#endif
+
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	/* retore be/fe clk */
+	CmuReg->Be0 = CmuReg_be_backup;
+	CmuReg->Fe0 = CmuReg_fe_backup;
 #endif
 	return 0;
 }

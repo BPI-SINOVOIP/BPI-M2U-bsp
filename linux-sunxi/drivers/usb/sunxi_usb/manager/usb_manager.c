@@ -47,6 +47,11 @@ __u32 thread_run_flag = 1;
 int thread_stopped_flag = 1;
 atomic_t thread_suspend_flag;
 
+#ifdef CONFIG_IO_EXPAND
+__u32 g_usb_drv_det_pin;
+__u32 g_usb_board_sel;
+#endif
+
 static int usb_device_scan_thread(void * pArg)
 {
 	/* delay for udc & hcd ready */
@@ -59,6 +64,10 @@ static int usb_device_scan_thread(void * pArg)
 		hw_rmmod_usb_device();
 		usb_msg_center(&g_usb_cfg);
 
+#ifdef CONFIG_IO_EXPAND
+		gpio_set_value_cansleep(g_usb_drv_det_pin,
+					g_usb_board_sel ? 0 : 1);
+#endif
 		hw_insmod_usb_device();
 		usb_msg_center(&g_usb_cfg);
 		thread_device_run_flag = 0;
@@ -232,6 +241,13 @@ static __s32 usb_script_parse(struct device_node *np, struct usb_cfg *cfg)
 	}else{
 		cfg->port.id.valid = 0;
 	}
+#ifdef CONFIG_IO_EXPAND
+	of_property_read_u32(usbc_np, "usb_board_sel", &g_usb_board_sel);
+	ret = of_property_read_u32(usbc_np, "usb_drv_det_pin",
+					&g_usb_drv_det_pin);
+	if (ret)
+		DMSG_INFO("get usb_drv_det_pin is fail, %d\n", -ret);
+#endif
 
 #else
         script_item_value_type_e type = 0;
@@ -359,10 +375,18 @@ static int sunxi_otg_manager_probe(struct platform_device *pdev)
 		return 0;
 	}
 
+#ifdef CONFIG_IO_EXPAND
+	/* requeset drvvbus gpio, and set low, mean device mode */
+	ret = gpio_request(g_usb_drv_det_pin, "drvvbus_det");
+	if (ret != 0) {
+		DMSG_PANIC("ERR: drvvbus_det gpio_request failed\n");
+		ret = -1;
+	}
+	gpio_set_value_cansleep(g_usb_drv_det_pin, 0);
+#endif
 	create_node_file(pdev);
 
 	if (g_usb_cfg.port.port_type == USB_PORT_TYPE_DEVICE) {
-
 		thread_device_run_flag = 1;
 		device_th = kthread_create(usb_device_scan_thread, NULL, "usb_device_chose");
 		if (IS_ERR(device_th)) {
@@ -377,7 +401,7 @@ static int sunxi_otg_manager_probe(struct platform_device *pdev)
 
 		set_usb_role_ex(USB_ROLE_HOST);
 
-		thread_host_run_flag = 1;
+		thread_host_run_flag = 0;
 		host_th = kthread_create(usb_host_scan_thread, NULL, "usb_host_chose");
 		if (IS_ERR(host_th)) {
 			DMSG_PANIC("ERR: host kthread_create failed\n");
@@ -442,6 +466,10 @@ static int sunxi_otg_manager_remove(struct platform_device *pdev)
 						 &g_usb_cfg);
 		usb_hw_scan_exit(&g_usb_cfg);
 	}
+#ifdef CONFIG_IO_EXPAND
+	if (g_usb_drv_det_pin != 0)
+		gpio_free(g_usb_drv_det_pin);
+#endif
 
 	return 0;
 }

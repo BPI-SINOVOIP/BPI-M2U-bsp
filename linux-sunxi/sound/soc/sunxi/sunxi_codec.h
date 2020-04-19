@@ -2065,10 +2065,12 @@ struct sunxi_codec {
 	struct pinctrl *pinctrl;
 	struct pinctrl_state  *aif2_pinstate;
 	struct pinctrl_state  *aif3_pinstate;
+	struct pinctrl_state  *dmic_pinstate;
 
 	/*for sleep*/
 	struct pinctrl_state  *aif2sleep_pinstate;
 	struct pinctrl_state  *aif3sleep_pinstate;
+	struct pinctrl_state  *dmicsleep_pinstate;
 
 	struct gain_config gain_config;
 	struct codec_hw_config hwconfig;
@@ -2087,7 +2089,7 @@ struct sunxi_codec {
 	u32 aif1_lrlk_div;
 	u32 aif2_lrlk_div;
 	u32 pa_sleep_time;
-
+	u32 dmic_used;
 	bool spkenable;
 	//u8 sysconfig:1;
 };

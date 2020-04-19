@@ -32,6 +32,20 @@
  * extern void printk(const char *, ...);
  */
 
+#if 0
+#define ARISC_INF(format, args...)                          \
+		printk(KERN_ERR "[ARISC] :"format, ##args);
+
+#define ARISC_LOG(format, args...)                                      \
+		printk(KERN_ERR "[ARISC] :"format, ##args);
+
+#define ARISC_WRN(format, args...)                          \
+		printk(KERN_ERR "[ARISC] :"format, ##args);
+
+#define ARISC_ERR(format, args...)                          \
+		printk(KERN_ERR "[ARISC] :"format, ##args);
+#endif
+
 #ifdef ARISC_DEBUG_ON
 /* debug levels */
 #define DEBUG_LEVEL_INF    ((u32)1 << 0)
@@ -62,7 +76,6 @@
 #define ARISC_LOG(...)
 
 #endif /* ARISC_DEBUG_ON */
-
 /* report error information id */
 #define ERR_NMI_INT_TIMEOUT    (0x1)
 

@@ -7,7 +7,6 @@
 #include <linux/workqueue.h>
 #include <linux/types.h>
 #include <linux/slab.h>
-#include <linux/interrupt.h>
 #include <linux/power_supply.h>
 #include "../axp-core.h"
 #include "../axp-charger.h"
@@ -448,9 +447,10 @@ static struct axp_supply_info axp22_spy_info = {
 static int axp22_charger_init(struct axp_dev *axp_dev)
 {
 	u8 ocv_cap[32];
-	u8 val;
+	u8 val = 0;
 	int cur_coulomb_counter, rdc;
 	struct axp_regmap *map = axp_dev->regmap;
+	int i, update_min_times[8] = {30, 60, 120, 164, 0, 5, 10, 20};
 
 	if (axp22_config.pmu_init_chgend_rate == 10)
 		val &= ~(1 << 4);
@@ -637,67 +637,34 @@ static int axp22_charger_init(struct axp_dev *axp_dev)
 	else
 		axp22_spy_info.batt->det_unused = 0;
 
+	if (axp22_config.pmu_ocv_en == 0) {
+		pr_warn("axp22 ocv must be enabled\n");
+		axp22_config.pmu_ocv_en = 1;
+	}
+
+	if (axp22_config.pmu_cou_en == 1) {
+		/* use ocv and cou */
+		axp_regmap_set_bits(map, AXP22_COULOMB_CTL, 0x80);
+		axp_regmap_set_bits(map, AXP22_COULOMB_CTL, 0x40);
+	} else if (axp22_config.pmu_cou_en == 0) {
+		/* only use ocv */
+		axp_regmap_set_bits(map, AXP22_COULOMB_CTL, 0x80);
+		axp_regmap_clr_bits(map, AXP22_COULOMB_CTL, 0x40);
+	}
+
+	for (i = 0; i < ARRAY_SIZE(update_min_times); i++) {
+		if (update_min_times[i] == axp22_config.pmu_update_min_time)
+			break;
+	}
+	axp_regmap_update(map, AXP22_ADJUST_PARA, i, 0x7);
+
 	return 0;
 }
 
-static irqreturn_t axp_ac_usb_in_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	axp_usbac_in(chg_dev);
-	return IRQ_HANDLED;
-}
-
-extern int axp_usbcur(enum AW_CHARGE_TYPE type);
-static irqreturn_t axp_ac_out_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_usbcur(CHARGE_USB_20);
-	axp_change(chg_dev);
-	axp_usbac_out(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_usb_out_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	axp_usbac_out(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_capchange_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_capchange(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_change_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_low_warning1_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_low_warning2_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	return IRQ_HANDLED;
-}
-
 static struct axp_interrupts axp_charger_irq[] = {
-	{"usb in",        axp_ac_usb_in_isr},
+	{"usb in",        axp_usb_in_isr},
 	{"usb out",       axp_usb_out_isr},
-	{"ac in",         axp_ac_usb_in_isr},
+	{"ac in",         axp_ac_in_isr},
 	{"ac out",        axp_ac_out_isr},
 	{"bat in",        axp_capchange_isr},
 	{"bat out",       axp_capchange_isr},
@@ -709,6 +676,27 @@ static struct axp_interrupts axp_charger_irq[] = {
 	{"low warning2",  axp_low_warning2_isr},
 	{"ic temp over",  axp_change_isr},
 };
+
+static void axp22_private_debug(struct axp_charger_dev *cdev)
+{
+	u8 tmp[2];
+	struct axp_regmap *map = cdev->chip->regmap;
+
+	axp_regmap_reads(map, 0xbc, 2, tmp);
+	AXP_DEBUG(AXP_SPLY, cdev->chip->pmu_num,
+			"ocv_vol = %d\n", ((tmp[0] << 4) | (tmp[1] & 0xF))
+			* 1100 / 1000);
+
+	axp_regmap_read(map, 0xe4, &tmp[0]);
+	if (tmp[0] & 0x80)
+		AXP_DEBUG(AXP_SPLY, cdev->chip->pmu_num,
+			"ocv_percent = %d\n", tmp[0] & 0x7f);
+
+	axp_regmap_read(map, 0xe5, &tmp[0]);
+	if (tmp[0] & 0x80)
+		AXP_DEBUG(AXP_SPLY, cdev->chip->pmu_num,
+			"coulomb_percent = %d\n", tmp[0] & 0x7f);
+}
 
 static int axp22_charger_probe(struct platform_device *pdev)
 {
@@ -753,6 +741,7 @@ static int axp22_charger_probe(struct platform_device *pdev)
 					&battery_data, &axp22_spy_info);
 	if (IS_ERR_OR_NULL(chg_dev))
 		goto fail;
+	chg_dev->private_debug = axp22_private_debug;
 
 	for (i = 0; i < ARRAY_SIZE(axp_charger_irq); i++) {
 		irq = platform_get_irq_byname(pdev, axp_charger_irq[i].name);
@@ -847,12 +836,18 @@ static int axp22_charger_resume(struct platform_device *dev)
 static void axp22_charger_shutdown(struct platform_device *dev)
 {
 	struct axp_charger_dev *chg_dev = platform_get_drvdata(dev);
+
+	/*
+	 * we use this flag to stop pmu service when shutdown
+	 */
+	axp_suspend_flag = AXP_WAS_SUSPEND;
 	axp_charger_shutdown(chg_dev);
 }
 
 static const struct of_device_id axp22_charger_dt_ids[] = {
 	{ .compatible = "axp221s-charger", },
 	{ .compatible = "axp227-charger", },
+	{ .compatible = "axp223-charger", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, axp22_charger_dt_ids);

@@ -15,7 +15,11 @@
 #include "standby_debug.h"
 #include "../pm_debug.h"
 #include "../mem_timing.h"
-#include "../mem_int.h"
+#ifdef CONFIG_ARCH_SUN3IW1P1
+#include "../mem_intc.h"
+#else
+#include "../mem_gic.h"
+#endif
 #include "standby_divlib.h"
 
 typedef enum POWER_SCENE_FLAGS {

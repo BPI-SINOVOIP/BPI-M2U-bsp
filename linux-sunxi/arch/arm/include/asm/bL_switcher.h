@@ -61,9 +61,11 @@ int bL_switcher_trace_trigger(void);
 int bL_switcher_get_logical_index(u32 mpidr);
 
 #else
-static void bL_switch_request_detach(unsigned int cpu,
-				     bL_switch_completion_handler completer) { }
-
+/*
+ *static void bL_switch_request_detach(unsigned int cpu,
+ *				     bL_switch_completion_handler completer) { }
+ * add this comment to realse warnning by xjr. 2017/2/16
+ */
 static inline int bL_switcher_register_notifier(struct notifier_block *nb)
 {
 	return 0;

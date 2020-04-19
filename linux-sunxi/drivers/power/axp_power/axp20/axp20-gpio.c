@@ -211,7 +211,8 @@ static int axp20_gpio_probe(struct platform_device *pdev)
 	struct axp_pinctrl *axp20_pin;
 
 	axp20_pin = axp_pinctrl_register(&pdev->dev,
-			axp_dev, &axp20_pinctrl_pins_desc, &axp20_gpio_ops);
+				axp_dev, &axp20_pinctrl_pins_desc,
+				&axp20_gpio_ops, axp_dev->pmu_num);
 	if (IS_ERR_OR_NULL(axp20_pin))
 		return -1;
 

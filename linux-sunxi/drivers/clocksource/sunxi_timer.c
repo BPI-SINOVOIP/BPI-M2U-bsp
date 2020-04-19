@@ -26,6 +26,10 @@
 #include <linux/of_irq.h>
 #include <linux/clk/sunxi.h>
 #include <linux/delay.h>
+#ifdef CONFIG_ARCH_SUN3I
+#include <asm/sched_clock.h>
+#include <linux/clocksource.h>
+#endif
 
 #define TIMER_IRQ_EN_REG	0x00
 #define TIMER_IRQ_EN(val)	(1 << val)
@@ -43,6 +47,77 @@
 static int timer_nr;
 static void __iomem *timer_base;
 static spinlock_t timer_spin_lock;
+
+#ifdef CONFIG_ARCH_SUN3I
+static DEFINE_SPINLOCK(clksrc_lock);
+#define SUN3I_HRES_CLK_RATE		24000000
+#define SUN3I_CLKSRC_ID		1
+
+static cycle_t sun3i_clksrc_read(struct clocksource *cs)
+{
+	unsigned long flags;
+	u32 cnt = 0;
+
+	spin_lock_irqsave(&clksrc_lock, flags);
+	cnt = readl(timer_base + TIMER_CNTVAL_REG(SUN3I_CLKSRC_ID));
+	cnt = 0xffffffff - cnt;
+	spin_unlock_irqrestore(&clksrc_lock, flags);
+
+	return cnt;
+}
+
+static struct clocksource sun3i_clocksrc = {
+	.name = "sun3i high-res couter",
+	.list = {NULL, NULL},
+	.rating = 300, /* perfect clock source */
+	.read = sun3i_clksrc_read, /* read clock counter */
+	.enable = 0, /* not define */
+	.disable = 0, /* not define */
+	.mask = CLOCKSOURCE_MASK(32), /* 32bits mask */
+	.mult = 0, /* calculated by shift */
+	.shift = 10, /* 32bit shift for */
+	.max_idle_ns = 1000000000000ULL,
+	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
+};
+
+u32 sun3i_sched_clock_read(void)
+{
+	u32   cnt = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&clksrc_lock, flags);
+	cnt = readl(timer_base + TIMER_CNTVAL_REG(SUN3I_CLKSRC_ID));
+	cnt = 0xffffffff - cnt;
+	spin_unlock_irqrestore(&clksrc_lock, flags);
+
+	return cnt;
+}
+
+void __init sun3i_clocksource_init(void)
+{
+	u32 data = 0;
+
+	/*set interval value to max(0xffffffff)*/
+	writel(0xffffffff, timer_base + TIMER_INTVAL_REG(SUN3I_CLKSRC_ID));
+
+	/*set counter value to 0*/
+	writel(0, timer_base + TIMER_CNTVAL_REG(SUN3I_CLKSRC_ID));
+
+	data = readl(timer_base + TIMER_CTL_REG(SUN3I_CLKSRC_ID));
+	/*continuse mode, no pre-scale, 24M clock src, auto reload, enabl*/
+	data |= (0x01 << 2) | (0x01 << 1) | (0x01 << 0);
+	writel(data, timer_base + TIMER_CTL_REG(SUN3I_CLKSRC_ID));
+
+	/* calculate the mult by shift	*/
+	sun3i_clocksrc.mult = clocksource_hz2mult(SUN3I_HRES_CLK_RATE,
+			sun3i_clocksrc.shift);
+
+	/* register clock source */
+	clocksource_register(&sun3i_clocksrc);
+	/* set sched clock */
+	setup_sched_clock(sun3i_sched_clock_read, 32, SUN3I_HRES_CLK_RATE);
+}
+#endif
 
 #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
 extern void tick_broadcast(const struct cpumask *mask);
@@ -179,7 +254,6 @@ static void __init sunxi_timer_init(struct device_node *node)
 #ifndef CONFIG_EVB_PLATFORM
 	rate = 32000;
 	prescale  = 1;
-	irq = 38;
 #endif
 
 	writel(rate / (prescale * HZ),
@@ -214,6 +288,10 @@ static void __init sunxi_timer_init(struct device_node *node)
 	sunxi_clockevent.cpumask = cpumask_of(0);
 
 	clockevents_register_device(&sunxi_clockevent);
+
+#ifdef CONFIG_ARCH_SUN3I
+	sun3i_clocksource_init();
+#endif
 }
 CLOCKSOURCE_OF_DECLARE(sunxi, "allwinner,sunxi-timer",
 		       sunxi_timer_init);

@@ -233,10 +233,13 @@ inline void csi_int_clear_status(unsigned int sel, unsigned int ch,
 #elif defined CONFIG_ARCH_SUN8IW9P1
 #define ADDR_BIT_R_SHIFT 2
 #define CLK_POL 1
-#elif defined CONFIG_ARCH_SUN50I
+#elif defined CONFIG_ARCH_SUN50IW1P1
 #define ADDR_BIT_R_SHIFT 2
 #define CLK_POL 1
 #elif defined CONFIG_ARCH_SUN8IW10P1
+#define ADDR_BIT_R_SHIFT 2
+#define CLK_POL 1
+#else
 #define ADDR_BIT_R_SHIFT 2
 #define CLK_POL 1
 #endif
@@ -342,10 +345,10 @@ u64 csi_get_buffer_address(unsigned int sel, unsigned int ch,
 void csi_capture_start(unsigned int sel, unsigned int ch_total_num,
 		       enum csi_cap_mode csi_cap_mode)
 {
-	u32 reg_val = (((ch_total_num == 4) ? csi_cap_mode : 0) << 24) +
-	    (((ch_total_num == 3) ? csi_cap_mode : 0) << 16) +
-	    (((ch_total_num == 2) ? csi_cap_mode : 0) << 8) +
-	    (((ch_total_num == 1) ? csi_cap_mode : 0));
+	u32 reg_val = (((ch_total_num >= 4) ? csi_cap_mode : 0) << 24) +
+	    (((ch_total_num >= 3) ? csi_cap_mode : 0) << 16) +
+	    (((ch_total_num >= 2) ? csi_cap_mode : 0) << 8) +
+	    (((ch_total_num >= 1) ? csi_cap_mode : 0));
 	vin_reg_writel(csi_base_addr[sel] + CSI_CAP_REG_OFF, reg_val);
 }
 

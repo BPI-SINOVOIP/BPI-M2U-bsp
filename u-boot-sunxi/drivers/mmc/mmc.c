@@ -32,13 +32,20 @@ static int cur_dev_num = -1;
 int mmc_send_ext_csd(struct mmc *mmc, char *ext_csd);
 int mmc_decode_ext_csd(struct mmc *mmc,struct mmc_ext_csd *dec_ext_csd, char *ext_csd);
 int mmc_do_switch(struct mmc *mmc, u8 set, u8 index, u8 value, u32 timeout);
+int mmc_user_scan_wp_sta(struct mmc *mmc);
 static void mmc_set_bus_width(struct mmc *mmc, uint width);
 
 extern int mmc_init_blk_ops(struct mmc *mmc);
 extern unsigned int mmc_mmc_update_timeout(struct mmc *mmc);
 extern char *spd_name[];
 
+extern int sunxi_mmc_ffu(struct mmc *mmc);
+
 LIST_HEAD(mmc_devices);
+
+
+
+
 
 int __weak board_mmc_getwp(struct mmc *mmc)
 {
@@ -152,6 +159,8 @@ int mmc_send_status(struct mmc *mmc, int timeout)
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 				MMCINFO("Status Error: 0x%08X\n",
 					cmd.response[0]);
+				if (cmd.response[0] & (0x1U<<26))
+					MMCINFO("26-write protect violation!!\n");
 #endif
 				return COMM_ERR;
 			}
@@ -699,6 +708,45 @@ int mmc_do_switch(struct mmc *mmc, u8 set, u8 index, u8 value, u32 timeout)
 	return 0;
 }
 
+#ifdef SUPPORT_SUNXI_MMC_FFU
+int mmc_switch_ffu(struct mmc *mmc, u8 set, u8 index, u8 value, u32 timeout, u8 check_status)
+{
+	struct mmc_cmd cmd;
+	int ret;
+
+	cmd.cmdidx = MMC_CMD_SWITCH;
+	cmd.resp_type = MMC_RSP_R1b;
+	cmd.cmdarg = (MMC_SWITCH_MODE_WRITE_BYTE << 24) |
+				 (index << 16) |
+				 (value << 8);
+	cmd.flags = 0;
+
+	ret = mmc_send_cmd(mmc, &cmd, NULL);
+	if (ret) {
+		MMCINFO("mmc switch failed\n");
+	}
+
+	mmc_set_ios(mmc);
+
+	ret = mmc_update_phase(mmc);
+	if (ret) {
+		MMCINFO("update clock failed after send switch cmd\n");
+		return ret;
+	}
+
+	/* Waiting for the ready status */
+	if (check_status) {
+		ret = mmc_send_status(mmc, timeout);
+		if (ret) {
+			MMCINFO("mmc swtich status error\n");
+			return ret;
+		}
+	}
+
+	return 0;
+}
+#endif
+
 int mmc_switch(struct mmc *mmc, u8 set, u8 index, u8 value)
 {
 	int timeout = 1000;
@@ -712,7 +760,7 @@ int mmc_mmc_switch_to_ds(struct mmc *mmc)
 	int err;
 
 	if (mmc->speed_mode == DS26_SDR12) {
-		MMCINFO("already at DS26_SDR12 mode\n");
+		MMCDBG("already at DS26_SDR12 mode\n");
 		return 0;
 	}
 
@@ -753,7 +801,7 @@ int mmc_mmc_switch_to_hs(struct mmc *mmc)
 	int err;
 
 	if (mmc->speed_mode == HSSDR52_SDR25) {
-		MMCINFO("already at HSSDR52_SDR25 mode\n");
+		MMCDBG("already at HSSDR52_SDR25 mode\n");
 		return 0;
 	}
 
@@ -794,7 +842,7 @@ int mmc_mmc_switch_to_hs200(struct mmc *mmc)
 	int err;
 
 	if (mmc->speed_mode == HS200_SDR104) {
-		MMCINFO("already at HS200_SDR104 mode\n");
+		MMCDBG("already at HS200_SDR104 mode\n");
 		return 0;
 	}
 
@@ -835,7 +883,7 @@ int mmc_mmc_switch_to_hs400(struct mmc *mmc)
 	int err;
 
 	if (mmc->speed_mode == HS400) {
-		MMCINFO("already at HS400 mode\n");
+		MMCDBG("already at HS400 mode\n");
 		return 0;
 	}
 
@@ -1183,6 +1231,45 @@ int mmc_getcd(struct mmc *mmc)
 	return cd;
 }
 
+static int mmc_en_emmc_hw_rst(struct mmc *mmc)
+{
+	ALLOC_CACHE_ALIGN_BUFFER(char, ext_csd, MMC_MAX_BLOCK_LEN);
+	int err;
+
+	err = mmc_send_ext_csd(mmc, ext_csd);
+	if (err) {
+		MMCINFO("mmc get extcsd fail -0\n");
+		return err;
+	}
+
+	if (ext_csd[162] & 0x1) {
+		MMCINFO("hw rst already enabled\n");
+		goto OUT;
+	}
+
+	err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_RST_N_FUNCTION, EXT_CSD_RST_N_ENABLE);
+	if (err) {
+		MMCINFO("mmc enable hw rst fail\n");
+		return err;
+	}
+
+	err = mmc_send_ext_csd(mmc, ext_csd);
+	if (err) {
+		MMCINFO("mmc get extcsd fail -1\n");
+		return err;
+	}
+
+	if (!(ext_csd[162] & 0x1)) {
+		MMCINFO("en hw rst fail, 0x%x\n", ext_csd[162]);
+		return -1;
+	} else {
+		MMCINFO("en hw rst ok, 0x%x\n", ext_csd[162]);
+	}
+
+OUT:
+	return 0;
+}
+
 static int sd_switch(struct mmc *mmc, int mode, int group, u8 value, u8 *resp)
 {
 	struct mmc_cmd cmd;
@@ -1499,6 +1586,8 @@ int mmc_switch_part(int dev_num, unsigned int part_num)
 	return ret;
 }
 
+
+
 static int mmc_startup(struct mmc *mmc)
 {
 	int err, i;
@@ -1508,7 +1597,8 @@ static int mmc_startup(struct mmc *mmc)
 	ALLOC_CACHE_ALIGN_BUFFER(char, ext_csd, MMC_MAX_BLOCK_LEN);
 	int timeout = 1000;
 	int erase_gsz, erase_gmul;
-	int def_erase_grp_size, hc_erase_gpr_size;
+	int def_erase_grp_size, hc_erase_grp_size;
+	int def_wp_grp_size, hc_wp_grp_size;
 	int hc_erase_timeout;
 	// = {"DS26/SDR12", "HSSDR52/SDR25", "HSDDR52/DDR50", "HS200/SDR104", "HS400"};
 
@@ -1564,6 +1654,8 @@ static int mmc_startup(struct mmc *mmc)
 			mmc->rca = (cmd.response[0] >> 16) & 0xffff;
 	}
 
+	mmc_set_clock(mmc, 25000000);
+
 	/* Get the Card-Specific Data */
 	cmd.cmdidx = MMC_CMD_SEND_CSD;
 	cmd.resp_type = MMC_RSP_R2;
@@ -1584,6 +1676,11 @@ static int mmc_startup(struct mmc *mmc)
 	mmc->csd[1] = cmd.response[1];
 	mmc->csd[2] = cmd.response[2];
 	mmc->csd[3] = cmd.response[3];
+
+	mmc->csd_perm_wp = ((mmc->csd[3]>>13) & 0x1); /*13*/
+	mmc->csd_wp_grp_size = ((mmc->csd[2]>>0) & 0x1F); /*36:32*/
+	/*MCINFO("CSD: %x %x %x %x\n", mmc->csd[0], mmc->csd[1], mmc->csd[2], mmc->csd[3]);*/
+
 
 	if (mmc->version == MMC_VERSION_UNKNOWN) {
 		int version = (cmd.response[0] >> 26) & 0xf;
@@ -1747,31 +1844,49 @@ static int mmc_startup(struct mmc *mmc)
 		erase_gmul = (mmc->csd[2] & 0x000003e0) >> 5;
 		def_erase_grp_size = (erase_gsz + 1) * (erase_gmul + 1);
 
-		hc_erase_gpr_size = ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE] * MMC_MAX_BLOCK_LEN * 1024;
-		hc_erase_gpr_size = hc_erase_gpr_size / mmc->write_bl_len;
+		hc_erase_grp_size = ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE] * MMC_MAX_BLOCK_LEN * 1024;
+		hc_erase_grp_size = hc_erase_grp_size / mmc->write_bl_len;
 
 		hc_erase_timeout = 300 * ext_csd[EXT_CSD_ERASE_TIMEOUT_MULT];
 
-		if (ext_csd[EXT_CSD_ERASE_GROUP_DEF] && hc_erase_gpr_size && hc_erase_timeout)
-			mmc->erase_grp_size = hc_erase_gpr_size;
-		else
+		/*
+		* udpate write protect group size
+		*/
+		def_wp_grp_size = (mmc->csd_wp_grp_size+1) * def_erase_grp_size;
+		hc_wp_grp_size = ext_csd[EXT_CSD_HC_WP_GRP_SIZE] * hc_erase_grp_size;
+		MMCINFO("*****grp info %x %x %x %x\n", def_wp_grp_size, hc_wp_grp_size, def_erase_grp_size, hc_erase_grp_size);
+
+
+		if ((ext_csd[EXT_CSD_ERASE_GROUP_DEF] && hc_erase_grp_size && hc_erase_timeout)) {
+			mmc->erase_grp_size = hc_erase_grp_size;
+			mmc->wp_grp_size = hc_wp_grp_size;
+			MMCINFO("hc wp_grp_size %x\n", mmc->wp_grp_size);
+		} else {
 			mmc->erase_grp_size = def_erase_grp_size;
+			mmc->wp_grp_size = def_wp_grp_size;
+			MMCINFO("def wp_grp_size %x\n", mmc->wp_grp_size);
+		}
 
 		/*
 		 * Host needs to enable ERASE_GRP_DEF bit if device is
 		 * partitioned. This bit will be lost every time after a reset
 		 * or power off. This will affect erase size.
 		 */
-		if ((ext_csd[EXT_CSD_PARTITIONING_SUPPORT] & PART_SUPPORT) &&
-			(ext_csd[EXT_CSD_PARTITIONS_ATTRIBUTE] & PART_ENH_ATTRIB)) {
+		if (((ext_csd[EXT_CSD_PARTITIONING_SUPPORT] & PART_SUPPORT) &&
+			(ext_csd[EXT_CSD_PARTITIONS_ATTRIBUTE] & PART_ENH_ATTRIB))
+			 || (mmc->cfg->platform_caps.drv_hc_cap_unit_feature & DRV_PARA_ENABLE_EMMC_HC_CAP_UNIT)) {
 			err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
 				EXT_CSD_ERASE_GROUP_DEF, 1);
 
 			if (err)
 				return err;
 
-			mmc->erase_grp_size = hc_erase_gpr_size;
+			mmc->erase_grp_size = hc_erase_grp_size;
+			mmc->wp_grp_size = hc_wp_grp_size;
+			MMCINFO("hc wp_grp_size %x\n", mmc->wp_grp_size);
 		}
+		MMCINFO("wp_grp_size 0x%x\n", mmc->wp_grp_size);
+		MMCINFO("*****grp info %x %x %x %x\n", def_wp_grp_size, hc_wp_grp_size, def_erase_grp_size, hc_erase_grp_size);
 
 		mmc->secure_feature = ext_csd[EXT_CSD_SEC_FEATURE_SUPPORT];
 		mmc->secure_removal_type = ext_csd[EXT_CSD_SECURE_REMOAL_TYPE];
@@ -1780,14 +1895,15 @@ static int mmc_startup(struct mmc *mmc)
 		if ((ext_csd[EXT_CSD_PARTITIONING_SUPPORT] & PART_SUPPORT) ||
 			ext_csd[EXT_CSD_BOOT_MULT]) {
 			mmc->part_config = ext_csd[EXT_CSD_PART_CONF];
-			mmc->capacity_boot = ext_csd[EXT_CSD_BOOT_MULT] * 128 * 1024; //<< 17;
-			mmc->capacity_rpmb = ext_csd[EXT_CSD_RPMB_MULT] * 128 * 1024 ; //<< 17;
+			mmc->capacity_boot = ext_csd[EXT_CSD_BOOT_MULT] * 128 * 1024;
+			mmc->capacity_rpmb = ext_csd[EXT_CSD_RPMB_MULT] * 128 * 1024 ;
 
 			if (mmc->capacity_boot) {
 				mmc->boot_support = 1;
 				mmc->boot_bus_cond = ext_csd[EXT_CSD_BOOT_BUS_WIDTH];
 			} else {
-				MMCDBG("not PART_SUPPORT ext_csd[226] = %d\n",ext_csd[226]);
+				MMCDBG("not PART_SUPPORT ext_csd[226] = %d\n",
+					ext_csd[226]);
 			}
 
 			for (i = 0; i < 4; i++) {
@@ -2030,15 +2146,17 @@ static int mmc_startup(struct mmc *mmc)
 
 	mmc->clock_after_init = mmc->clock; //back up clock after mmc init
 
-	MMCINFO("speed mode     : %s \n", spd_name[mmc->speed_mode]);
-	MMCINFO("clock          : %d Hz\n", mmc->clock);
-	MMCINFO("bus_width      : %d bit\n", mmc->bus_width);
+	/*MMCINFO("speed mode:%s\n", spd_name[mmc->speed_mode]);*/
+	/*MMCINFO("clock          : %d Hz\n", mmc->clock);*/
+	/*MMCINFO("bus_width      : %d bit\n", mmc->bus_width);*/
 	MMCINFO("user capacity  : "LBAFU" MB\n", mmc->block_dev.lba>>11);
 	if (!IS_SD(mmc)) {
-		MMCINFO("boot capacity  : %lld KB\n", mmc->capacity_boot>>10);
-		MMCINFO("rpmb capacity  : %lld KB\n", mmc->capacity_rpmb>>10);
+		//MMCINFO("boot capacity  : %lld KB\n", mmc->capacity_boot>>10);
+		//MMCINFO("rpmb capacity  : %lld KB\n", mmc->capacity_rpmb>>10);
+		MMCINFO("wp_grp_size: 0x%x sector\n", mmc->wp_grp_size);
+		mmc_user_scan_wp_sta(mmc);
 	}
-	MMCINFO("************SD/MMC %d init OK!!!************\n", mmc->cfg->host_no);
+	MMCINFO("SD/MMC %d init OK!!!\n", mmc->cfg->host_no);
 	return 0;
 }
 
@@ -2222,7 +2340,7 @@ int mmc_start_init(struct mmc *mmc)
 		}
 		else if (priv_info->card_type == CARD_TYPE_MMC)
 		{
-			MMCINFO("************Try MMC card %d************\n", mmc->cfg->host_no);
+			MMCINFO("Try MMC card %d\n", mmc->cfg->host_no);
 
 			err = mmc_send_op_cond(mmc);
 			if (err && err != IN_PROGRESS) {
@@ -2313,17 +2431,94 @@ static int mmc_complete_init(struct mmc *mmc)
 	return err;
 }
 
-static void mmc_update_sdly_to_sysconfig(struct mmc *mmc)
+void mmc_update_config_for_dragonboard(int card_no)
+{
+	int ret = 0;
+	int nodeoffset=0;
+	char prop_path[128] = {0};
+
+	/* For dragon board test, boot sdc0 firstly, try sdc2 at uboot. if sdc2 is invalid(not emmc/sd), modify device tree to disable sdc2.
+	    Because boot from sdc0, there is no valid timing parameters for sdc2 in boot0's header. Updating timing parameters from boot0's header is wrong.
+	    Therefore, change sdc2's "sdc_ex_dly_used" in device tree to 0 to cancel update timing parameters.
+	    It is also necessary to delete flowing items from device tree:
+	    mmc-ddr-1_8v	   =
+	    mmc-hs200-1_8v	   =
+	    mmc-hs400-1_8v	   =
+	    max-frequency	   = 150000000
+	*/
+	if(card_no == 2)
+		nodeoffset = fdt_path_offset(working_fdt, FDT_PATH_CARD2_BOOT_PARA);
+	else
+		nodeoffset = fdt_path_offset(working_fdt, FDT_PATH_CARD3_BOOT_PARA);
+	if(nodeoffset < 0 ) {
+		MMCINFO("get card2_boot_para para fail --- 0\n");
+		return ;
+	}
+
+	ret = fdt_setprop_u32(working_fdt, nodeoffset, "sdc_ex_dly_used", 0);
+	if(ret < 0) {
+		MMCINFO("update card2_boot_para:dtb sdc_ex_dly_used, %d\n", ret);
+		return ;
+	}
+
+	if (card_no == 2)
+		strcpy(prop_path, "mmc2");
+	else
+		strcpy(prop_path, "mmc3");
+
+	nodeoffset = fdt_path_offset(working_fdt, prop_path);
+	if (nodeoffset < 0) {
+		MMCINFO("can't find node \"%s\" \n", prop_path);
+		return ;
+	}
+	ret = fdt_delprop(working_fdt, nodeoffset, "mmc-hs400-1_8v");
+	if (ret == 0) {
+		MMCINFO("delete mmc-hs400-1_8v from dtb\n");
+	} else if (ret == -FDT_ERR_NOTFOUND){
+		MMCINFO("no mmc-hs400-1_8v!\n");
+	} else {
+		MMCINFO("update dtb fail, delete mmc-hs400-1_8v fail\n");
+	}
+
+	ret = fdt_delprop(working_fdt, nodeoffset, "mmc-hs200-1_8v");
+	if (ret == 0) {
+		MMCINFO("delete mmc-hs200-1_8v from dtb\n");
+	} else if (ret == -FDT_ERR_NOTFOUND){
+		MMCINFO("no mmc-hs200-1_8v!\n");
+	} else {
+		MMCINFO("update dtb fail, delete mmc-hs200-1_8v fail\n");
+	}
+
+	ret = fdt_delprop(working_fdt, nodeoffset, "mmc-ddr-1_8v");
+	if (ret == 0) {
+		MMCINFO("delete mmc-ddr-1_8v from dtb\n");
+	} else if (ret == -FDT_ERR_NOTFOUND){
+		MMCINFO("no mmc-ddr-1_8v!\n");
+	} else {
+		MMCINFO("update dtb fail, delete mmc-ddr-1_8v fail\n");
+	}
+
+	ret = fdt_delprop(working_fdt, nodeoffset, "max-frequency");
+	if (ret == 0) {
+		MMCINFO("delete max-frequency from dtb\n");
+	} else if (ret == -FDT_ERR_NOTFOUND){
+		MMCINFO("no max-frequency!\n");
+	} else {
+		MMCINFO("update dtb fail, delete max-frequency fail\n");
+	}
+
+}
+
+
+void mmc_update_config_for_sdly(struct mmc *mmc)
 {
 	int ret = 0;
 	int nodeoffset;
 	char prop_path[128] = {0};
-	struct boot_sdmmc_private_info_t *priv_info =
-		(struct boot_sdmmc_private_info_t *)(uboot_spare_head.boot_data.sdcard_spare_data);
-	struct tune_sdly *sdly = &(priv_info->tune_sdly);
 	u32 f3210, f7654;
 
 	struct sunxi_mmc_host *host = (struct sunxi_mmc_host *)mmc->priv;
+	struct tune_sdly *sdly = &host->cfg.platform_caps.sdly;
 	int imd, ifreq;
 	int dly, dsdly;
 	int null_hs200, null_hs400, null_hsddr;
@@ -2339,13 +2534,6 @@ static void mmc_update_sdly_to_sysconfig(struct mmc *mmc)
 		MMCINFO("can't find node \"%s\",will add new node\n", prop_path);
 		goto __ERROR_END;
 	}
-
-#if 0
-	ret = fdt_getprop_u32(working_fdt, nodeoffset, "", &prop_val);
-	if(ret < 0){
-		goto __ERROR_END;
-	}
-#endif
 
 	f3210 = sdly->tm4_smx_fx[0*2 + 0]; //sdly->tm4_sm0_f3210;
 	ret = fdt_setprop_u32(working_fdt, nodeoffset, "sdc_tm4_sm0_freq0", f3210);
@@ -2578,31 +2766,31 @@ __ERROR_END:
 static void _mmc_life_time_est(u8 est_val)
 {
 	if (est_val == 0)
-		printf("Not defined\n");
+		MMCINFO("Not defined\n");
 	else if (est_val == 0x01)
-		printf("0%%-10%% life time used\n");
+		MMCINFO("0%%-10%% life time used\n");
 	else if (est_val == 0x02)
-		printf("10%%-20%% life time used\n");
+		MMCINFO("10%%-20%% life time used\n");
 	else if (est_val == 0x03)
-		printf("20%%-30%% life time used\n");
+		MMCINFO("20%%-30%% life time used\n");
 	else if (est_val == 0x04)
-		printf("30%%-40%% life time used\n");
+		MMCINFO("30%%-40%% life time used\n");
 	else if (est_val == 0x05)
-		printf("40%%-50%% life time used\n");
+		MMCINFO("40%%-50%% life time used\n");
 	else if (est_val == 0x06)
-		printf("50%%-60%% life time used\n");
+		MMCINFO("50%%-60%% life time used\n");
 	else if (est_val == 0x07)
-		printf("60%%-70%% life time used\n");
+		MMCINFO("60%%-70%% life time used\n");
 	else if (est_val == 0x08)
-		printf("70%%-80%% life time used\n");
+		MMCINFO("70%%-80%% life time used\n");
 	else if (est_val == 0x09)
-		printf("80%%-90%% life time used\n");
+		MMCINFO("80%%-90%% life time used\n");
 	else if (est_val == 0x0A)
-		printf("90%%-100%% life time used\n");
+		MMCINFO("90%%-100%% life time used\n");
 	else if (est_val == 0x0B)
-		printf("Exceeded its max estimated life time\n");
+		MMCINFO("Exceeded its max estimated life time\n");
 	else
-		printf("Reserved\n");
+		MMCINFO("Reserved\n");
 }
 
 static int mmc_mmc_parse_health_report(struct mmc *mmc)
@@ -2692,6 +2880,18 @@ int mmc_init_boot(struct mmc *mmc)
 	if (!err || err == IN_PROGRESS)
 		err = mmc_complete_init(mmc);
 
+	if (err) {
+		MMCINFO("%s: mmc int fail\n", __FUNCTION__);
+		return err;
+	}
+
+#ifdef SUPPORT_SUNXI_MMC_FFU
+	if ( sunxi_mmc_ffu(mmc) ) {
+		MMCINFO("%s, try to execute ffu flow fail\n",  __FUNCTION__);
+		return err;
+	}
+#endif
+
 	if ((work_mode == WORK_MODE_BOOT)
 		&& (mmc->cfg->platform_caps.sample_mode == AUTO_SAMPLE_MODE))
 	{
@@ -2701,7 +2901,7 @@ int mmc_init_boot(struct mmc *mmc)
 		{
 			if (((priv_info->ext_para0 & 0xFF000000) == EXT_PARA0_ID)
 				&& (priv_info->ext_para0 & EXT_PARA0_TUNING_SUCCESS_FLAG))
-				MMCINFO("%s: tuning procedure is executed!\n", __FUNCTION__);
+				MMCDBG("%s: tuning procedure is executed!\n", __FUNCTION__);
 			else
 				need_tuning = 1;
 		}
@@ -2753,7 +2953,11 @@ int mmc_init_boot(struct mmc *mmc)
 
 	if((work_mode == WORK_MODE_BOOT)
 		&& (mmc->cfg->platform_caps.sample_mode == AUTO_SAMPLE_MODE))
-		mmc_update_sdly_to_sysconfig(mmc);
+	{
+		/*call this function in board_common.c*/
+		//mmc_update_config_for_sdly(mmc);
+	}
+
 
 	/* update some feature */
 	if (mmc->cfg->platform_caps.drv_wipe_feature & DRV_PARA_DISABLE_EMMC_SANITIZE)
@@ -2764,8 +2968,8 @@ int mmc_init_boot(struct mmc *mmc)
 		mmc->secure_feature &= (~EXT_CSD_SEC_GB_CL_EN);
 
 
-	MMCINFO("erase_grp_size      : 0x%xWrBlk*0x%x=0x%x Byte\n",
-			mmc->erase_grp_size, mmc->write_bl_len, mmc->erase_grp_size*mmc->write_bl_len);
+	//MMCINFO("erase_grp_size      : 0x%xWrBlk*0x%x=0x%x Byte\n",
+	//		mmc->erase_grp_size, mmc->write_bl_len, mmc->erase_grp_size*mmc->write_bl_len);
 	//MMCINFO("erase_to:                %d ms\n", mmc->erase_timeout);
 	//MMCINFO("trim_discard_to:         %d ms\n", mmc->trim_discard_timeout);
 	//MMCINFO("secure_tirm_to:          %d ms\n", mmc->secure_erase_timeout);
@@ -2774,14 +2978,14 @@ int mmc_init_boot(struct mmc *mmc)
 	MMCDBG("support trim           : %d \n", mmc->secure_feature & EXT_CSD_SEC_GB_CL_EN);
 	MMCDBG("support secure purge op: %d \n", mmc->secure_feature & EXT_CSD_SEC_ER_EN);
 	MMCDBG("secure removal type  : 0x%x\n", mmc->secure_removal_type);
-    MMCINFO("secure_feature      : 0x%x\n", mmc->secure_feature);
-    MMCINFO("secure_removal_type : 0x%x\n", mmc->secure_removal_type);
+    //MMCINFO("secure_feature      : 0x%x\n", mmc->secure_feature);
+    //MMCINFO("secure_removal_type : 0x%x\n", mmc->secure_removal_type);
     if (!IS_SD(mmc)) {
     	mmc_mmc_parse_health_report(mmc);
     }
     //MMCINFO("========================================\n\n");
 
-	MMCDBG("=============== end mmc_init_boot\n");
+	MMCINFO("End mmc_init_boot\n");
 
 	return err;
 }
@@ -2862,6 +3066,13 @@ retry:
 
     if (!IS_SD(mmc)) {
     	mmc_mmc_parse_health_report(mmc);
+
+		if (mmc->cfg->platform_caps.host_caps_mask & DRV_PARA_ENABLE_EMMC_HW_RST) {
+			err = mmc_en_emmc_hw_rst(mmc);
+			if (err) {
+				MMCINFO("enable hw rst fail!!\n");
+			}
+		}
     }
 
 	err = sunxi_mmc_tuning_init();

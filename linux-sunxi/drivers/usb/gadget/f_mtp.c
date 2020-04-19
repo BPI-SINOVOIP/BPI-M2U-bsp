@@ -499,6 +499,15 @@ requeue_req:
 	/* queue a request */
 	req = dev->rx_req[0];
 	req->length = count;
+
+	/*
+	 * Do not use dma during MTP protocol streaming (not data),
+	 * otherwise it will cause dma hang if the packet length
+	 * is shorter than ep->maxpacket.
+	 */
+#ifdef CONFIG_USB_SUNXI_UDC0
+	req->dma_flag = 0;
+#endif
 	dev->rx_done = 0;
 	ret = usb_ep_queue(dev->ep_out, req, GFP_KERNEL);
 	if (ret < 0) {
@@ -604,6 +613,15 @@ static ssize_t mtp_write(struct file *fp, const char __user *buf,
 		}
 
 		req->length = xfer;
+
+		/*
+		 * Do not use dma during MTP protocol streaming (not data),
+		 * otherwise it will cause dma hang if the packet length
+		 * is shorter than ep->maxpacket.
+		 */
+#ifdef CONFIG_USB_SUNXI_UDC0
+		req->dma_flag = 0;
+#endif
 		ret = usb_ep_queue(dev->ep_in, req, GFP_KERNEL);
 		if (ret < 0) {
 			DBG(cdev, "mtp_write: xfer error %d\n", ret);
@@ -712,6 +730,11 @@ static void send_file_work(struct work_struct *data)
 		hdr_size = 0;
 
 		req->length = xfer;
+
+		/* Use inner dma to transport. */
+#ifdef CONFIG_USB_SUNXI_UDC0
+		req->dma_flag = 1;
+#endif
 		ret = usb_ep_queue(dev->ep_in, req, GFP_KERNEL);
 		if (ret < 0) {
 			DBG(cdev, "send_file_work: xfer error %d\n", ret);
@@ -764,6 +787,11 @@ static void receive_file_work(struct work_struct *data)
 
 			read_req->length = (count > MTP_BULK_BUFFER_SIZE
 					? MTP_BULK_BUFFER_SIZE : count);
+
+			/* Use inner dma to transport. */
+#ifdef CONFIG_USB_SUNXI_UDC0
+			read_req->dma_flag = 1;
+#endif
 			dev->rx_done = 0;
 			ret = usb_ep_queue(dev->ep_out, read_req, GFP_KERNEL);
 			if (ret < 0) {

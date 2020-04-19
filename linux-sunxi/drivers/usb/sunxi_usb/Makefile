@@ -12,6 +12,19 @@ sunxi_usbc-objs := usbc/usbc.o \
 				manager/usb_hw_scan.o \
 				manager/usb_msg_center.o
 
+ifeq ($(CONFIG_USB_SUNXI_HCD0),y)
+        sunxi_usbc-objs +=hcd/core/sunxi_hcd_core.o \
+                                        hcd/core/sunxi_hcd_host.o \
+                                        hcd/core/sunxi_hcd_virt_hub.o \
+                                        hcd/core/sunxi_hcd_debug.o \
+                                        hcd/core/sunxi_hcd_dma.o \
+                                        usbc/usbc_host.o
+
+        sunxi_usb_hcd0-objs := hcd/hcd0/sunxi_hcd0.o
+endif
+
+obj-$(CONFIG_USB_SUNXI_HCD0) += sunxi_usb_hcd0.o
+
 obj-$(CONFIG_USB_SUNXI_USB_MANAGER) += sunxi_usbc.o
 
 sunxi_usb_udc-objs :=  udc/sunxi_udc.o \

@@ -95,6 +95,7 @@ Foscl is clock SCL;standard mode:100KHz or fast mode:400KHz
 #define TWI_LCR_SCL_STATE_MASK  (0x01<<5)   /* current state of SCL,readonly bit */
 /* 31:6bits reserved */
 #define TWI_LCR_IDLE_STATUS     (0x3a)
+#define TWI_LCR_NORM_STATUS	(0x30) /* normal status */
 
 
 /* TWI Status Register Bit Fields & Masks  */

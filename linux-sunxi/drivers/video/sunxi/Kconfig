@@ -15,7 +15,10 @@ config FB_CONSOLE_SUNXI
 
 config DISP2_SUNXI
   tristate "DISP Driver Support(sunxi-disp2)"
-  depends on (ARCH_SUNXI)
+  depends on (ARCH_SUNXI) && (!ARCH_SUN8IW5)
+  select SYNC
+  select SW_SYNC
+  select SW_SYNC_USER
   default n
   ---help---
 
@@ -24,6 +27,16 @@ config HDMI_DISP2_SUNXI
 	depends on (DISP2_SUNXI)
 	default n
 	---help---
+
+config HDMI2_DISP2_SUNXI
+  tristate "HDMI2.0 Driver Support(sunxi-disp2)"
+  depends on (DISP2_SUNXI)
+  default n
+  ---help---
+  Say Y here if you want to have support for HDMI2.0 controller
+  on the sunxi based boards. The HDMI2.0 controller include edid,
+  hdcp1.4,hdcp2.2,cec feature and is compatible with hdmi1.4,support
+  HDR,4k@60Hz. If unsure, say N.
 
 config TV_DISP2_SUNXI
   tristate "TV Driver Support(sunxi-disp2)"
@@ -37,9 +50,17 @@ config DISP2_TV_GM7121
   default n
   ---help---
 
+config EDP_DISP2_SUNXI
+	tristate "EDP Driver Support(sunxi-disp2)"
+	depends on (DISP2_SUNXI)
+	default n
+	---help---
+	  EDP driver for sunxi. Embedded Display Port is
+	  a high speed display interface for embedded device.
+
 config DISP2_TV_AC200
   tristate "AC200 TV module Support(sunxi-disp2)"
-  depends on (DISP2_SUNXI && TV_DISP2_SUNXI && MFD_ACX00)
+  depends on (DISP2_SUNXI && MFD_ACX00)
 	default n
 	---help---
 
@@ -60,5 +81,49 @@ config DISP2_SUNXI_DEBUG
   depends on DISP2_SUNXI
   default n
   ---help---
+
+config FB_SUNXI
+	tristate "DISP Driver Support(sunxi)"
+	depends on (ARCH_SUN9IW1P1 || ARCH_SUN8IW5P1 || ARCH_SUN3IW1P1)
+	default m
+	---help---
+	  Frame buffer driver for sunxi based boards.If you want
+	  to have support, say Y here.
+
+	  The frame buffer device provides an abstraction for the graphics
+	  hardware. It represents the frame buffer of some video hardware and
+	  allows application software to access the graphics hardware through
+	  a well-defined interface, so the software doesn't need to know
+	  anything about the low-level (hardware register) stuff.
+
+config TV_GM7121
+	tristate "GM7121 driver Support(sunxi)"
+	depends on FB_SUNXI
+	default m
+	---help---
+	 Say Y here, if you want to have support for sunxi based
+	 boards with an TV module(GM7121) connected to the LCD
+	 interface. GM7121 can support bothe NTSC and PAL mode.
+	 If unsure, say N.
+
+config LCD_SUNXI
+	tristate "LCD Driver Support(sunxi)"
+	depends on FB_SUNXI
+	default m
+	---help---
+	 Say Y here if you want to have support for LCD controller
+	 on the sunxi based boards. The LCD controller can support
+	 RGB/LVDS/CPU/DSI/EDP interface depend on specified Soc.
+	 If unsure, say N.
+
+config HDMI_SUNXI
+	tristate "HDMI Driver Support(sunxi)"
+	depends on (ARCH_SUN9IW1P1 && FB_SUNXI)
+	default m
+	---help---
+	 Say Y here if you want to have support for HDMI controller
+	 on the sunxi based boards. The HDMI controller can support
+	 480P@60HZ/576P@50HZ/720P@50HZ/720P@60HZ/1080P@50HZ/1080P@60HZ
+	 mode. If unsure, say N.
 
 endmenu

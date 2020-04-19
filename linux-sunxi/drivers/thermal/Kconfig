@@ -200,33 +200,12 @@ config SUNXI_THERMAL
 	  If you say yes here you get support for (Thermal Management
 	  Unit) on ALLWINEER series of SoC.
 
-config SUN50IW1P1_THERMAL
-	tristate "Temperature sensor on SUN50IW1P1"
+config SUNXI_THS_DRIVER
+	tristate "Temperature sensor driver for SUNXI platform"
 	depends on SUNXI_THERMAL
-	depends on ARCH_SUN50IW1P1
 	help
-	  Temperature sensor on SUN50IW1P1
-
-config SUN8IW10P1_THERMAL
-	tristate "Temperature sensor on SUN8IW10P1"
-	depends on SUNXI_THERMAL
-	depends on ARCH_SUN8IW10P1
-	help
-	  Temperature sensor on SUN8IW10P1
-
-config SUN8IW11P1_THERMAL
-	tristate "Temperature sensor on SUN8IW11P1"
-	depends on SUNXI_THERMAL
-	depends on ARCH_SUN8IW11P1
-	help
-	  Temperature sensor on SUN8IW11P1
-
-config SUN50IW2P1_THERMAL
-	tristate "Temperature sensor on SUN50IW2P1"
-	depends on SUNXI_THERMAL
-	depends on ARCH_SUN50IW2P1
-	help
-	  Temperature sensor on SUN50IW2P1
+	  Temperature sensor on SUNXI platform. The thermal sensor driver used to
+	  get temp. It call the thermal driver core interface.
 
 config SUNXI_BUDGET_COOLING
 	tristate "sunxi budget cooling"

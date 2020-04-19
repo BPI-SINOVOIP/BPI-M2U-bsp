@@ -156,9 +156,9 @@ int disp_al_layer_apply(unsigned int disp, struct disp_layer_config_data *data,
 			csc_cfg.out_fmt = al_priv.output_cs[tcon_id];
 			if ((al_priv.disp_size[disp].width < 1280)
 			    && (al_priv.disp_size[disp].height < 720))
-				csc_cfg.out_mode = DISP_BT601;
+				csc_cfg.out_mode = DE_BT601;
 			else
-				csc_cfg.out_mode = DISP_BT709;
+				csc_cfg.out_mode = DE_BT709;
 			csc_cfg.out_color_range =
 			    al_priv.output_color_range[tcon_id];
 			csc_cfg.color = al_priv.de_backcolor[disp];
@@ -238,7 +238,7 @@ int disp_al_manager_disable_irq(unsigned int disp)
 
 int disp_al_enhance_apply(unsigned int disp, struct disp_enhance_config *config)
 {
-	if (config->flags & ENHANCE_MODE_DIRTY) {
+	if (config->flags & ENH_MODE_DIRTY) {
 		struct disp_csc_config csc_config;
 
 		de_dcsc_get_config(disp, &csc_config);
@@ -266,12 +266,16 @@ int disp_al_enhance_tasklet(unsigned int disp)
 
 int disp_al_capture_init(unsigned int disp)
 {
-	return de_clk_enable(DE_CLK_WB);
+	de_clk_enable(DE_CLK_WB);
+	wb_ebios_dereset(disp);
+	return 0;
 }
 
 int disp_al_capture_exit(unsigned int disp)
 {
-	return de_clk_disable(DE_CLK_WB);
+	wb_ebios_reset(disp);
+	de_clk_disable(DE_CLK_WB);
+	return 0;
 }
 
 int disp_al_capture_sync(u32 disp)
@@ -321,7 +325,11 @@ static struct lcd_clk_info clk_tbl[] = {
 	{LCD_IF_HV, 6, 1, 1, 0},
 	{LCD_IF_CPU, 12, 1, 1, 0},
 	{LCD_IF_LVDS, 7, 1, 1, 0},
-	{LCD_IF_DSI, 4, 1, 4, 148500000},
+#if defined(DSI_VERSION_28)
+       {LCD_IF_DSI, 6, 1, 6, 0},
+#else
+       {LCD_IF_DSI, 4, 1, 4, 0},
+#endif /*endif DSI_VERSION_28 */
 };
 
 /* lcd */
@@ -378,6 +386,13 @@ int disp_al_lcd_get_clk_info(u32 screen_id, struct lcd_clk_info *info,
 	if (0 == find)
 		__wrn("cant find clk info for lcd_if %d\n", panel->lcd_if);
 
+	if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+	    panel->lcd_if == LCD_IF_DSI) {
+		info->tcon_div = tcon_div / 2;
+		dsi_div /= 2;
+	} else
+		info->tcon_div = tcon_div;
+
 	info->tcon_div = tcon_div;
 	info->lcd_div = lcd_div;
 	info->dsi_div = dsi_div;
@@ -415,8 +430,17 @@ int disp_al_lcd_cfg(u32 screen_id, disp_panel_para *panel,
 
 	if (LCD_IF_DSI == panel->lcd_if)	{
 #if defined(SUPPORT_DSI)
-		if (0 != dsi_cfg(screen_id, panel))
-			DE_WRN("dsi cfg fail!\n");
+		if (panel->lcd_if == LCD_IF_DSI) {
+			if (0 != dsi_cfg(screen_id, panel))
+				DE_WRN("dsi %d cfg fail!\n", screen_id);
+			if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+			    screen_id + 1 < DEVICE_DSI_NUM) {
+				if (0 != dsi_cfg(screen_id + 1, panel))
+					DE_WRN("dsi %d cfg fail!\n",
+					       screen_id + 1);
+			}
+		}
+
 #endif
 	}
 #else
@@ -434,6 +458,13 @@ int disp_al_lcd_cfg(u32 screen_id, disp_panel_para *panel,
 	return 0;
 }
 
+int disp_al_lcd_cfg_ext(u32 screen_id, panel_extend_para *extend_panel)
+{
+	tcon0_cfg_ext(screen_id, extend_panel);
+
+	return 0;
+}
+
 int disp_al_lcd_enable(u32 screen_id, disp_panel_para *panel)
 {
 #if !defined(TCON1_DRIVE_PANEL)
@@ -444,6 +475,9 @@ int disp_al_lcd_enable(u32 screen_id, disp_panel_para *panel)
 	} else if (LCD_IF_DSI == panel->lcd_if) {
 #if defined(SUPPORT_DSI)
 		dsi_open(screen_id, panel);
+		if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+		    screen_id + 1 < DEVICE_DSI_NUM)
+			dsi_open(screen_id + 1, panel);
 #endif
 	}
 
@@ -469,6 +503,10 @@ int disp_al_lcd_disable(u32 screen_id, disp_panel_para *panel)
 	} else if (LCD_IF_DSI == panel->lcd_if) {
 #if defined(SUPPORT_DSI)
 		dsi_close(screen_id);
+		if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+		    screen_id + 1 < DEVICE_DSI_NUM)
+			dsi_close(screen_id + 1);
+
 #endif
 	}
 	tcon0_close(screen_id);
@@ -579,14 +617,20 @@ int disp_al_lcd_tri_start(u32 screen_id, disp_panel_para *panel)
 int disp_al_lcd_io_cfg(u32 screen_id, u32 enable, disp_panel_para *panel)
 {
 #if defined(SUPPORT_DSI)
-	if (LCD_IF_DSI == panel->lcd_if) {
-		if (enable)
+	if (panel->lcd_if == LCD_IF_DSI) {
+		if (enable == 1) {
 			dsi_io_open(screen_id, panel);
-		else
+			if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+			    screen_id + 1 < DEVICE_DSI_NUM)
+				dsi_io_open(screen_id + 1, panel);
+		} else {
 			dsi_io_close(screen_id);
+			if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+			    screen_id + 1 < DEVICE_DSI_NUM)
+				dsi_io_close(screen_id + 1);
+		}
 	}
 #endif
-
 	return 0;
 }
 
@@ -604,8 +648,16 @@ int disp_al_lcd_get_cur_line(u32 screen_id, disp_panel_para *panel)
 int disp_al_lcd_get_start_delay(u32 screen_id, disp_panel_para *panel)
 {
 #if defined(SUPPORT_DSI) && defined(DSI_VERSION_40)
+	u32 lcd_start_delay = 0;
+	u32 de_clk_rate = de_get_clk_rate() / 1000000;
+	if (panel) {
+		lcd_start_delay = ((tcon0_get_cpu_tri2_start_delay(screen_id)+1)
+				   << 3) * (panel->lcd_dclk_freq)
+			/ (panel->lcd_ht*de_clk_rate);
+
+	}
 	if (LCD_IF_DSI == panel->lcd_if)
-		return dsi_get_start_delay(screen_id);
+		return dsi_get_start_delay(screen_id)+lcd_start_delay;
 	else
 #endif
 		return tcon_get_start_delay(screen_id,
@@ -749,7 +801,8 @@ int disp_al_vga_cfg(u32 screen_id, struct disp_video_timings *video_info)
 #endif
 
 int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info,
-			struct disp_vdevice_interface_para *para)
+			struct disp_vdevice_interface_para *para,
+			u8 config_tcon_only)
 {
 	struct lcd_clk_info clk_info;
 	disp_panel_para info;
@@ -800,7 +853,13 @@ int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info,
 		DE_WRN("lcd cfg fail!\n");
 	else
 		DE_INF("lcd cfg ok!\n");
-	tcon0_src_select(screen_id, LCD_SRC_DE, al_priv.de_id[screen_id]);
+
+	if (!config_tcon_only)
+		tcon0_src_select(screen_id, LCD_SRC_DE,
+				 al_priv.de_id[screen_id]);
+	else
+		DE_INF("%s:config_tcon_only is %d\n", __func__,
+		       config_tcon_only);
 
 	return 0;
 }
@@ -918,7 +977,8 @@ int disp_init_al(disp_bsp_init_para *para)
 	tcon_top_set_reg_base(0, para->reg_base[DISP_MOD_DEVICE]);
 #endif
 #if defined(SUPPORT_DSI)
-	dsi_set_reg_base(0, para->reg_base[DISP_MOD_DSI0]);
+	for (i = 0; i < DEVICE_DSI_NUM; ++i)
+		dsi_set_reg_base(i, para->reg_base[DISP_MOD_DSI0 + i]);
 #endif
 
 	if (1 == para->boot_info.sync) {

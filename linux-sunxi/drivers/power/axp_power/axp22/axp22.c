@@ -9,6 +9,7 @@
 #include <linux/delay.h>
 #include <linux/mfd/core.h>
 #include <linux/of.h>
+#include <linux/of_irq.h>
 #include <linux/of_device.h>
 #include <linux/err.h>
 #include <linux/power/aw_pm.h>
@@ -204,8 +205,16 @@ static void axp22_wakeup_event(void)
 static s32 axp22_usb_det(void)
 {
 	u8 value = 0;
+	int ret = 0;
+
 	axp_regmap_read(axp22_pm_power->regmap, AXP22_STATUS, &value);
-	return (value & 0x10) ? 1 : 0;
+
+	if (value & 0x10) {
+		axp_usb_connect = 1;
+		ret = 1;
+	}
+
+	return ret;
 }
 
 static s32 axp22_usb_vbus_output(int high)
@@ -272,41 +281,53 @@ struct axp_platform_ops axp22_platform_ops = {
 	.pmu_regulator_restore = axp22_regulator_restore,
 	.powerkey_name = {
 		"axp221s-powerkey",
-		"axp227-powerkey"
+		"axp227-powerkey",
+		"axp223-powerkey"
 	},
 	.charger_name = {
 		"axp221s-charger",
-		"axp227-charger"
+		"axp227-charger",
+		"axp223-charger"
 	},
 	.regulator_name = {
 		"axp221s-regulator",
-		"axp227-regulator"
+		"axp227-regulator",
+		"axp223-regulator"
 	},
 	.gpio_name = {
 		"axp221s-gpio",
-		"axp227-gpio"
+		"axp227-gpio",
+		"axp223-gpio"
 	},
-};
-
-static const struct i2c_device_id axp22_id_table[] = {
-	{ "axp221s", 0 },
-	{ "axp227", 0 },
-	{}
 };
 
 static const struct of_device_id axp22_dt_ids[] = {
 	{ .compatible = "axp221s", },
 	{ .compatible = "axp227", },
+	{ .compatible = "axp223", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, axp22_dt_ids);
 
+#ifdef CONFIG_AXP_TWI_USED
 static int axp22_probe(struct i2c_client *client,
 				const struct i2c_device_id *id)
+#else
+static int axp22_probe(struct platform_device *pdev)
+#endif
 {
 	int ret;
 	struct axp_dev *axp22;
-	struct device_node *node = client->dev.of_node;
+	struct device_node *node;
+	struct device *device;
+
+#ifdef CONFIG_AXP_TWI_USED
+	node = client->dev.of_node;
+	device = &client->dev;
+#else
+	node = pdev->dev.of_node;
+	device = &pdev->dev;
+#endif
 
 	axp22_pmu_num = axp_get_pmu_num(axp22_dt_ids, ARRAY_SIZE(axp22_dt_ids));
 	if (axp22_pmu_num < 0) {
@@ -334,11 +355,11 @@ static int axp22_probe(struct i2c_client *client,
 		return -EBUSY;
 	}
 
-	axp22 = devm_kzalloc(&client->dev, sizeof(*axp22), GFP_KERNEL);
+	axp22 = devm_kzalloc(device, sizeof(*axp22), GFP_KERNEL);
 	if (!axp22)
 		return -ENOMEM;
 
-	axp22->dev = &client->dev;
+	axp22->dev = device;
 	axp22->nr_cells = ARRAY_SIZE(axp22_cells);
 	axp22->cells = axp22_cells;
 	axp22->pmu_num = axp22_pmu_num;
@@ -349,16 +370,29 @@ static int axp22_probe(struct i2c_client *client,
 	if (ret)
 		return ret;
 
-	axp22->regmap = axp_regmap_init_i2c(&client->dev);
+#ifdef CONFIG_AXP_TWI_USED
+	axp22->regmap = axp_regmap_init_i2c(device);
+#else
+	axp22->regmap = axp_regmap_init_arisc_rsb(device, AXP22_RSB_RTSADDR);
+#endif
 	if (IS_ERR(axp22->regmap)) {
 		ret = PTR_ERR(axp22->regmap);
-		dev_err(&client->dev, "regmap init failed: %d\n", ret);
+		dev_err(device, "regmap init failed: %d\n", ret);
 		return ret;
 	}
 
+#ifdef CONFIG_AXP_TWI_USED
+	i2c_set_clientdata(client, axp22);
+#else
+	platform_set_drvdata(pdev, axp22);
+#endif
 	ret = axp22_init_chip(axp22);
 	if (ret)
 		return ret;
+
+	axp22_pm_power = axp22;
+
+	axp_platform_ops_set(axp22->pmu_num, &axp22_platform_ops);
 
 	ret = axp_mfd_add_devices(axp22);
 	if (ret) {
@@ -366,7 +400,12 @@ static int axp22_probe(struct i2c_client *client,
 		return ret;
 	}
 
-	axp22->irq_data = axp_irq_chip_register(axp22->regmap, client->irq,
+#ifdef CONFIG_AXP_TWI_USED
+	axp22->irq = client->irq;
+#else
+	axp22->irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+#endif
+	axp22->irq_data = axp_irq_chip_register(axp22->regmap, axp22->irq,
 						IRQF_SHARED
 						| IRQF_DISABLED
 						| IRQF_NO_SUSPEND,
@@ -374,25 +413,31 @@ static int axp22_probe(struct i2c_client *client,
 						axp22_wakeup_event);
 	if (IS_ERR(axp22->irq_data)) {
 		ret = PTR_ERR(axp22->irq_data);
-		dev_err(&client->dev, "axp init irq failed: %d\n", ret);
+		dev_err(device, "axp init irq failed: %d\n", ret);
 		return ret;
 	}
 
-	axp22_pm_power = axp22;
-
 	if (!pm_power_off)
 		pm_power_off = axp22_power_off;
-
-	axp_platform_ops_set(axp22->pmu_num, &axp22_platform_ops);
 
 	axp22_ws = wakeup_source_register("axp22_wakeup_source");
 
 	return 0;
 }
 
+#ifdef CONFIG_AXP_TWI_USED
 static int axp22_remove(struct i2c_client *client)
+#else
+static int axp22_remove(struct platform_device *pdev)
+#endif
 {
-	struct axp_dev *axp22 = i2c_get_clientdata(client);
+	struct axp_dev *axp22;
+
+#ifdef CONFIG_AXP_TWI_USED
+	axp22 = i2c_get_clientdata(client);
+#else
+	axp22 = platform_get_drvdata(pdev);
+#endif
 
 	if (axp22 == axp22_pm_power) {
 		axp22_pm_power = NULL;
@@ -400,13 +445,23 @@ static int axp22_remove(struct i2c_client *client)
 	}
 
 	axp_mfd_remove_devices(axp22);
-	axp_irq_chip_unregister(client->irq, axp22->irq_data);
+	axp_irq_chip_unregister(axp22->irq, axp22->irq_data);
 
 	return 0;
 }
 
+static const struct i2c_device_id axp22_id_table[] = {
+	{ "axp221s", 0 },
+	{ "axp227", 0 },
+	{ "axp223", 0 },
+	{}
+};
 
+#ifdef CONFIG_AXP_TWI_USED
 static struct i2c_driver axp22_driver = {
+#else
+static struct platform_driver axp22_driver = {
+#endif
 	.driver = {
 		.name   = "axp22",
 		.owner  = THIS_MODULE,
@@ -414,24 +469,36 @@ static struct i2c_driver axp22_driver = {
 	},
 	.probe      = axp22_probe,
 	.remove     = axp22_remove,
+#ifdef CONFIG_AXP_TWI_USED
 	.id_table   = axp22_id_table,
+#endif
 };
 
-static int __init axp22_i2c_init(void)
+static int __init axp22_init(void)
 {
 	int ret;
+
+#ifdef CONFIG_AXP_TWI_USED
 	ret = i2c_add_driver(&axp22_driver);
+#else
+	ret = platform_driver_register(&axp22_driver);
+#endif
 	if (ret != 0)
-		pr_err("Failed to register axp22 I2C driver: %d\n", ret);
+		pr_err("Failed to register axp22x driver: %d\n", ret);
+
 	return ret;
 }
-subsys_initcall(axp22_i2c_init);
+subsys_initcall_sync(axp22_init);
 
-static void __exit axp22_i2c_exit(void)
+static void __exit axp22_exit(void)
 {
+#ifdef CONFIG_AXP_TWI_USED
 	i2c_del_driver(&axp22_driver);
+#else
+	platform_driver_unregister(&axp22_driver);
+#endif
 }
-module_exit(axp22_i2c_exit);
+module_exit(axp22_exit);
 
 MODULE_DESCRIPTION("PMIC Driver for AXP22X");
 MODULE_AUTHOR("Qin <qinyongshen@allwinnertech.com>");

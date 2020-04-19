@@ -158,7 +158,7 @@ int sprite_form_sysrecovery(void)
 	sunxi_download_info   *dl_info  = NULL;
 	char        *src_buf = NULL;
 	int         ret = -1;
-	int production_media = uboot_spare_head.boot_data.storage_type;
+	int production_media = get_boot_storage_type();
 
 	printf("sunxi sprite begin\n");
 

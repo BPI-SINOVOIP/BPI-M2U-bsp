@@ -9,11 +9,14 @@ struct sunxi_disp_source_ops
 	int (*sunxi_lcd_delay_us)(unsigned int us);
 	int (*sunxi_lcd_tcon_enable)(unsigned int scree_id);
 	int (*sunxi_lcd_tcon_disable)(unsigned int scree_id);
-	int (*sunxi_lcd_cpu_write)(unsigned int scree_id, unsigned int command, unsigned int *para, unsigned int para_num);
+	int (*sunxi_lcd_cpu_write)(u32 sel, u32 index, u32 data);
 	int (*sunxi_lcd_cpu_write_index)(unsigned int scree_id, unsigned int index);
 	int (*sunxi_lcd_cpu_write_data)(unsigned int scree_id, unsigned int data);
+	int (*sunxi_lcd_cpu_set_auto_mode)(unsigned int scree_id);
 	int (*sunxi_lcd_dsi_dcs_write)(unsigned int scree_id, unsigned char command, unsigned char *para, unsigned int para_num);
 	int (*sunxi_lcd_dsi_gen_write)(unsigned int scree_id, unsigned char command, unsigned char *para, unsigned int para_num);
+	int (*sunxi_lcd_dsi_open)(unsigned int scree_id);
+	int (*sunxi_lcd_dsi_close)(unsigned int scree_id);
 	int (*sunxi_lcd_dsi_clk_enable)(u32 screen_id, u32 en);
 	int (*sunxi_lcd_backlight_enable)(unsigned int screen_id);
 	int (*sunxi_lcd_backlight_disable)(unsigned int screen_id);
@@ -46,6 +49,7 @@ s32 bsp_disp_get_lcd_registered(u32 disp);
 s32 bsp_disp_get_hdmi_registered(void);
 s32 bsp_disp_get_output_type(u32 disp);
 s32 bsp_disp_device_switch(int disp, enum disp_output_type output_type, enum disp_output_type mode);
+s32 bsp_disp_device_set_config(int disp, struct disp_device_config *config);
 s32 bsp_disp_set_hdmi_func(struct disp_device_func * func);
 s32 bsp_disp_hdmi_check_support_mode(u32 disp, enum disp_output_type mode);
 s32 bsp_disp_hdmi_set_detect(bool hpd);
@@ -89,6 +93,11 @@ s32 bsp_disp_tv_resume(void);
 extern s32   dsi_dcs_wr(u32 sel, u8 cmd, u8* para_p, u32 para_num);
 extern s32   dsi_gen_wr(u32 sel,u8 cmd,u8* para_p,u32 para_num);
 extern s32   dsi_clk_enable(u32 sel, u32 en);
+s32 bsp_disp_lcd_dsi_open(u32 disp);
+s32 bsp_disp_lcd_dsi_close(u32 disp);
+s32 bsp_disp_lcd_dsi_clk_enable(u32 disp, u32 en);
+s32 bsp_disp_lcd_dsi_dcs_wr(u32 disp, u8 command, u8 *para, u32 para_num);
+s32 bsp_disp_lcd_dsi_gen_wr(u32 disp, u8 command, u8 *para, u32 para_num);
 
 extern struct disp_manager* disp_get_layer_manager(u32 disp);
 

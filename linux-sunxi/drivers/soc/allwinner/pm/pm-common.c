@@ -324,9 +324,12 @@ ssize_t parse_status_code_show(struct device *dev,
 }
 
 #if (defined(CONFIG_ARCH_SUN8IW8P1) || \
+	defined(CONFIG_ARCH_SUN8IW17P1) || \
 	defined(CONFIG_ARCH_SUN8IW6P1)  || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1))
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1))
 void init_wakeup_src(unsigned int event, unsigned int gpio_enable_bitmap, unsigned int cpux_gpiog_bitmap)
 {
 	/*config int src. */
@@ -357,8 +360,11 @@ void exit_wakeup_src(unsigned int event, unsigned int gpio_enable_bitmap, unsign
 	defined(CONFIG_ARCH_SUN8IW6P1) || \
 	defined(CONFIG_ARCH_SUN8IW10P1) || \
 	defined(CONFIG_ARCH_SUN8IW11P1) || \
+	defined(CONFIG_ARCH_SUN8IW17P1) || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)) && \
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1)) && \
 	defined(CONFIG_AW_AXP)
 static unsigned int pwr_dm_mask_saved;
 static int save_sys_pwr_state(const char *id)
@@ -479,7 +485,9 @@ int init_sys_pwr_dm(void)
 	/*add_sys_pwr_dm("vcc-pm"); */
 	add_sys_pwr_dm("vcc-io");
 	/*add_sys_pwr_dm("vcc-cpvdd"); */
-	/*add_sys_pwr_dm("vcc-ldoin"); */
+#if defined CONFIG_ARCH_SUN50IW6P1
+	add_sys_pwr_dm("vcc-ldoin");
+#endif
 	add_sys_pwr_dm("vcc-pll");
 	add_sys_pwr_dm("vcc-pc");
 
@@ -491,7 +499,9 @@ int init_sys_pwr_dm(void)
 #endif
 
 #if (defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)) && \
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1)) && \
 	defined(CONFIG_AW_AXP)
 static int config_pmux_para(unsigned num)
 {
@@ -566,7 +576,8 @@ int config_pmu_para(void)
 #endif
 
 #if (defined(CONFIG_ARCH_SUN8IW8P1) || defined(CONFIG_ARCH_SUN8IW6P1) \
-	|| defined(CONFIG_ARCH_SUN8IW10P1) || defined(CONFIG_ARCH_SUN8IW11P1)) && defined(CONFIG_AW_AXP)
+	|| defined(CONFIG_ARCH_SUN8IW10P1) || defined(CONFIG_ARCH_SUN8IW11P1) \
+	|| defined(CONFIG_ARCH_SUN8IW17P1)) && defined(CONFIG_AW_AXP)
 extern  int config_pmux_para(int num, struct aw_pm_info *api, int *pmu_id);
 
 int config_pmu_para(void)
@@ -591,8 +602,11 @@ int config_pmu_para(void)
 	defined(CONFIG_ARCH_SUN8IW6P1) || \
 	defined(CONFIG_ARCH_SUN8IW10P1) || \
 	defined(CONFIG_ARCH_SUN8IW11P1) || \
+	defined(CONFIG_ARCH_SUN8IW17P1) || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)) && \
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1)) && \
 	defined(CONFIG_AW_AXP)
 int config_dynamic_standby(void)
 {

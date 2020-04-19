@@ -23,6 +23,8 @@ extern int (* sunxi_sprite_force_erase_pt)(void)  ;
 extern int (* sunxi_sprite_phyread_pt) (unsigned int start_block, unsigned int nblock, void *buffer);
 extern int (* sunxi_sprite_phywrite_pt)(unsigned int start_block, unsigned int nblock, void *buffer);
 
+extern int (* sunxi_secstorage_read_pt)( int item, unsigned char *buf, unsigned int len) ;
+extern int (* sunxi_secstorage_write_pt) (int item, unsigned char *buf, unsigned int len);
 
 extern int  nand_init_for_boot(int workmode);
 extern int  nand_init_for_sprite(int workmode);

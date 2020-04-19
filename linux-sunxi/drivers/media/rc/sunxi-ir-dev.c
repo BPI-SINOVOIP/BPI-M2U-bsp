@@ -24,10 +24,19 @@
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
 #include <media/rc-core.h>
+#include <linux/arisc/arisc.h>
+#include <linux/delay.h>
+#include <linux/proc_fs.h>
+#include <asm/uaccess.h>
 #include "sunxi-ir-rx.h"
 
 #define SUNXI_IR_DRIVER_NAME	"sunxi-rc-recv"
-#define SUNXI_IR_DEVICE_NAME	"sunxi_ir_recv"
+#define SUNXI_IR_DEVICE_NAME	"sunxi-ir"
+#define NEC			0
+#define RC5			1
+static struct proc_dir_entry *sunxi_ir_protocol;
+
+#define RC5_UNIT		889000  /* ns */
 
 DEFINE_IR_RAW_EVENT(rawir);
 static struct sunxi_ir_data *ir_data;
@@ -70,14 +79,68 @@ static struct of_device_id sunxi_ir_recv_of_match[] = {
 MODULE_DEVICE_TABLE(of, sunxi_ir_recv_of_match);
 #else /* !CONFIG_OF */
 #endif
+static void sunxi_ir_recv(u32 reg_data)
+{
+	bool pluse_now = 0;
+	u32 ir_duration = 0;
 
+	pluse_now = reg_data >> 7; /* get the polarity */
+	ir_duration = reg_data & 0x7f; /* get duration, number of clocks */
+
+	if (pluse_pre == pluse_now) {
+		/* the signal sunperposition */
+		rawir.duration += ir_duration;
+		dprintk(DEBUG_INT, "raw: polar=%d; dur=%d\n",
+							pluse_now, ir_duration);
+	} else {
+#ifdef CONFIG_IR_RC5
+		rawir.duration *= IR_SIMPLE_UNIT;
+		dprintk(DEBUG_INT, "pusle :polar=%d, dur: %u ns\n",
+					rawir.pulse, rawir.duration);
+		if ((rawir.duration > (RC5_UNIT + RC5_UNIT/2))
+			&& (rawir.duration < (2*RC5_UNIT + RC5_UNIT/2))) {
+			rawir.duration = rawir.duration/2;
+			ir_raw_event_store(sunxi_rcdev, &rawir);
+			ir_raw_event_store(sunxi_rcdev, &rawir);
+		} else
+			ir_raw_event_store(sunxi_rcdev, &rawir);
+
+		rawir.pulse = pluse_now;
+		rawir.duration = ir_duration;
+		dprintk(DEBUG_INT, "raw: polar=%d; dur=%d\n",
+							pluse_now, ir_duration);
+#else
+		if (is_receiving) {
+			rawir.duration *= IR_SIMPLE_UNIT;
+			dprintk(DEBUG_INT, "pusle :polar=%d, dur: %u ns\n",
+						rawir.pulse, rawir.duration);
+			ir_raw_event_store(sunxi_rcdev, &rawir);
+			rawir.pulse = pluse_now;
+			rawir.duration = ir_duration;
+			dprintk(DEBUG_INT, "raw: polar=%d; dur=%d\n",
+							pluse_now, ir_duration);
+		} else {
+			/* get the first pluse signal */
+			rawir.pulse = pluse_now;
+			rawir.duration = ir_duration;
+			/* Since IR hardware will cut Active Threshold time,
+			 * So just add comeback */
+			rawir.duration += ((IR_ACTIVE_T>>16)+1) * ((IR_ACTIVE_T_C>>23) ? 128 : 1);
+			is_receiving = 1;
+			dprintk(DEBUG_INT, "get frist pulse,add head %d !!\n",
+					((IR_ACTIVE_T>>16)+1) * ((IR_ACTIVE_T_C>>23) ? 128 : 1));
+			dprintk(DEBUG_INT, "raw: polar=%d; dur=%d\n",
+							pluse_now, ir_duration);
+		}
+#endif
+		pluse_pre = pluse_now;
+	}
+}
 static irqreturn_t sunxi_ir_recv_irq(int irq, void *dev_id)
 {
 	u32 intsta,dcnt;
 	u32 i = 0;
-	bool pluse_now = 0;
-	u8 reg_data;
-	u32 ir_duration = 0;
+	u32 reg_data;
 
 	dprintk(DEBUG_INT, "IR RX IRQ Serve\n");
 
@@ -93,40 +156,16 @@ static irqreturn_t sunxi_ir_recv_irq(int irq, void *dev_id)
 		/* get the data from fifo */
 		reg_data = ir_get_data();
 		/* Byte in FIFO format YXXXXXXX(B)	Y:polarity(0:low level, 1:high level)  X:Number of clocks */
-		pluse_now = reg_data >> 7; /* get the polarity */
-		ir_duration = reg_data & 0x7f; /* get duration, number of clocks */
-
-		if (pluse_pre == pluse_now) {
-			/* the signal maintian */
-			rawir.duration += ir_duration;
-			dprintk(DEBUG_INT, "raw: polar=%d; dur=%d \n", pluse_now, ir_duration);
-		} else {
-			if (is_receiving) {
-				rawir.duration *= IR_SIMPLE_UNIT;
-				dprintk(DEBUG_INT, "pusle :polar=%d, dur: %u ns\n", rawir.pulse, rawir.duration);
-				ir_raw_event_store(sunxi_rcdev, &rawir);
-				rawir.pulse = pluse_now;
-				rawir.duration = ir_duration;
-				dprintk(DEBUG_INT, "raw: polar=%d; dur=%d \n", pluse_now, ir_duration);
-			} else {
-				/* get the first pluse signal */
-				rawir.pulse = pluse_now;
-				rawir.duration = ir_duration;
-				/* Since IR hardware will cut Active Threshold time,So just add comeback */
-				rawir.duration += ((IR_ACTIVE_T>>16)+1) * ((IR_ACTIVE_T_C>>23 )? 128:1);
-				is_receiving = 1;
-				dprintk(DEBUG_INT, "get frist pulse,add head %d !!\n", ((IR_ACTIVE_T>>16)+1) * ((IR_ACTIVE_T_C>>23) ? 128 : 1));
-				dprintk(DEBUG_INT, "raw: polar=%d; dur=%d \n", pluse_now, ir_duration);
-			}
-			pluse_pre = pluse_now;
-		}	
+		sunxi_ir_recv(reg_data);
 	}
-	
+
 	if (intsta & IR_RXINTS_RXPE) {
-		/* The last pulse can not call ir_raw_event_store() since miss invert level in above, manu call */
+		/* The last pulse can not call ir_raw_event_store()
+		 * since miss invert level in above, manu call */
 		if (rawir.duration) {
 			rawir.duration *= IR_SIMPLE_UNIT;
-			dprintk(DEBUG_INT, "pusle :polar=%d, dur: %u ns\n", rawir.pulse, rawir.duration);
+			dprintk(DEBUG_INT, "pusle :polar=%d, dur: %u ns\n",
+						rawir.pulse, rawir.duration);
 			ir_raw_event_store(sunxi_rcdev, &rawir);
 		}
 		dprintk(DEBUG_INT, "handle raw data.\n");
@@ -193,7 +232,11 @@ static void ir_sample_config(enum ir_sample_config set_sample)
 		sample_reg |= IR_SAMPLE_DEV;
 		break;
 	case IR_FILTER_TH:
+#ifdef CONFIG_IR_RC5
+		sample_reg |= IR_RXFILT_VAL_RC5;
+#else
 		sample_reg |= IR_RXFILT_VAL;
+#endif
 		break;
 	case IR_IDLE_TH:
 		sample_reg |= IR_RXIDLE_VAL;
@@ -201,6 +244,10 @@ static void ir_sample_config(enum ir_sample_config set_sample)
 	case IR_ACTIVE_TH:
 		sample_reg |= IR_ACTIVE_T;
 		sample_reg |= IR_ACTIVE_T_C;
+		break;
+	case IR_ACTIVE_TH_SAMPLE:
+		sample_reg |= IR_ACTIVE_T_SAMPLE;
+		sample_reg &= ~IR_ACTIVE_T_C;
 		break;
 	default:
 		return;
@@ -246,8 +293,13 @@ static void ir_reg_cfg(void)
 	ir_sample_config(IR_CLK_SAMPLE);
 	ir_sample_config(IR_FILTER_TH);		/* Set Filter Threshold */
 	ir_sample_config(IR_IDLE_TH); 		/* Set Idle Threshold */
-	ir_sample_config(IR_ACTIVE_TH);         /* Set Active Threshold */
+
+#ifdef CONFIG_IR_RC5
+	ir_sample_config(IR_ACTIVE_TH_SAMPLE);         /* rc5 Set Active Threshold */
 	/* Invert Input Signal */
+#else
+	ir_sample_config(IR_ACTIVE_TH);         /* Set Active Threshold */
+#endif
 	ir_signal_invert();
 	/* Clear All Rx Interrupt Status */
 	ir_irq_config(IR_IRQ_STATUS_CLEAR);
@@ -321,7 +373,27 @@ static void ir_setup(void)
 	dprintk(DEBUG_INIT, "ir_rx_setup: ir setup end!!\n");
 	return;
 }
-
+static ssize_t sunxi_ir_protocol_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
+{
+	if (size != sizeof(unsigned int)) {
+		dprintk(DEBUG_INIT, "size != sizeof(unsigned int) \n");
+		return -1;
+	}
+	if (copy_to_user((void __user *)buf, &ir_data->ir_protocol_used, size))
+		return -1;
+	return size;
+}
+static const struct file_operations sunxi_ir_proc_fops = {
+	.read		= sunxi_ir_protocol_read,
+};
+static bool ir_protocol_judge(void)
+{
+	dprintk(DEBUG_INIT, "sunxi ir_protocol_judge\n");
+	sunxi_ir_protocol = proc_create("sunxi_ir_protocol", S_IRUSR, NULL, &sunxi_ir_proc_fops);
+	if (!sunxi_ir_protocol)
+		return true;
+	return false;
+}
 static int sunxi_ir_startup(struct platform_device *pdev)
 {
 	struct device_node *np =NULL;
@@ -356,6 +428,10 @@ static int sunxi_ir_startup(struct platform_device *pdev)
 		pr_err("%s:Failed to get clk.\n", __func__);
 		ret = -EBUSY;
 	}
+	if (of_property_read_u32(np, "ir_protocol_used", &ir_data->ir_protocol_used)) {
+		dprintk(DEBUG_INIT, "Can not get ir_protocol_used node , defualt to NEC\n");
+		ir_data->ir_protocol_used = NEC;
+	}
 	if (of_property_read_u32(np, "ir_addr_cnt", &ir_data->ir_addr_cnt)) {
 		pr_err("%s: get cir addr cnt failed", __func__);
 		ret =  -EBUSY;
@@ -382,7 +458,10 @@ static int sunxi_ir_startup(struct platform_device *pdev)
 			ir_data->suply = NULL;
 		}
 	}
-
+	/* Creat file node for android to show which protocol to used. */
+	if (ir_protocol_judge()) {
+		pr_err("%s: Failed to creat file node for android.\n", __func__);
+	}
 	return ret;
 }
 
@@ -420,7 +499,11 @@ static int sunxi_ir_recv_probe(struct platform_device *pdev)
 	sunxi_rcdev->dev.parent = &pdev->dev;
 	sunxi_rcdev->driver_name = SUNXI_IR_DRIVER_NAME;
 
+#ifdef CONFIG_IR_RC5
+	sunxi_rcdev->allowed_protos = (u64)RC_BIT_RC5;
+#else
 	sunxi_rcdev->allowed_protos = (u64)RC_BIT_NEC;
+#endif
 	sunxi_rcdev->map_name = RC_MAP_SUNXI;
 
 	init_rc_map_sunxi(ir_data->ir_addr, ir_data->ir_addr_cnt);

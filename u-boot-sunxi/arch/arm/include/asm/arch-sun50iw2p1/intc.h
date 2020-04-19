@@ -124,6 +124,8 @@ extern int irq_disable(int irq_no);
 int arch_interrupt_init (void);
 
 int arch_interrupt_exit (void);
+extern int sunxi_gic_cpu_interface_init(int cpu);
+extern int sunxi_gic_cpu_interface_exit(void);
 
 
 #endif

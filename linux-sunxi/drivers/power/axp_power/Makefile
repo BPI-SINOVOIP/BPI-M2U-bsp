@@ -28,6 +28,7 @@ obj-$(CONFIG_AW_AXP22) += axp22/virtual22_dev.o
 obj-$(CONFIG_AW_AXP259) += axp259/axp259.o
 obj-$(CONFIG_AW_AXP259) += axp259/axp259-charger.o
 obj-$(CONFIG_AW_AXP259) += axp259/axp259-powerkey.o
+obj-$(CONFIG_AW_AXP259) += axp259/axp259-gpio.o
 
 #AXP22X
 obj-$(CONFIG_AW_AXP20) += axp20/axp20.o
@@ -45,6 +46,23 @@ obj-$(CONFIG_AW_AXP80) += axp80/axp80-gpio.o
 obj-$(CONFIG_AW_AXP80) += axp80/axp80-powerkey.o
 obj-$(CONFIG_AW_AXP80) += axp80/virtual80.o
 obj-$(CONFIG_AW_AXP80) += axp80/virtual80_dev.o
+
+#AXP803
+obj-$(CONFIG_AW_AXP803) += axp803/axp803.o
+obj-$(CONFIG_AW_AXP803) += axp803/axp803-regu.o
+obj-$(CONFIG_AW_AXP803) += axp803/axp803-charger.o
+obj-$(CONFIG_AW_AXP803) += axp803/axp803-gpio.o
+obj-$(CONFIG_AW_AXP803) += axp803/axp803-powerkey.o
+obj-$(CONFIG_AW_AXP803) += axp803/virtual803.o
+obj-$(CONFIG_AW_AXP803) += axp803/virtual803_dev.o
+
+#PMU1736
+obj-$(CONFIG_AW_PMU1736) += pmu1736/pmu1736.o
+obj-$(CONFIG_AW_PMU1736) += pmu1736/pmu1736-regu.o
+obj-$(CONFIG_AW_PMU1736) += pmu1736/pmu1736-gpio.o
+obj-$(CONFIG_AW_PMU1736) += pmu1736/pmu1736-powerkey.o
+obj-$(CONFIG_AW_PMU1736) += pmu1736/virtual_pmu1736.o
+obj-$(CONFIG_AW_PMU1736) += pmu1736/virtual_pmu1736_dev.o
 
 #AXPDUMMY
 obj-$(CONFIG_AW_AXPDUMMY) += axpdummy/axpdummy.o

@@ -173,16 +173,18 @@ static inline int sizeof_gpio_leds_priv(int num_leds)
 
 static int gpio_led_probe(struct platform_device *pdev)
 {
-	pr_info("%s start\n", __func__);
 	struct device_node *np = pdev->dev.of_node;
 	struct gpio_leds_priv *priv;
 	int i, ret = -1;
-
 	u32 val;
 	u32 led_used = 0;
+	char (*led_name)[5];
 	char trigger_name[32];
+	char led_active_low[25];
 	struct gpio_config config;
-	char *trigger_str;
+	const char *trigger_str;
+	
+	pr_info("%s start\n", __func__);
 
 	ret = of_property_read_u32(np, "led_used", &val);
 	if (ret < 0) {
@@ -209,7 +211,7 @@ static int gpio_led_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 	gpio_leds = (struct gpio_led *) led_list_head;
-	char (*led_name)[5];
+
 	led_list_name = kzalloc(led_num * sizeof(char[5]), GFP_KERNEL);
 	if (led_list_name == NULL) {
 		pr_err("%s: kzalloc led list name failed.\n", __func__);
@@ -220,6 +222,8 @@ static int gpio_led_probe(struct platform_device *pdev)
 	for (i = 0; i < led_num; i++) {
 		sprintf(led_name[i], "%s%d", "led", i+1);
 		sprintf(trigger_name, "%s%s", led_name[i], "_trigger");
+		sprintf(led_active_low, "%s_active_low", led_name[i]);
+		
 		ret = of_get_named_gpio_flags(np,
 				led_name[i], 0, (enum of_gpio_flags *)&config);
 		if (ret < 0) {
@@ -228,8 +232,7 @@ static int gpio_led_probe(struct platform_device *pdev)
 			return ret;
 		}
 		gpio_leds[i].gpio = config.gpio;
-		pr_info("%s gpio number is %d\n",
-				led_name[i], gpio_leds[i].gpio);
+		pr_info("%s gpio number is %d\n", led_name[i], gpio_leds[i].gpio);
 
 		ret = of_property_read_string(np, trigger_name, &trigger_str);
 		if (ret < 0) {
@@ -240,10 +243,15 @@ static int gpio_led_probe(struct platform_device *pdev)
 		gpio_leds[i].default_trigger = trigger_str;
 		pr_info("%s led trigger name is %s\n", trigger_name,
 				gpio_leds[i].default_trigger);
+				
+		ret = of_property_read_u32(np, led_active_low, &val);
+		if (ret < 0) {
+			pr_err("script_get_item %s err\n", led_active_low);
+			return ret;
+		}
+		gpio_leds[i].active_low = val ? true : false;
 
 		gpio_leds[i].name = led_name[i];
-		gpio_leds[i].active_low = 0;
-		gpio_leds[i].default_state = LEDS_GPIO_DEFSTATE_OFF;
 	}
 
 	if (gpio_leds && led_num) {

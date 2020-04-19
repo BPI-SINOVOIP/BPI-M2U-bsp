@@ -12,7 +12,10 @@
 #define TVE_DEVICE_NUM          1
 #define TVE_TOP_DEVIVE_NUM      1
 #define TVE_DAC_NUM             1
-
+#elif defined(CONFIG_ARCH_SUN50IW6)
+#define TVE_DEVICE_NUM          0
+#define TVE_TOP_DEVIVE_NUM      0
+#define TVE_DAC_NUM             0
 #endif
 
 /* tv encoder registers offset */
@@ -102,7 +105,7 @@ s32 tve_low_open(u32 sel);
 s32 tve_low_close(u32 sel);
 s32 tve_resync_enable(u32 sel);
 s32 tve_resync_disable(u32 sel);
-s32 tve_low_set_tv_mode(u32 sel, enum disp_tv_mode mode, u32 cali);
+s32 tve_low_set_tv_mode(u32 sel, enum disp_tv_mode mode, u32 *cali);
 s32 tve_low_get_dac_status(u32 sel);
 s32 tve_low_dac_autocheck_enable(u32 sel);
 s32 tve_low_dac_autocheck_disable(u32 sel);

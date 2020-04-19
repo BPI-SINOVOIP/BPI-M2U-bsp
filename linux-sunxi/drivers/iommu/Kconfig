@@ -127,6 +127,19 @@ config IRQ_REMAP
 	  To use x2apic mode in the CPU's which support x2APIC enhancements or
 	  to support platforms with CPU's having > 8 bit APIC ID, say Y.
 
+config SUNXI_IOMMU
+	bool "Allwinner Sunxi IOMMU Support"
+	depends on ARCH_SUNXI
+	select ARM_DMA_USE_IOMMU if ARM
+	select ARM64_DMA_USE_IOMMU if ARM64
+	select IOMMU_API
+	help
+	  Support for the Allwinner's IOMMU(System MMU) component. This
+	  enables H/W multimedia accellerators to see non-linear physical
+	  memory chunks as a linear memory in their address spaces
+
+	  If unsure, say N here.
+
 # OMAP IOMMU support
 config OMAP_IOMMU
 	bool "OMAP IOMMU Support"
@@ -261,4 +274,37 @@ config SHMOBILE_IOMMU_L1SIZE
 	default 256 if SHMOBILE_IOMMU_ADDRSIZE_64MB
 	default 128 if SHMOBILE_IOMMU_ADDRSIZE_32MB
 
+menuconfig IOMMU_DEBUG
+	bool "IOMMU Profiling and Debugging"
+	help
+	  Makes available some additional IOMMU profiling and debugging
+	  options.
+
+	  Say Y here if you want to debug and trace iommu driver.
+
+if IOMMU_DEBUG
+
+config IOMMU_DEBUG_TRACKING
+	bool "Track key IOMMU events"
+	depends on IOMMU_DEBUG
+	select IOMMU_API
+	help
+	  Enables additional debug tracking in the IOMMU framework code.
+	  Tracking information and tests can be accessed through various
+	  debugfs files.
+
+	  Say Y here if you need to debug IOMMU issues and are okay with
+	  the performance penalty of the tracking.
+
+config IOMMU_TESTS
+	bool "Interactive IOMMU performance/functional tests"
+	depends on IOMMU_DEBUG
+	select IOMMU_API
+	help
+	  Enables a suite of IOMMU unit tests.  The tests are runnable
+	  through debugfs.  Unlike the IOMMU_DEBUG_TRACKING option, the
+	  impact of enabling this option to overal system performance
+	  should be minimal.
+
+endif # IOMMU_DEBUG
 endif # IOMMU_SUPPORT

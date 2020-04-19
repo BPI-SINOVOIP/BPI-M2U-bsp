@@ -32,7 +32,13 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #else /* CONFIG_MALI_DT */
+#ifdef CONFIG_ARCH_SUN7I
+#include <mach/system.h>
+#include <mach/clock.h>
+#else /* CONFIG_ARCH_SUN7I */
 #include <linux/clk/sunxi_name.h>
+#endif /* CONFIG_ARCH_SUN7I */
+
 #include <mach/irqs.h>
 #include <mach/sys_config.h>
 #include <mach/platform.h>
@@ -49,7 +55,15 @@ typedef struct {
 
 	int freq; /* MHz */
 
-	bool         clk_status;
+	int parent_clk_num;
+
+	bool clk_status;
+
+#ifdef CONFIG_ARCH_SUN7I
+	bool need_reset;
+#endif /* CONFIG_ARCH_SUN7I */
+
+	bool need_set_freq;
 } aw_clk_data;
 
 typedef struct {
@@ -61,7 +75,11 @@ typedef struct {
 	struct regulator *regulator;
 	char   *regulator_id;
 	int    current_vol;
+#ifdef CONFIG_ARCH_SUN7I
+	aw_clk_data clk[3];
+#else
 	aw_clk_data clk[2];
+#endif /* CONFIG_ARCH_SUN7I */
 	struct mutex dvfs_lock;
 	bool   dvfs_status;
 	vf_table_data vf_table[4];

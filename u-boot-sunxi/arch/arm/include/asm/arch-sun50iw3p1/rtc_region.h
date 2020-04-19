@@ -29,6 +29,10 @@
 #define __RTC_REGION_H__
 
 
+#define  RTC_DATA_HOLD_REG_BASE        (SUNXI_RTC_BASE + 0x100)
+#define  RTC_DATA_HOLD_REG_FEL         (RTC_DATA_HOLD_REG_BASE + 0x8)
+
+#define  SUNXI_RTC_GPREG_NUM 6
 
 uint rtc_region_probe_fel_flag(void);
 void rtc_region_clear_fel_flag(void);

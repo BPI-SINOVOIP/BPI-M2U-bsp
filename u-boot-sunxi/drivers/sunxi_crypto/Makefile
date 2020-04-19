@@ -6,5 +6,6 @@
 #
 
 obj-$(CONFIG_SUNXI_SECURE_SYSTEM)	+= sunxi_crypto.o
+obj-$(CONFIG_SUNXI_SECURE_SYSTEM)	+= ss_op.o
 obj-$(CONFIG_SUNXI_SECURE_SYSTEM)	+= sunxi_efuse.o
 obj-$(CONFIG_BURN_NORMAL_EFUSE)	+= efuse_normal.o

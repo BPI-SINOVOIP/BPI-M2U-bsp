@@ -1,3 +1,13 @@
+/*
+ * Driver for sunxi SD/MMC host controllers
+ * (C) Copyright 2012-2017 lixiang <lixiang@allwinnertech.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ */
+
 #include <linux/clk.h>
 #include <linux/clk/sunxi.h>
 
@@ -310,6 +320,7 @@ struct sunxi_mmc_host {
 	struct pinctrl		*pinctrl;
 	struct pinctrl_state	*pins_default;
 	struct pinctrl_state	*pins_sleep;
+	struct pinctrl_state	*pins_idle;
 
 	/*sys node*/
 	struct device_attribute maual_insert;

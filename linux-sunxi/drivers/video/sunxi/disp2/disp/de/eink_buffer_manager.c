@@ -188,7 +188,11 @@ static int __conver_32bit_bmp_to_8bit(u8 *src_image_data, u32 width, u32 height,
 }
 #endif
 
-s32 __queue_image(struct eink_buffer_manager *buffer_mgr, void *src_image, u32 mode,  struct area_info update_area)
+s32 __queue_image(struct eink_buffer_manager *buffer_mgr,
+			struct disp_layer_config *config,
+			unsigned int layer_num,
+			u32 mode,
+			struct area_info update_area)
 {
 	bool queue_is_full;
 	int ret = 0;
@@ -220,7 +224,8 @@ s32 __queue_image(struct eink_buffer_manager *buffer_mgr, void *src_image, u32 m
 			in_index = IMAGE_BUF_NUM - 1;
 	}
 
-	if ((!queue_is_full) && buffer_mgr->image_slot[in_index].state == USED) {
+	if ((!queue_is_full) &&
+		buffer_mgr->image_slot[in_index].state == USED) {
 		/* do nothing */
 	}
 
@@ -228,16 +233,17 @@ s32 __queue_image(struct eink_buffer_manager *buffer_mgr, void *src_image, u32 m
 	cmgr = disp_get_format_manager(0);
 	memset((void*)&src, 0, sizeof(struct image_format));
 	src.format = DISP_FORMAT_ARGB_8888;
-	src.addr1 = (unsigned long)src_image;
 	src.width = buffer_mgr->width;
 	src.height = buffer_mgr->height;
 
 	memset((void*)&dest, 0, sizeof(struct image_format));
 	dest.format = DISP_FORMAT_8BIT_GRAY;
 	dest.addr1 = (unsigned long)buffer_mgr->image_slot[in_index].paddr;
+	dest.width = buffer_mgr->width;
+	dest.height = buffer_mgr->height;
 
-	if (NULL != src_image)
-		ret = cmgr->start_convert(0, &src, &dest);
+	if (NULL != config)
+		ret = cmgr->start_convert(0, config, layer_num, &dest);
 	if (ret)
 		goto out;
 

@@ -1,7 +1,15 @@
 /*
- * A V4L2 driver for sensor_spi cameras.
- *
- */
+  * sensor_spi.c:for spi sensors.
+  *
+  * Copyright (c) 2017 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
+  *
+  * Authors:  Zhao Wei <zhaowei@allwinnertech.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -46,13 +54,6 @@ MODULE_LICENSE("GPL");
  */
 #define SENSOR_FRAME_RATE 	30
 
-static struct v4l2_subdev *glb_sd;
-
-/*
- * Information we maintain about a known sensor.
- */
-struct sensor_format_struct;	/* coming later */
-
 struct cfg_array {		/* coming later */
 	struct regval_list *regs;
 	int size;
@@ -65,10 +66,7 @@ struct regval_list {
 	u8 data;
 };
 
-static inline struct sensor_info *to_state(struct v4l2_subdev *sd)
-{
-	return container_of(sd, struct sensor_info, sd);
-}
+
 
 /*
  * The default register settings
@@ -1094,13 +1092,7 @@ static long sensor_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 /*
  * Store information about the video data format.
  */
-static struct sensor_format_struct {
-	__u8 *desc;
-	enum v4l2_mbus_pixelcode mbus_code;
-	struct regval_list *regs;
-	int regs_size;
-	int bpp;		/* Bytes per pixel */
-} sensor_formats[] = {
+static struct sensor_format_struct sensor_formats[] = {
 	{
 		.desc = "YUYV 4:2:2",
 		.mbus_code = V4L2_MBUS_FMT_YUYV8_2X8,
@@ -1163,27 +1155,6 @@ static struct sensor_win_size sensor_win_sizes[] = {
 
 #define N_WIN_SIZES (ARRAY_SIZE(sensor_win_sizes))
 
-static int sensor_enum_fmt(struct v4l2_subdev *sd, unsigned index,
-			   enum v4l2_mbus_pixelcode *code)
-{
-	if (index >= N_FMTS)
-		return -EINVAL;
-
-	*code = sensor_formats[index].mbus_code;
-	return 0;
-}
-
-static int sensor_enum_size(struct v4l2_subdev *sd,
-			    struct v4l2_frmsizeenum *fsize)
-{
-	if (fsize->index > N_WIN_SIZES - 1)
-		return -EINVAL;
-
-	fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
-	fsize->discrete.width = sensor_win_sizes[fsize->index].width;
-	fsize->discrete.height = sensor_win_sizes[fsize->index].height;
-	return 0;
-}
 static int sensor_try_fmt_internal(struct v4l2_subdev *sd,
 				   struct v4l2_mbus_framefmt *fmt,
 				   struct sensor_format_struct **ret_fmt,
@@ -1304,34 +1275,6 @@ static int sensor_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *fmt)
 }
 
 /*
- * Implement G/S_PARM.  There is a "high quality" mode we could try
- * to do someday; for now, we just do the frame rate tweak.
- */
-static int sensor_g_parm(struct v4l2_subdev *sd,
-			struct v4l2_streamparm *parms)
-{
-	struct v4l2_captureparm *cp = &parms->parm.capture;
-	struct sensor_info *info = to_state(sd);
-
-	if (parms->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
-		return -EINVAL;
-
-	memset(cp, 0, sizeof(struct v4l2_captureparm));
-	cp->capability = V4L2_CAP_TIMEPERFRAME;
-	cp->capturemode = info->capture_mode;
-	cp->timeperframe.numerator = info->tpf.numerator;
-	cp->timeperframe.denominator = info->tpf.denominator;
-
-	return 0;
-}
-
-static int sensor_s_parm(struct v4l2_subdev *sd,
-			struct v4l2_streamparm *parms)
-{
-	return 0;
-}
-
-/*
  * Code for dealing with controls.
  * fill with different sensor module
  * different sensor module has different settings here
@@ -1344,7 +1287,7 @@ static int sensor_queryctrl(struct v4l2_subdev *sd,
 {
 	/* Fill in min, max, step and default value for these controls. */
 	/* see include/linux/videodev2.h for details */
-	/* see sensor_s_parm and sensor_g_parm for the meaning of value */
+
 	switch (qc->id) {
 	case V4L2_CID_BRIGHTNESS:
 		return v4l2_ctrl_query_fill(qc, -4, 4, 1, 1);
@@ -1487,11 +1430,12 @@ static const struct v4l2_subdev_core_ops sensor_core_ops = {
 	.init = sensor_init,
 	.s_power = sensor_power,
 	.ioctl = sensor_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = sensor_compat_ioctl32,
+#endif
 };
 
 static const struct v4l2_subdev_video_ops sensor_video_ops = {
-	.enum_mbus_fmt = sensor_enum_fmt,
-	.enum_framesizes = sensor_enum_size,
 	.try_mbus_fmt = sensor_try_fmt,
 	.s_mbus_fmt = sensor_s_fmt,
 	.s_parm = sensor_s_parm,
@@ -1514,9 +1458,15 @@ static int sensor_probe(struct spi_device *spi)
 	if (info == NULL)
 		return -ENOMEM;
 	sd = &info->sd;
-	glb_sd = sd;
 	v4l2_spi_subdev_init(sd, spi, &sensor_ops);
+
+	mutex_init(&info->lock);
 	info->fmt = &sensor_formats[0];
+	info->fmt_pt = &sensor_formats[0];
+	info->win_pt = &sensor_win_sizes[0];
+	info->fmt_num = N_FMTS;
+	info->win_size_num = N_WIN_SIZES;
+	info->sensor_field = V4L2_FIELD_NONE;
 	info->af_first_flag = 1;
 	info->auto_focus = 0;
 

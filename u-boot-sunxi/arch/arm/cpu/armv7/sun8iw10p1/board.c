@@ -63,11 +63,11 @@ int power_source_init(void)
 	int cpu_vol = 0;
 	int nodeoffset=0;
 
-	//PMU_SUPPLY_DCDC3 is for cpua
+	//PMU_SUPPLY_DCDC2 is for cpua
 	nodeoffset =  fdt_path_offset(working_fdt,FDT_PATH_POWER_SPLY);
 	if(nodeoffset >=0)
 	{
-		fdt_getprop_u32(working_fdt, nodeoffset, "dcdc3_vol", &dcdc_vol);
+		fdt_getprop_u32(working_fdt, nodeoffset, "dcdc2_vol", &dcdc_vol);
 	}
 	if(!dcdc_vol)
 	{
@@ -85,12 +85,12 @@ int power_source_init(void)
 		{
 			if(!axp_set_supply_status(0, PMU_SUPPLY_DCDC2, cpu_vol, -1))
 			{
-				tick_printf("PMU: dcdc3 %d\n", cpu_vol);
+				tick_printf("PMU: dcdc2 %d\n", cpu_vol);
 				sunxi_clock_set_corepll(uboot_spare_head.boot_data.run_clock, 0);
 			}
 			else
 			{
-				printf("axp_set_dcdc3 fail\n");
+				printf("axp_set_dcdc2 fail\n");
 			}
 		}
 		else
@@ -145,32 +145,6 @@ int sunxi_probe_securemode(void)
 	return 0;
 }
 
-int sunxi_get_securemode(void)
-{
-	return gd->securemode;
-}
-
-int sunxi_probe_secure_monitor(void)
-{
-	return uboot_spare_head.boot_data.secureos_exist == SUNXI_SECURE_MODE_USE_SEC_MONITOR?1:0;
-}
-
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
 int sunxi_set_secure_mode(void)
 {
 	return 0;

@@ -63,4 +63,44 @@ static inline void register_firmware_ops(const struct firmware_ops *ops)
 	firmware_ops = ops;
 }
 
+struct firmware_secure_ops {
+	unsigned int (*read_reg)(void __iomem *reg);
+	unsigned int (*write_reg)(u32 value, void __iomem *reg);
+	unsigned int (*send_command)(u32 arg0, u32 arg1, u32 arg2, u32 arg3);
+	unsigned int (*load_arisc)(void *image, u32 image_size, void *para,
+			u32 para_size, u32 para_offset);
+	unsigned int (*set_secondary_entry)(void *entry);
+	unsigned int (*suspend)(void);
+	unsigned int (*suspend_prepare)(void);
+	unsigned int (*set_standby_status)(u32 arg0, u32 arg1, u32 arg2,
+			u32 arg3);
+	unsigned int (*get_cp15_status)(void *addr);
+	unsigned int (*resume_hdcp_key)(void);
+};
+
+/* Global pointer for current firmware_secure_ops structure, can't be NULL. */
+extern const struct firmware_secure_ops *firmware_secure_ops;
+
+/*
+ * call_firmware_op(op, ...)
+ *
+ * Checks if firmware operation is present and calls it,
+ * otherwise returns -ENOSYS
+ */
+#define call_firmware_secure_op(op, ...) \
+	((firmware_secure_ops->op) ? firmware_secure_ops->op(__VA_ARGS__) \
+	 : (-ENOSYS))
+
+/*
+ * register_firmware_secure_ops(ops)
+ *
+ * A function to register platform firmware_secure_ops struct.
+ */
+static inline void register_firmware_secure_ops(
+		const struct firmware_secure_ops *ops)
+{
+	BUG_ON(!ops);
+
+	firmware_secure_ops = ops;
+}
 #endif

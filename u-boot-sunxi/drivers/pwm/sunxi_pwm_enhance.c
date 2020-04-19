@@ -25,6 +25,7 @@
 #include <fdt_support.h>
 #include <div64.h>
 #include <malloc.h>
+#include<clk/clk.h>
 
 #define sys_get_wvalue(n)   (*((volatile uint *)(n)))          /* word input */
 #define sys_put_wvalue(n,c) (*((volatile uint *)(n))  = (c))   /* word output */
@@ -55,6 +56,13 @@ user_gpio_set_t pwm_gpio_info[PWM_NUM][2];
             (((reg) & SETMASK(width, shift)) >> (shift))
 #define SET_BITS(shift, width, reg, val) \
             (((reg) & CLRMASK(width, shift)) | (val << (shift)))
+
+#if ((defined CONFIG_ARCH_SUN8IW12P1) ||\
+		(defined CONFIG_ARCH_SUN8IW17P1) ||\
+		(defined CONFIG_ARCH_SUN50IW6P1) ||\
+		(defined CONFIG_ARCH_SUN50IW3P1))
+#define CLK_GATE_SUPPORT
+#endif
 
 struct sunxi_pwm_cfg {
 	unsigned int reg_peci_offset;
@@ -150,7 +158,10 @@ struct sunxi_pwm_chip {
 	unsigned int            base;
 	int                     pwm;
 	int 			pwm_base;
-	struct sunxi_pwm_cfg    *config;
+	struct sunxi_pwm_cfg *config;
+#ifdef CLK_GATE_SUPPORT
+	struct clk *pwm_clk;
+#endif
 };
 
 static LIST_HEAD(pwm_list);
@@ -516,7 +527,7 @@ static int sunxi_pwm_enable(struct sunxi_pwm_chip *pchip)
 	u32 value = 0, base = 0, pwm = 0;
 	unsigned int reg_offset, reg_shift, reg_width;
 	struct sunxi_pwm_chip *pc = pchip;
-	char pin_name[5];
+	char pin_name[8];
 
 	base = pc->pwm_base;
 	pwm = pchip->pwm;
@@ -552,7 +563,7 @@ static void sunxi_pwm_disable(struct sunxi_pwm_chip *pchip)
 	u32 value = 0, base = 0, pwm = 0;
 	unsigned int reg_offset, reg_shift, reg_width;
 	struct sunxi_pwm_chip *pc = pchip;
-	char pin_name[5];
+	char pin_name[8];
 
 	base = pc->pwm_base;
 	pwm = pchip->pwm;
@@ -578,6 +589,9 @@ static void sunxi_pwm_disable(struct sunxi_pwm_chip *pchip)
 	else
 		sprintf(pin_name, "pwm%d", pwm);
 	sunxi_pwm_pin_set_state(pin_name, PWM_PIN_STATE_SLEEP);
+#if defined CLK_GATE_SUPPORT
+	clk_disable(pchip->pwm_clk);
+#endif
 }
 
 struct pwm_ops {
@@ -707,6 +721,18 @@ int pwm_request(int pwm, const char *label)
 		printf("fdt_getprop_u32 %s.%s fail\n", main_name, sub_name);
 		return -1;
 	}
+#if defined(CLK_GATE_SUPPORT)
+	pchip->pwm_clk = clk_get(NULL, "pwm");
+	if (pchip->pwm_clk == NULL) {
+		printf("%s: can't get pwm clk\n", __func__);
+		return -1;
+	}
+	ret = clk_prepare_enable(pchip->pwm_clk);
+	if (ret) {
+		printf("failed to enable pwm clock\n");
+		return -1;
+	}
+#endif
 
 
 	/* pwm is included is in pwm area.*/
@@ -768,26 +794,25 @@ int pwm_request(int pwm, const char *label)
 	sub_node = fdt_node_offset_by_phandle(working_fdt,handle[pwm-pwm_base]);
 	if(sub_node < 0) {
 		printf("%s:%d: error:get property by handle error\n",__func__, __LINE__);
-		return -1;
+		goto err_pwm;
 	}
 
 	pchip->config = (struct sunxi_pwm_cfg*) malloc(sizeof(struct sunxi_pwm_cfg));
 	if (!pchip->config) {
 		printf("%s: error:pwm chip malloc failed!\n",__func__);
-		return -1;
-	}else {
+		goto err_pwm;
+	} else
 		memset(pchip->config, 0, sizeof(struct sunxi_pwm_cfg));
-	}
+
 	pchip->pwm = pwm;
 	pchip->ops = &sunxi_pwm_ops;
 
 	ret = fdt_getprop_u32(working_fdt,sub_node,"reg_base",&pchip->base);
 	if (ret < 0) {
 		printf("%s: err: get reg-base err.\n", __func__);
-		return -1;
-	} else {
+		goto err_config;
+	} else
 		printf("%s: reg = 0x%x. pwm = %d.\n", __func__, pchip->base, pchip->pwm);
-	}
 
 	ret = sunxi_pwm_get_config(sub_node, pchip->config);
 
@@ -796,5 +821,12 @@ int pwm_request(int pwm, const char *label)
 	printf("request pwm success, pwm = %d.\n", pwm);
 
 	return pwm;
+
+err_config:
+	free(pchip->config);
+err_pwm:
+	free(pchip);
+	return -1;
+
 }
 

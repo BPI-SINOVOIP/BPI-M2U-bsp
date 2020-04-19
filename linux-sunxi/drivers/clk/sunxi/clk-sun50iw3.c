@@ -54,7 +54,7 @@ SUNXI_CLK_FACTORS(pll_video0,     8,  8,  0,  0,  0,  0,  0,  0,  1,  1,  0,  0,
 SUNXI_CLK_FACTORS(pll_video1,     8,  8,  0,  0,  0,  0,  0,  0,  1,  1,  0,  0,    0,    0,  0,      31,     24,     0,      PLL_VIDEO1PAT0, 0xd1303333);
 SUNXI_CLK_FACTORS(pll_ve,         8,  8,  0,  0,  0,  0,  0,  0,  1,  1,  0,  1,    0,    0,  0,      31,     24,     0,      PLL_VEPAT0,     0xd1303333);
 SUNXI_CLK_FACTORS(pll_de,         8,  8,  0,  0,  0,  0,  0,  0,  1,  1,  0,  1,    0,    0,  0,      31,     24,     0,      PLL_DEPAT0,     0xd1303333);
-SUNXI_CLK_FACTORS(pll_audio,      8,  8,  0,  0,  0,  0,  16, 6,  1,  1,  0,  1,    0,    0,  0,      31,     24,     0,      PLL_AUDIOPAT0,  0xd1303333);
+SUNXI_CLK_FACTORS(pll_audio,      8,  8,  0,  0,  0,  0,  16, 6,  1,  1,  0,  1,    0,    0,  0,      31,     24,     1,      PLL_AUDIOPAT0,  0xc00121ff);
 
 static int get_factors_pll_cpu(u32 rate, u32 parent_rate,
 		struct clk_factors_value *factor)
@@ -246,24 +246,6 @@ static int get_factors_pll_de(u32 rate, u32 parent_rate,
 	return 0;
 }
 
-static int get_factors_pll_audio(u32 rate, u32 parent_rate,
-		struct clk_factors_value *factor)
-{
-	u64 tmp_rate;
-	int index;
-
-	if (!factor)
-		return -1;
-
-	tmp_rate = rate > pllaudio_max ? pllaudio_max : rate;
-	do_div(tmp_rate, 1000000);
-	index = tmp_rate;
-
-	if (FACTOR_SEARCH(audio))
-		return -1;
-
-	return 0;
-}
 
 /*    pll_cpux: 24*N/M/P (P=2^factorp)  */
 static unsigned long calc_rate_pll_cpu(u32 parent_rate,
@@ -285,13 +267,13 @@ static unsigned long calc_rate_pll_ddr(u32 parent_rate,
 	return (unsigned long)tmp_rate;
 }
 
-/*    pll_periph0/pll_periph1: 24*N/D1/D2/2    */
+/*    pll_periph0/pll_periph1: 24*N/D1/D2/4    */
 static unsigned long calc_rate_pll_periph(u32 parent_rate,
 		struct clk_factors_value *factor)
 {
 	u64 tmp_rate = (parent_rate ? parent_rate : 24000000);
 	tmp_rate = tmp_rate * (factor->factorn + 1);
-	do_div(tmp_rate, 2 * (factor->factord1 + 1) * (factor->factord2 + 1));
+	do_div(tmp_rate, 4 * (factor->factord1 + 1) * (factor->factord2 + 1));
 	return (unsigned long)tmp_rate;
 }
 
@@ -306,6 +288,7 @@ static unsigned long calc_rate_video(u32 parent_rate,
 }
 
 /*    pll_media: 24*N/D1/D2    */
+/*	media include VE, DE, GPU*/
 static unsigned long calc_rate_media(u32 parent_rate,
 		struct clk_factors_value *factor)
 {
@@ -327,25 +310,60 @@ static unsigned long calc_rate_audio(u32 parent_rate,
 		struct clk_factors_value *factor)
 {
 	u64 tmp_rate = (parent_rate ? parent_rate : 24000000);
-	tmp_rate = tmp_rate * (factor->factorn + 1);
-	do_div(tmp_rate, (factor->factord1 + 1) * (factor->factord2 + 1) * (factor->factorp + 1));
-	return (unsigned long)tmp_rate;
+	if ((factor->factorn == 21) &&
+			(factor->factorp == 11) &&
+			(factor->factord1 == 0) &&
+			(factor->factord2 == 1))
+		return 22579200;
+	else if ((factor->factorn == 23) &&
+			(factor->factorp == 11) &&
+			(factor->factord1 == 0) &&
+			(factor->factord2 == 1))
+		return 24576000;
+	else {
+		tmp_rate = tmp_rate * (factor->factorn + 1);
+		do_div(tmp_rate, ((factor->factorp + 1) *
+				(factor->factord1 + 1) *
+				(factor->factord2 + 1)));
+		return (unsigned long)tmp_rate;
+	}
+}
+
+static int get_factors_pll_audio(u32 rate, u32 parent_rate,
+		struct clk_factors_value *factor)
+{
+	if (rate == 22579200) {
+		factor->factorn = 21;
+		factor->factorp = 11;
+		factor->factord1 = 0;
+		factor->factord2 = 1;
+		sunxi_clk_factor_pll_audio.sdmval = 0xC001288D;
+	} else if (rate == 24576000) {
+		factor->factorn = 23;
+		factor->factorp = 11;
+		factor->factord1 = 0;
+		factor->factord2 = 1;
+		sunxi_clk_factor_pll_audio.sdmval = 0xC00126E9;
+	} else
+		return -1;
+
+	return 0;
 }
 
 static const char *hosc_parents[] = {"hosc"};
 struct factor_init_data sunxi_factos[] = {
 	/* name         parent        parent_num, flags                                      reg          lock_reg     lock_bit     pll_lock_ctrl_reg lock_en_bit lock_mode           config                         get_factors               calc_rate              priv_ops*/
-	{"pll_cpu",     hosc_parents, 1,          CLK_GET_RATE_NOCACHE, PLL_CPU,     PLL_CPU,     LOCKBIT(28), PLL_CPU,     29,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_cpu,     &get_factors_pll_cpu,     &calc_rate_pll_cpu,    (struct clk_ops *)NULL},
-	{"pll_ddr0",    hosc_parents, 1,          CLK_GET_RATE_NOCACHE, PLL_DDR0,    PLL_DDR0,    LOCKBIT(28), PLL_DDR0,    29,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_ddr0,    &get_factors_pll_ddr0,    &calc_rate_pll_ddr,    (struct clk_ops *)NULL},
-	{"pll_ddr1",    hosc_parents, 1,          CLK_GET_RATE_NOCACHE, PLL_DDR1,    PLL_DDR1,    LOCKBIT(28), PLL_DDR1,    29,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_ddr1,    &get_factors_pll_ddr1,    &calc_rate_pll_ddr,    (struct clk_ops *)NULL},
-	{"pll_periph0", hosc_parents, 1,          0,                    PLL_PERIPH0, PLL_PERIPH0, LOCKBIT(28), PLL_PERIPH0, 29,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_periph0, &get_factors_pll_periph0, &calc_rate_pll_periph, (struct clk_ops *)NULL},
-	{"pll_periph1", hosc_parents, 1,          0,                    PLL_PERIPH1, PLL_PERIPH1, LOCKBIT(28), PLL_PERIPH1, 29,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_periph1, &get_factors_pll_periph1, &calc_rate_pll_periph, (struct clk_ops *)NULL},
-	{"pll_gpu",     hosc_parents, 1,          0,                    PLL_GPU,     PLL_GPU,     LOCKBIT(28), PLL_GPU,     29,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_gpu,     &get_factors_pll_gpu,     &calc_rate_media,      (struct clk_ops *)NULL},
-	{"pll_video0",  hosc_parents, 1,          0,                    PLL_VIDEO0,  PLL_VIDEO0,  LOCKBIT(28), PLL_VIDEO0,  29,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_video0,  &get_factors_pll_video0,  &calc_rate_video,      (struct clk_ops *)NULL},
-	{"pll_video1",  hosc_parents, 1,          0,                    PLL_VIDEO1,  PLL_VIDEO1,  LOCKBIT(28), PLL_VIDEO1,  29,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_video1,  &get_factors_pll_video1,  &calc_rate_video,      (struct clk_ops *)NULL},
-	{"pll_ve",      hosc_parents, 1,          0,                    PLL_VE,      PLL_VE,      LOCKBIT(28), PLL_VE,      29,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_ve,      &get_factors_pll_ve,      &calc_rate_media,      (struct clk_ops *)NULL},
-	{"pll_de",      hosc_parents, 1,          0,                    PLL_DE,      PLL_DE,      LOCKBIT(28), PLL_DE,      29,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_de,      &get_factors_pll_de,      &calc_rate_media,      (struct clk_ops *)NULL},
-	{"pll_audio",   hosc_parents, 1,          0,                    PLL_AUDIO,   PLL_AUDIO,   LOCKBIT(28), PLL_AUDIO,   29,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_audio,   &get_factors_pll_audio,   &calc_rate_audio,      (struct clk_ops *)NULL},
+	{"pll_cpu",     hosc_parents, 1,          CLK_GET_RATE_NOCACHE|CLK_IGNORE_ENABLE_DISABLE, PLL_CPU,     PLL_CPU,     LOCKBIT(28), PLL_CPU,     29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_cpu,     &get_factors_pll_cpu,     &calc_rate_pll_cpu,    (struct clk_ops *)NULL},
+	{"pll_ddr0",    hosc_parents, 1,          CLK_GET_RATE_NOCACHE|CLK_IGNORE_ENABLE_DISABLE, PLL_DDR0,    PLL_DDR0,    LOCKBIT(28), PLL_DDR0,    29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_ddr0,    &get_factors_pll_ddr0,    &calc_rate_pll_ddr,    (struct clk_ops *)NULL},
+	{"pll_ddr1",    hosc_parents, 1,          CLK_GET_RATE_NOCACHE|CLK_IGNORE_ENABLE_DISABLE, PLL_DDR1,    PLL_DDR1,    LOCKBIT(28), PLL_DDR1,    29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_ddr1,    &get_factors_pll_ddr1,    &calc_rate_pll_ddr,    (struct clk_ops *)NULL},
+	{"pll_periph0", hosc_parents, 1,          CLK_IGNORE_ENABLE_DISABLE,                    PLL_PERIPH0, PLL_PERIPH0, LOCKBIT(28), PLL_PERIPH0, 29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_periph0, &get_factors_pll_periph0, &calc_rate_pll_periph, (struct clk_ops *)NULL},
+	{"pll_periph1", hosc_parents, 1,          CLK_IGNORE_ENABLE_DISABLE,                    PLL_PERIPH1, PLL_PERIPH1, LOCKBIT(28), PLL_PERIPH1, 29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_periph1, &get_factors_pll_periph1, &calc_rate_pll_periph, (struct clk_ops *)NULL},
+	{"pll_gpu",     hosc_parents, 1,          CLK_IGNORE_ENABLE_DISABLE,                    PLL_GPU,     PLL_GPU,     LOCKBIT(28), PLL_GPU,     29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_gpu,     &get_factors_pll_gpu,     &calc_rate_media,      (struct clk_ops *)NULL},
+	{"pll_video0",  hosc_parents, 1,          CLK_IGNORE_ENABLE_DISABLE,                    PLL_VIDEO0,  PLL_VIDEO0,  LOCKBIT(28), PLL_VIDEO0,  29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_video0,  &get_factors_pll_video0,  &calc_rate_video,      (struct clk_ops *)NULL},
+	{"pll_video1",  hosc_parents, 1,          CLK_IGNORE_ENABLE_DISABLE,                    PLL_VIDEO1,  PLL_VIDEO1,  LOCKBIT(28), PLL_VIDEO1,  29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_video1,  &get_factors_pll_video1,  &calc_rate_video,      (struct clk_ops *)NULL},
+	{"pll_ve",      hosc_parents, 1,          CLK_IGNORE_ENABLE_DISABLE,                    PLL_VE,      PLL_VE,      LOCKBIT(28), PLL_VE,      29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_ve,      &get_factors_pll_ve,      &calc_rate_media,      (struct clk_ops *)NULL},
+	{"pll_de",      hosc_parents, 1,          CLK_IGNORE_ENABLE_DISABLE,                    PLL_DE,      PLL_DE,      LOCKBIT(28), PLL_DE,      29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_de,      &get_factors_pll_de,      &calc_rate_media,      (struct clk_ops *)NULL},
+	{"pll_audio",   hosc_parents, 1,          CLK_IGNORE_ENABLE_DISABLE,                    PLL_AUDIO,   PLL_AUDIO,   LOCKBIT(28), PLL_AUDIO,   29,          PLL_LOCK_NEW_MODE, &sunxi_clk_factor_pll_audio,   &get_factors_pll_audio,   &calc_rate_audio,      (struct clk_ops *)NULL},
 };
 
 static const char *cpu_parents[] = {"hosc", "losc", "iosc", "pll_cpu"};
@@ -357,7 +375,7 @@ static const char *ahb2_parents[] = {"psi"};
 static const char *ahb3_parents[] = {"hosc", "losc", "psi", "pll_periph0"};
 static const char *apb1_parents[] = {"hosc", "losc", "psi", "pll_periph0"};
 static const char *apb2_parents[] = {"hosc", "losc", "psi", "pll_periph0"};
-static const char *mbus_parents[] = {"hosc", "pll_periph0x2", "pll_ddr0", "pll_ddr1"};
+static const char *mbus_parents[] = {"hosc", "pll_periph0x2", "pll_ddr0", "pll_periph0x4"};
 static const char *de_parents[] = {"pll_de", "pll_periph0x2"};
 static const char *gpu_parents[] = {"pll_gpu", ""};
 static const char *ce_parents[] = {"hosc", "pll_periph0x2"};
@@ -370,15 +388,16 @@ static const char *apb1mod_parents[] = {"apb1"};
 static const char *apb2mod_parents[] = {"apb2"};
 static const char *sdram_parents[] = {"pll_ddr0", "pll_ddr1", "", ""};
 static const char *nand_parents[] = {"hosc", "pll_periph0", "pll_periph1", "pll_periph0x2", "pll_periph1x2", "", "", ""};
-static const char *smhc_parents[] = {"hosc", "pll_periph0x2", "pll_periph1x2", ""};
+static const char *smhc_parents[] = {"hosc", "pll_periph0x2", "pll_periph1x2", "", "", "", "", ""};
 static const char *spi_parents[] = {"hosc", "pll_periph0", "pll_periph1", "pll_periph0x2", "pll_periph1x2", "", "", ""};
 static const char *audio_parents[] = {"pll_audio", "pll_audiox2", "pll_audiox4", ""};
 static const char *usbohci_12m_parents[] = {"osc48md4", "hoscd2", "losc", ""};
 static const char *mipi_dphy_parents[] = {"pll_video0", "pll_video0x4", "pll_video1", ""};
 static const char *mipi_host_parents[] = {"pll_periph0", "pll_periph0x2", "hosc", ""};
 static const char *tcon_lcd_parents[] = {"pll_video0", "pll_video0x4", "pll_video1", "", "", "", "", ""};
+static const char *lvds0_parents[] = {"tcon_lcd0"};
 static const char *csi_top_parents[] = {"pll_video0", "", "pll_ve", "pll_periph0", "", "", "", ""};
-static const char *csi_master_parents[] = {"hosc", "pll_video0", "pll_periph0", "pll_periph0", "", "", "", ""};
+static const char *csi_master_parents[] = {"hosc", "pll_video0", "pll_periph0", "pll_periph1", "", "", "", ""};
 static const char *cpurcpus_pll_parents[] = {"pll_periph0"};
 static const char *cpurcpus_parents[] = {"hosc", "losc", "iosc", "cpurcpus_pll"};
 static const char *cpurahbs_parents[] = {"cpurcpus"};
@@ -387,6 +406,7 @@ static const char *cpurapbs2_pll_parents[] = {"pll_periph0"};
 static const char *cpurapbs2_parents[] = {"hosc", "losc", "iosc", "cpurapbs2_pll"};
 static const char *cpurpio_parents[] = {"cpurapbs1"};
 static const char *losc_parents[] = {"losc"};
+static const char *spwm_parents[] = {"hosc"};
 
 struct sunxi_clk_comgate com_gates[] = {
 {"nand",    0, 0x3, BUS_GATE_SHARE|RST_GATE_SHARE|MBUS_GATE_SHARE, 0},
@@ -430,7 +450,7 @@ SUNXI_CLK_PERIPH(nand1,          NAND1_CFG,       24,      3,            NAND1_C
 SUNXI_CLK_PERIPH(sdmmc0_mod,     SMHC0_CFG,       24,      2,            SMHC0_CFG,          0,         4,          8,          2,          0,          SMHC0_CFG,       0,              0,                 0,          31,         0,          0,             0,             &clk_lock, NULL,             0);
 SUNXI_CLK_PERIPH(sdmmc0_rst,     0,               0,       0,            0,                  0,         0,          0,          0,          0,          0,               SMHC_GATE,      0,                 0,          0,          16,         0,             0,             &clk_lock, NULL,             0);
 SUNXI_CLK_PERIPH(sdmmc0_bus,     0,               0,       0,            0,                  0,         0,          0,          0,          0,          0,               0,              SMHC_GATE,         0,          0,          0,         0,             0,             &clk_lock, NULL,             0);
-SUNXI_CLK_PERIPH(sdmmc1_mod,     SMHC1_CFG,       24,      2,            SMHC0_CFG,          0,         4,          8,          2,          0,          SMHC1_CFG,       0,              0,                 0,          31,         0,          0,             0,             &clk_lock, NULL,             0);
+SUNXI_CLK_PERIPH(sdmmc1_mod,     SMHC1_CFG,       24,      2,            SMHC1_CFG,          0,         4,          8,          2,          0,          SMHC1_CFG,       0,              0,                 0,          31,         0,          0,             0,             &clk_lock, NULL,             0);
 SUNXI_CLK_PERIPH(sdmmc1_rst,     0,               0,       0,            0,                  0,         0,          0,          0,          0,          0,               SMHC_GATE,      0,                 0,          0,          17,         0,             0,             &clk_lock, NULL,             0);
 SUNXI_CLK_PERIPH(sdmmc1_bus,     0,               0,       0,            0,                  0,         0,          0,          0,          0,          0,               0,              SMHC_GATE,         0,          0,          0,          1,             0,             &clk_lock, NULL,             0);
 SUNXI_CLK_PERIPH(sdmmc2_mod,     SMHC2_CFG,       24,      2,            SMHC2_CFG,          0,         4,          8,          2,          0,          SMHC2_CFG,       0,              0,                 0,          31,         0,          0,             0,             &clk_lock, NULL,             0);
@@ -471,6 +491,7 @@ SUNXI_CLK_PERIPH(mipi_host1,     MIPI_HOST1_CFG,  24,      2,            MIPI_HO
 SUNXI_CLK_PERIPH(display_top,    0,               0,       0,            0,                  0,         0,          0,          0,          0,          0,               DISPLAY_TOP_GATE, DISPLAY_TOP_GATE, 0,         0,          16,         0,            0,              &clk_lock, NULL,             0);
 SUNXI_CLK_PERIPH(tcon_lcd0,      TCON_LCD0_CFG,   24,      3,            0,                  0,         0,          0,          0,          0,          TCON_LCD0_CFG,   TCON_LCD_GATE,   TCON_LCD_GATE, 0,             31,         16,         0,             0,             &clk_lock, NULL,             0);
 SUNXI_CLK_PERIPH(tcon_lcd1,      TCON_LCD1_CFG,   24,      3,            0,                  0,         0,          0,          0,          0,          TCON_LCD1_CFG,   TCON_LCD_GATE,   TCON_LCD_GATE, 0,             31,         17,         1,             0,             &clk_lock, NULL,             0);
+SUNXI_CLK_PERIPH(lvds0,                      0,    0,      0,            0,                  0,         0,          0,          0,          0,                      0,       LVDS_GATE,               0, 0,              0,         16,         0,             0,             &clk_lock, NULL,             0);
 SUNXI_CLK_PERIPH(edp,            EDP_CFG,         0,       0,            0,                  0,         0,          0,          0,          0,          EDP_CFG,         EDP_GATE,        EDP_GATE,      0,             31,         16,         0,             0,             &clk_lock, NULL,             0);
 SUNXI_CLK_PERIPH(csi_misc,       0,               0,       0,            0,                  0,         0,          0,          0,          0,          CSI_MISC_CFG,    CSI_GATE,        CSI_GATE,      MBUS_GATE,     0,          16,         0,             8,             &clk_lock, &com_gates[4],    0);
 SUNXI_CLK_PERIPH(csi_top,        CSI_TOP_CFG,     24,      3,            CSI_TOP_CFG,        0,         4,          0,          0,          0,          CSI_TOP_CFG,     CSI_GATE,        CSI_GATE,      MBUS_GATE,     31,         16,         0,             8,             &clk_lock, &com_gates[4],    1);
@@ -484,6 +505,7 @@ SUNXI_CLK_PERIPH(cpurapbs2_pll,  0,               0,       0,            CPUS_AP
 SUNXI_CLK_PERIPH(cpurapbs2,      CPUS_APBS2_CFG,  24,      2,            CPUS_APBS2_CFG,     0,         0,          8,          2,          0,          0,               0,               0,             0,             0,          0,          0,             0,             &clk_lock, NULL,             0);
 SUNXI_CLK_PERIPH(losc_out,       0,               0,       0,            0,                  0,         0,          0,          0,          0,          0,               0,               LOSC_OUT_GATE, 0,             0,          0,          0,             0,             &clk_lock, NULL,             0);
 SUNXI_CLK_PERIPH(cpurpio,        0,               0,       0,            0,                  0,         0,          0,          0,          0,          0,               0,               0,             0,             0,          0,          0,             0,             &clk_lock, NULL,             0);
+SUNXI_CLK_PERIPH(spwm,           0,               0,       0,            0,                  0,         0,          0,          0,          0,          0,               CPUS_PWM_GATE,   CPUS_PWM_GATE, 0,             0,          16,         0,             0,             &clk_lock, NULL,             0);
 
 struct periph_init_data sunxi_periphs_init[] = {
 	{"cpu",            CLK_GET_RATE_NOCACHE, cpu_parents,            ARRAY_SIZE(cpu_parents),            &sunxi_clk_periph_cpu              },
@@ -539,9 +561,9 @@ struct periph_init_data sunxi_periphs_init[] = {
 	{"i2s0",           0,                    audio_parents,          ARRAY_SIZE(audio_parents),          &sunxi_clk_periph_i2s0             },
 	{"i2s1",           0,                    audio_parents,          ARRAY_SIZE(audio_parents),          &sunxi_clk_periph_i2s1             },
 	{"i2s2",           0,                    audio_parents,          ARRAY_SIZE(audio_parents),          &sunxi_clk_periph_i2s2             },
-	{"dmic",           0,                    audio_parents,          ARRAY_SIZE(audio_parents),          &sunxi_clk_periph_codec_1x         },
-	{"codec_1x",       0,                    audio_parents,          ARRAY_SIZE(audio_parents),          &sunxi_clk_periph_codec_4x         },
-	{"codec_4x",       0,                    audio_parents,          ARRAY_SIZE(audio_parents),          &sunxi_clk_periph_dmic             },
+	{"dmic",           0,                    audio_parents,          ARRAY_SIZE(audio_parents),          &sunxi_clk_periph_dmic             },
+	{"codec_1x",       0,                    audio_parents,          ARRAY_SIZE(audio_parents),          &sunxi_clk_periph_codec_1x         },
+	{"codec_4x",       0,                    audio_parents,          ARRAY_SIZE(audio_parents),          &sunxi_clk_periph_codec_4x         },
 	{"usbphy0",        0,                    hosc_parents,           ARRAY_SIZE(hosc_parents),           &sunxi_clk_periph_usbphy0          },
 	{"usbphy1",        0,                    hosc_parents,           ARRAY_SIZE(hosc_parents),           &sunxi_clk_periph_usbphy1          },
 	{"usbohci0",       0,                    ahb3mod_parents,        ARRAY_SIZE(ahb3mod_parents),        &sunxi_clk_periph_usbohci0         },
@@ -558,6 +580,7 @@ struct periph_init_data sunxi_periphs_init[] = {
 	{"display_top",    0,                    ahb3mod_parents,        ARRAY_SIZE(ahb3mod_parents),        &sunxi_clk_periph_display_top      },
 	{"tcon_lcd0",      0,                    tcon_lcd_parents,       ARRAY_SIZE(tcon_lcd_parents),       &sunxi_clk_periph_tcon_lcd0        },
 	{"tcon_lcd1",      0,                    tcon_lcd_parents,       ARRAY_SIZE(tcon_lcd_parents),       &sunxi_clk_periph_tcon_lcd1        },
+	{"lvds0",          0,                    lvds0_parents,          ARRAY_SIZE(lvds0_parents),          &sunxi_clk_periph_lvds0            },
 	{"edp",            0,                    hosc_parents,           ARRAY_SIZE(hosc_parents),           &sunxi_clk_periph_edp              },
 	{"csi_misc",       0,                    hosc_parents,           ARRAY_SIZE(hosc_parents),           &sunxi_clk_periph_csi_misc         },
 	{"csi_top",        0,                    csi_top_parents,        ARRAY_SIZE(csi_top_parents),        &sunxi_clk_periph_csi_top          },
@@ -574,6 +597,7 @@ struct periph_init_data sunxi_periphs_cpus_init[] = {
 	{"cpurapbs2",       CLK_GET_RATE_NOCACHE|CLK_READONLY,  cpurapbs2_parents,      ARRAY_SIZE(cpurapbs2_parents),      &sunxi_clk_periph_cpurapbs2     },
 	{"losc_out",        0,                                  losc_parents,           ARRAY_SIZE(losc_parents),           &sunxi_clk_periph_losc_out      },
 	{"cpurpio",         CLK_GET_RATE_NOCACHE|CLK_READONLY,  cpurpio_parents,        ARRAY_SIZE(cpurpio_parents),        &sunxi_clk_periph_cpurpio       },
+	{"spwm",            0,                                  spwm_parents,           ARRAY_SIZE(spwm_parents),           &sunxi_clk_periph_spwm          },
 };
 
 /**

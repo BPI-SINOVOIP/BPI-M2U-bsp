@@ -62,7 +62,7 @@ static int dmam_match(struct device *dev, void *res, void *match_data)
  * RETURNS:
  * Pointer to allocated memory on success, NULL on failure.
  */
-void * dmam_alloc_coherent(struct device *dev, size_t size,
+void *dmam_alloc_coherent(struct device *dev, size_t size,
 			   dma_addr_t *dma_handle, gfp_t gfp)
 {
 	struct dma_devres *dr;
@@ -309,7 +309,12 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
 	void *ptr;
 	unsigned long pfn;
 
-	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
+	pages = kmalloc(sizeof(struct page *) << get_order(size),
+			GFP_KERNEL | __GFP_NOWARN);
+
+	if (!pages)
+		pages = vmalloc(sizeof(struct page *) << get_order(size));
+
 	if (!pages)
 		return NULL;
 
@@ -318,12 +323,14 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
 
 	ptr = dma_common_pages_remap(pages, size, vm_flags, prot, caller);
 
-	kfree(pages);
+	kvfree(pages);
 
 	return ptr;
 }
 
 /*
+	area->pages = pages;
+
  * unmaps a range previously mapped by dma_common_*_remap
  */
 void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
@@ -331,7 +338,8 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
 	struct vm_struct *area = find_vm_area(cpu_addr);
 
 	if (!area || (area->flags & vm_flags) != vm_flags) {
-		WARN(1, "trying to free invalid coherent area: %p\n", cpu_addr);
+		WARN(1, "trying to free invalid coherent area: %p\n",
+			cpu_addr);
 		return;
 	}
 

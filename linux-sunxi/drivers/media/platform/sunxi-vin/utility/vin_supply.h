@@ -1,17 +1,14 @@
 /*
- ******************************************************************************
+ * for modules (sensor/actuator/flash) power supply helper.
  *
- * vin_supply.h
+ * Copyright (c) 2017 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
  *
- * Hawkview ISP - vin_supply.h module
+ * Authors:  Zhao Wei <zhaowei@allwinnertech.com>
+ *	Yang Feng <yangfeng@allwinnertech.com>
  *
- * Copyright (c) 2015 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
- *
- * Version		  Author         Date		    Description
- *
- *   3.0		  Yang Feng   	2015/12/02	ISP Tuning Tools Support
- *
- ******************************************************************************
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 
 #ifndef __VIN__SUBDEV__H__
@@ -30,6 +27,8 @@ enum gpio_type {
 	POWER_EN = 0,
 	PWDN,
 	RESET,
+	SM_HS,
+	SM_VS,
 	AF_PWDN,
 	FLASH_EN,
 	FLASH_MODE,
@@ -41,6 +40,7 @@ enum gpio_fun {
 	GPIO_OUTPUT = 1,
 	GPIO_DISABLE = 7,
 };
+
 enum on_off {
 	OFF,
 	ON,
@@ -53,16 +53,16 @@ enum power_seq_cmd {
 	STBY_ON = 3,
 };
 
-extern struct vin_core *sd_to_vin_core(struct v4l2_subdev *sd);
+extern struct modules_config *sd_to_modules(struct v4l2_subdev *sd);
 extern int vin_set_pmu_channel(struct v4l2_subdev *sd,
-			       enum pmic_channel pmic_ch,
-			       enum on_off on_off);
+			enum pmic_channel pmic_ch, enum on_off on_off);
 extern int vin_set_mclk(struct v4l2_subdev *sd, enum on_off on_off);
 extern int vin_set_mclk_freq(struct v4l2_subdev *sd, unsigned long freq);
-extern int vin_gpio_write(struct v4l2_subdev *sd, enum gpio_type gpio_type,
-			  unsigned int status);
+extern int vin_set_sync_mclk(struct v4l2_subdev *sd, int id, unsigned long freq, enum on_off on_off);
+
+extern int vin_gpio_write(struct v4l2_subdev *sd,
+			enum gpio_type gpio_id, unsigned int status);
 extern int vin_gpio_set_status(struct v4l2_subdev *sd,
-			       enum gpio_type gpio_type,
-			       unsigned int status);
+			enum gpio_type gpio_id, unsigned int out_value);
 
 #endif	/*__VIN__SUBDEV__H__*/

@@ -1011,6 +1011,7 @@ static ulong mmc_write_blocks(struct mmc *mmc, lbaint_t start,
 		cmd.cmdarg = start * mmc->write_bl_len;
 
 	cmd.resp_type = MMC_RSP_R1;
+	cmd.flags = 0;
 
 	data.src = src;
 	data.blocks = blkcnt;

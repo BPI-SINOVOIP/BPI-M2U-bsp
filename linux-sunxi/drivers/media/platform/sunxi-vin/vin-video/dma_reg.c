@@ -34,17 +34,60 @@ int csic_dma_set_base_addr(unsigned int sel, unsigned long addr)
 }
 
 /* open module */
+
+int csic_dma_get_frame_cnt(unsigned int sel)
+{
+	unsigned int reg_val = vin_reg_readl(csic_dma_base[sel] + CSIC_DMA_FRM_CNT_REG_OFF);
+	return (reg_val & CSIC_DMA_FRM_CNT_MASK) >> CSIC_DMA_FRM_CNT;
+}
 void csic_dma_enable(unsigned int sel)
 {
 	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
 			CSIC_DMA_EN_MASK, 1 << CSIC_DMA_EN);
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
+			CSIC_DMA_TOP_EN_MASK, 1 << CSIC_DMA_TOP_EN);
 }
 
 void csic_dma_disable(unsigned int sel)
 {
 	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
 			CSIC_DMA_EN_MASK, 0 << CSIC_DMA_EN);
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
+			CSIC_DMA_TOP_EN_MASK, 0 << CSIC_DMA_TOP_EN);
 }
+
+void csic_fbc_enable(unsigned int sel)
+{
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
+			CSIC_FBC_EN_MASK, 1 << CSIC_FBC_EN);
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
+			CSIC_DMA_TOP_EN_MASK, 1 << CSIC_DMA_TOP_EN);
+}
+
+void csic_fbc_disable(unsigned int sel)
+{
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
+			CSIC_FBC_EN_MASK, 0 << CSIC_FBC_EN);
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
+			CSIC_DMA_TOP_EN_MASK, 0 << CSIC_DMA_TOP_EN);
+}
+
+void csic_frame_cnt_enable(unsigned int sel)
+{
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
+			CSIC_FRAME_CNT_EN_MASK, 1 << CSIC_FRAME_CNT_EN);
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
+			CSIC_DMA_TOP_EN_MASK, 1 << CSIC_DMA_TOP_EN);
+}
+
+void csic_frame_cnt_disable(unsigned int sel)
+{
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
+			CSIC_FRAME_CNT_EN_MASK, 0 << CSIC_FRAME_CNT_EN);
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
+			CSIC_DMA_TOP_EN_MASK, 0 << CSIC_DMA_TOP_EN);
+}
+
 void csic_dma_clk_cnt_en(unsigned int sel, unsigned int en)
 {
 	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_EN_REG_OFF,
@@ -120,6 +163,16 @@ void csic_dma_flip_size(unsigned int sel, struct dma_flip_size *flip_size)
 			VER_LEN_MASK, flip_size->ver_len << VER_LEN);
 }
 
+void csic_dma_line_cnt(unsigned int sel, int line)
+{
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_LINE_CNT_REG_OFF,
+			LINE_CNT_NUM_MASK, line);
+}
+void csic_dma_frm_cnt(unsigned int sel, struct csi_sync_ctrl *sync)
+{
+	vin_reg_clr_set(csic_dma_base[sel] + CSIC_DMA_FRM_CNT_REG_OFF,
+			CSIC_DMA_CLR_DIS_MASK, sync->dma_clr_dist<<CSIC_DMA_CLR_DIS);
+}
 void csic_dma_cap_status(unsigned int sel, struct dma_capture_status *status)
 {
 	unsigned int reg_val = vin_reg_readl(csic_dma_base[sel] + CSIC_DMA_CAP_STA_REG_OFF);
@@ -140,7 +193,7 @@ void csic_dma_int_get_status(unsigned int sel, struct dma_int_status *status)
 {
 	unsigned int reg_val = vin_reg_readl(csic_dma_base[sel] + CSIC_DMA_INT_STA_REG_OFF);
 	status->capture_done = (reg_val & CD_PD_MASK) >> CD_PD;
-	status->frame_done = (reg_val & FD_PD) >> FD_PD_MASK;
+	status->frame_done = (reg_val & FD_PD_MASK) >> FD_PD;
 	status->buf_0_overflow = (reg_val & FIFO0_OF_PD_MASK) >> FIFO0_OF_PD;
 	status->buf_1_overflow = (reg_val & FIFO1_OF_PD_MASK) >> FIFO1_OF_PD;
 	status->buf_2_overflow = (reg_val & FIFO2_OF_PD_MASK) >> FIFO2_OF_PD;

@@ -56,11 +56,17 @@
 #define	CTL_GEN_EN		1
 #if	defined(CONFIG_ARCH_SUN8IW1)
 #define	CTL_MCLKOUTEN		2
+#elif	defined(CONFIG_ARCH_SUN50IW6)
+#define CTL_MCLKOOUTEN		3
 #endif
-#if	defined(CONFIG_ARCH_SUN8IW10)
+#if	defined(CONFIG_ARCH_SUN8IW10) || \
+	defined(CONFIG_ARCH_SUN50IW6)
 #define	CTL_LOOP_EN		2
 #endif
-#if 	defined(CONFIG_ARCH_SUN8IW1) || \
+
+#if	defined(CONFIG_ARCH_SUN50IW6)
+#define	CTL_MCLKDIV		5
+#elif	defined(CONFIG_ARCH_SUN8IW1) || \
 	defined(CONFIG_ARCH_SUN8IW7) || \
 	defined(CONFIG_ARCH_SUN50I) || \
 	defined(CONFIG_ARCH_SUN8IW11)
@@ -87,7 +93,8 @@
 /* SUNXI_SPDIF_FIFO_CTL register */
 #define	FIFO_CTL_RXOM		0
 #define	FIFO_CTL_TXIM		2
-#if	defined(CONFIG_ARCH_SUN8IW10)
+#if	defined(CONFIG_ARCH_SUN8IW10) || \
+	defined(CONFIG_ARCH_SUN50IW6)
 #define	FIFO_CTL_RXTL		4
 #define	FIFO_CTL_TXTL		12
 #define	FIFO_CTL_FRX		29
@@ -108,7 +115,8 @@
 #else
 #define	FIFO_CTL_SRC		31
 #endif
-#if	defined(CONFIG_ARCH_SUN8IW10)
+#if	defined(CONFIG_ARCH_SUN8IW10) || \
+	defined(CONFIG_ARCH_SUN50IW6)
 #define	CTL_TXTL_MASK		255
 #define	CTL_RXTL_MASK		127	
 #else
@@ -118,7 +126,8 @@
 
 /* SUNXI_SPDIF_FIFO_STA register */
 #define	FIFO_STA_RXA_CNT	0
-#if	defined(CONFIG_ARCH_SUN8IW10)
+#if	defined(CONFIG_ARCH_SUN8IW10) || \
+	defined(CONFIG_ARCH_SUN50IW6)
 #define	FIFO_STA_RXA		15
 #define	FIFO_STA_TXA_CNT	16
 #define	FIFO_STA_TXE		31

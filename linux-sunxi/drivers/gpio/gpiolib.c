@@ -12,6 +12,7 @@
 #include <linux/of_gpio.h>
 #include <linux/idr.h>
 #include <linux/slab.h>
+#include <linux/sys_config.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/gpio.h>
@@ -2073,21 +2074,110 @@ EXPORT_SYMBOL_GPL(gpio_set_value_cansleep);
 
 #ifdef CONFIG_DEBUG_FS
 
+#define PINS_PER_BANK		32
+static int map_gpio_to_name(char *name, u32 gpio)
+{
+	char base;
+	int num;
+	num = gpio - SUNXI_PA_BASE;
+	if (num < 0)
+		goto map_fail;
+
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'A';
+		goto map_done;
+	}
+	num = gpio - SUNXI_PB_BASE;
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'B';
+		goto map_done;
+	}
+	num = gpio - SUNXI_PC_BASE;
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'C';
+		goto map_done;
+	}
+	num = gpio - SUNXI_PD_BASE;
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'D';
+		goto map_done;
+	}
+	num = gpio - SUNXI_PE_BASE;
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'E';
+		goto map_done;
+	}
+	num = gpio - SUNXI_PF_BASE;
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'F';
+		goto map_done;
+	}
+	num = gpio - SUNXI_PG_BASE;
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'G';
+		goto map_done;
+	}
+	num = gpio - SUNXI_PH_BASE;
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'H';
+		goto map_done;
+	}
+	num = gpio - SUNXI_PI_BASE;
+        if ((num >= 0) && (num < PINS_PER_BANK)) {
+                base = 'I';
+                goto map_done;
+        }
+	num = gpio - SUNXI_PJ_BASE;
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'J';
+		goto map_done;
+	}
+	num = gpio - SUNXI_PL_BASE;
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'L';
+		goto map_done;
+	}
+	num = gpio - SUNXI_PM_BASE;
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'M';
+		goto map_done;
+	}
+	num = gpio - AXP_PIN_BASE;
+	if ((num >= 0) && (num < PINS_PER_BANK)) {
+		base = 'X';
+		goto map_done;
+	}
+	goto map_fail;
+map_done:
+	sprintf(name, "P%c%d", base, num);
+	return 0;
+map_fail:
+	return -1;
+}
+
 static void gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
 {
 	unsigned		i;
 	unsigned		gpio = chip->base;
 	struct gpio_desc	*gdesc = &chip->desc[0];
 	int			is_out;
+	char gpio_name[16];
+	int ret;
 
 	for (i = 0; i < chip->ngpio; i++, gpio++, gdesc++) {
+
+		/* bpi, show all gpios
 		if (!test_bit(FLAG_REQUESTED, &gdesc->flags))
 			continue;
+		*/
+
+		/* bpi, show gpio name */
+		ret = map_gpio_to_name(gpio_name, gpio);
 
 		gpiod_get_direction(gdesc);
 		is_out = test_bit(FLAG_IS_OUT, &gdesc->flags);
-		seq_printf(s, " gpio-%-3d (%-20.20s) %s %s",
-			gpio, gdesc->label,
+		seq_printf(s, "%s gpio-%-3d (%-20.20s) %s %s",
+			gpio_name, gpio, gdesc->label,
 			is_out ? "out" : "in ",
 			chip->get
 				? (chip->get(chip, i) ? "hi" : "lo")

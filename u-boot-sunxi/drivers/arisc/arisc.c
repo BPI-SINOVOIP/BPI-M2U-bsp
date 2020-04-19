@@ -117,72 +117,14 @@ int arisc_dvfs_cfg_vf_table(void)
 
 static int sunxi_arisc_parse_cfg(void)
 {
-	u32 value[4] = {0, 0, 0};
+	u32 value[4] = {0, 0, 0, 0};
 	int nodeoffset;
-	uint32_t i;
-	char subkey[64];
-
-	/* parse arisc node */
-	//fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,sunxi-arisc");
-	nodeoffset = fdt_path_offset(working_fdt,"/soc/arisc");
-	if (IS_ERR_VALUE(nodeoffset)) {
-		ARISC_ERR("get [allwinner,sunxi-arisc] device node error\n");
-		return -EINVAL;
-	}
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "powchk_used", &dts_cfg.power.powchk_used))) {
-		ARISC_ERR("parse power powchk_used fail\n");
-		return -EINVAL;
-	}
-	ARISC_INF("powchk_used:0x%x\n", dts_cfg.power.powchk_used);
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "power_reg", &dts_cfg.power.power_reg))) {
-		ARISC_ERR("parse power power_reg fail\n");
-		return -EINVAL;
-	}
-	ARISC_INF("power_reg:0x%x\n", dts_cfg.power.power_reg);
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "system_power", &dts_cfg.power.system_power))) {
-		ARISC_ERR("parse power system_power fail\n");
-		return -EINVAL;
-	}
-	ARISC_INF("system_power:0x%x\n", dts_cfg.power.system_power);
-
 	/* parse arisc_space node */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "/soc/arisc_space");
 	nodeoffset = fdt_path_offset(working_fdt, "/soc/arisc_space");
 	if (IS_ERR_VALUE(nodeoffset)) {
 		ARISC_ERR("get [allwinner,arisc_space] device node error\n");
 		return -EINVAL;
 	}
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "space1", value))) {
-		ARISC_ERR("get arisc_space space1 error\n");
-		return -EINVAL;
-	}
-
-	dts_cfg.space.sram_dst = (phys_addr_t)value[0];
-	dts_cfg.space.sram_offset = (phys_addr_t)value[1];
-	dts_cfg.space.sram_size = (size_t)value[2];
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "space2", value))) {
-		ARISC_ERR("get arisc_space space2 error\n");
-		return -EINVAL;
-	}
-
-	dts_cfg.space.dram_dst = (phys_addr_t)value[0];
-	dts_cfg.space.dram_offset = (phys_addr_t)value[1];
-	dts_cfg.space.dram_size = (size_t)value[2];
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "space3", value))) {
-		ARISC_ERR("get arisc_space space3 error\n");
-		return -EINVAL;
-	}
-
-	dts_cfg.space.para_dst = (phys_addr_t)value[0];
-	dts_cfg.space.para_offset = (phys_addr_t)value[1];
-	dts_cfg.space.para_size = (size_t)value[2];
-
 	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "space4", value))) {
 		ARISC_ERR("get arisc_space space4 error\n");
 		return -EINVAL;
@@ -191,84 +133,10 @@ static int sunxi_arisc_parse_cfg(void)
 	dts_cfg.space.msgpool_dst = (phys_addr_t)value[0];
 	dts_cfg.space.msgpool_offset = (phys_addr_t)value[1];
 	dts_cfg.space.msgpool_size = (size_t)value[2];
-
-	ARISC_INF("arisc_space space1 sram_dst:0x%p, sram_offset:0x%p, sram_size:0x%zx, \n",
-		(void *)dts_cfg.space.sram_dst, (void *)dts_cfg.space.sram_offset, dts_cfg.space.sram_size);
-	ARISC_INF("arisc_space space2 dram_dst:0x%p, dram_offset:0x%p, dram_size:0x%zx, \n",
-		(void *)dts_cfg.space.dram_dst, (void *)dts_cfg.space.dram_offset, dts_cfg.space.dram_size);
-	ARISC_INF("arisc_space space3 para_dst:0x%p, para_offset:0x%p, para_size:0x%zx, \n",
-		(void *)dts_cfg.space.para_dst, (void *)dts_cfg.space.para_offset, dts_cfg.space.para_size);
 	ARISC_INF("arisc_space space4 msgpool_dst:0x%p, msgpool_offset:0x%p, msgpool_size:0x%zx, \n",
 		(void *)dts_cfg.space.msgpool_dst, (void *)dts_cfg.space.msgpool_offset, dts_cfg.space.msgpool_size);
 
-	/* parse standby_space node */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,standby_space");
-	nodeoffset = fdt_path_offset(working_fdt, "/soc/standby_space");
-	if (IS_ERR_VALUE(nodeoffset)) {
-		ARISC_ERR("get [allwinner,standby_space] device node error\n");
-		return -EINVAL;
-	}
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "space1", value))) {
-		ARISC_ERR("get standby_space space1 error\n");
-		return -EINVAL;
-	}
-
-	dts_cfg.space.standby_dst = (phys_addr_t)value[0];
-	dts_cfg.space.standby_offset = (phys_addr_t)value[1];
-	dts_cfg.space.standby_size = (size_t)value[2];
-
-	ARISC_INF("standby_space space1 standby_dst:0x%p, standby_offset:0x%p, standby_size:0x%zx, \n",
-		(void *)dts_cfg.space.standby_dst, (void *)dts_cfg.space.standby_offset, dts_cfg.space.standby_size);
-
-	/* parse image para */
-	#if 0
-	get_image_addr_size(&dts_cfg.image.base, &dts_cfg.image.size);
-	ARISC_INF("image base:0x%p, image size:0x%zx\n", (void *)dts_cfg.image.base, dts_cfg.image.size);
-	#endif
-	/* parse dram node */
-	memcpy((void *)&dts_cfg.dram_para, (void *)(uboot_spare_head.boot_data.dram_para), sizeof(dts_cfg.dram_para));
-
-	/* parse prcm node */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,prcm");
-	nodeoffset = fdt_path_offset(working_fdt,  "/prcm");
-	if (IS_ERR_VALUE(nodeoffset)) {
-		ARISC_ERR("get [allwinner,prcm] device node error\n");
-		return -EINVAL;
-	}
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "reg", value))) {
-		ARISC_ERR("get prcm reg error\n");
-		return -EINVAL;
-	}
-
-	dts_cfg.prcm.base = (phys_addr_t)value[1];
-	dts_cfg.prcm.size = (size_t)value[3];
-
-	ARISC_INF("prcm base:0x%p, size:0x%zx\n",
-		(void *)dts_cfg.prcm.base, dts_cfg.prcm.size);
-
-	/* parse cpuscfg node */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,cpuscfg");
-	nodeoffset = fdt_path_offset(working_fdt,  "/cpuscfg");
-	if (IS_ERR_VALUE(nodeoffset)) {
-		ARISC_ERR("get [allwinner,cpuscfg] device node error\n");
-		return -EINVAL;
-	}
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "reg", value))) {
-		ARISC_ERR("get cpuscfg reg error\n");
-		return -EINVAL;
-	}
-
-	dts_cfg.cpuscfg.base = (phys_addr_t)value[1];
-	dts_cfg.cpuscfg.size = (size_t)value[3];
-
-	ARISC_INF("cpuscfg base:0x%p, size:0x%zx\n",
-		(void *)dts_cfg.cpuscfg.base, dts_cfg.cpuscfg.size);
-
 	/* parse msgbox node */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,msgbox");
 	nodeoffset = fdt_path_offset(working_fdt,  "/soc/msgbox");
 	if (IS_ERR_VALUE(nodeoffset)) {
 		ARISC_ERR("get [allwinner,msgbox] device node error\n");
@@ -282,7 +150,6 @@ static int sunxi_arisc_parse_cfg(void)
 
 	dts_cfg.msgbox.base = (phys_addr_t)value[1];
 	dts_cfg.msgbox.size = (size_t)value[3];
-
 	dts_cfg.msgbox.status = fdtdec_get_is_enabled(working_fdt, nodeoffset);
 
 	ARISC_INF("msgbox base:0x%p, size:0x%zx, status:%u\n",
@@ -303,177 +170,10 @@ static int sunxi_arisc_parse_cfg(void)
 
 	dts_cfg.hwspinlock.base = (phys_addr_t)value[1];
 	dts_cfg.hwspinlock.size = (size_t)value[3];
-
 	dts_cfg.hwspinlock.status = fdtdec_get_is_enabled(working_fdt, nodeoffset);
 
 	ARISC_INF("hwspinlock base:0x%p, size:0x%zx, status:%u\n",
 		(void *)dts_cfg.hwspinlock.base, dts_cfg.hwspinlock.size, dts_cfg.hwspinlock.status);
-
-	/* parse s_uart node */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,s_uart");
-	nodeoffset = fdt_path_offset(working_fdt, "/soc/s_uart");
-	if (IS_ERR_VALUE(nodeoffset)) {
-		ARISC_ERR("get [allwinner,s_uart] device node error\n");
-		return -EINVAL;
-	}
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "reg", value))) {
-		ARISC_ERR("get s_uart reg error\n");
-		return -EINVAL;
-	}
-
-	dts_cfg.s_uart.base = (phys_addr_t)value[1];
-	dts_cfg.s_uart.size = (size_t)value[3];
-
-	ARISC_INF("s_uart base:0x%p, size:0x%zx\n",
-		(void *)dts_cfg.s_uart.base, dts_cfg.s_uart.size);
-
-	dts_cfg.s_uart.status = fdtdec_get_is_enabled(working_fdt, nodeoffset);
-
-	ARISC_INF("s_uart base:0x%p, size:0x%zx, status:%u\n",
-		(void *)dts_cfg.s_uart.base, dts_cfg.s_uart.size, dts_cfg.s_uart.status);
-
-#if defined CONFIG_ARCH_SUN50IW2P1
-	/* parse s_twi node */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,s_twi");
-	nodeoffset = fdt_path_offset(working_fdt, "/soc/s_twi");
-	if (IS_ERR_VALUE(nodeoffset)) {
-		ARISC_ERR("get [allwinner,s_twi] device node error\n");
-		return -EINVAL;
-	}
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "reg", value))) {
-		ARISC_ERR("get s_twi reg error\n");
-		return -EINVAL;
-	}
-
-	dts_cfg.s_twi.base = (phys_addr_t)value[1];
-	dts_cfg.s_twi.size = (size_t)value[3];
-
-	dts_cfg.s_twi.status = fdtdec_get_is_enabled(working_fdt, nodeoffset);
-
-	ARISC_INF("s_twi base:0x%p, size:0x%zx, status:%u\n",
-		(void *)dts_cfg.s_twi.base, dts_cfg.s_twi.size, dts_cfg.s_twi.status);
-#else
-	/* parse s_rsb node */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,s_rsb");
-	nodeoffset = fdt_path_offset(working_fdt, "/soc/s_rsb");
-	if (IS_ERR_VALUE(nodeoffset)) {
-		ARISC_ERR("get [allwinner,s_rsb] device node error\n");
-		return -EINVAL;
-	}
-
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "reg", value))) {
-		ARISC_ERR("get s_rsb reg error\n");
-		return -EINVAL;
-	}
-
-	dts_cfg.s_rsb.base = (phys_addr_t)value[1];
-	dts_cfg.s_rsb.size = (size_t)value[3];
-
-	dts_cfg.s_rsb.status = fdtdec_get_is_enabled(working_fdt, nodeoffset);
-
-	ARISC_INF("s_rsb base:0x%p, size:0x%zx, status:%u\n",
-		(void *)dts_cfg.s_rsb.base, dts_cfg.s_rsb.size, dts_cfg.s_rsb.status);
-#endif
-	/* parse s_jtag node */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,s_jtag");
-	nodeoffset = fdt_path_offset(working_fdt, "/soc/s_jtag0");
-	if (IS_ERR_VALUE(nodeoffset)) {
-		ARISC_ERR("get [allwinner,s_jtag] device node error\n");
-		return -EINVAL;
-	}
-
-	dts_cfg.s_jtag.status = fdtdec_get_is_enabled(working_fdt, nodeoffset);
-
-	ARISC_INF("s_jtag status:%u\n", dts_cfg.s_jtag.status);
-
-	/* parse dvfs_table node */
-	if (arisc_dvfs_cfg_vf_table()) {
-		ARISC_ERR("parse dvfs v-f table failed\n");
-		return -EINVAL;
-	}
-
-
-	/* parse s_cir node */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,s_cir");
-	nodeoffset = fdt_path_offset(working_fdt, "/soc/s_cir");
-	if (IS_ERR_VALUE(nodeoffset)) {
-		ARISC_ERR("get [allwinner,s_cir] device node error\n");
-		return -EINVAL;
-	}
-
-	if (!IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "ir_power_key_code", &dts_cfg.s_cir.ir_key.ir_code[0].key_code))) {
-		if (!IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "ir_addr_code", &dts_cfg.s_cir.ir_key.ir_code[0].addr_code))) {
-			dts_cfg.s_cir.ir_key.num = 1;
-			goto print_ir_paras;
-		}
-	}
-
-	dts_cfg.s_cir.ir_key.num = 0;
-	for (i = 0; i < IR_NUM_KEY_SUP; i++) {
-		sprintf(subkey, "%s%d", "ir_power_key_code", i);
-		if (!IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, subkey, &dts_cfg.s_cir.ir_key.ir_code[i].key_code))) {
-			sprintf(subkey, "%s%d", "ir_addr_code", i);
-			if (!IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, subkey, &dts_cfg.s_cir.ir_key.ir_code[i].addr_code))) {
-				dts_cfg.s_cir.ir_key.num++;
-			}
-		}
-	}
-
-print_ir_paras:
-	for (i = 0; i < dts_cfg.s_cir.ir_key.num; i++) {
-		ARISC_INF("scir ir_code[%u].key_code:0x%x, ir_code[%u].addr_code:0x%x\n",
-			i, dts_cfg.s_cir.ir_key.ir_code[i].key_code, i, dts_cfg.s_cir.ir_key.ir_code[i].addr_code);
-	}
-
-#ifndef CONFIG_ARCH_SUN50IW2P1
-	/* config pmu config paras */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,pmu0");
-	nodeoffset = fdt_path_offset(working_fdt, "/soc/pmu0");
-	if (IS_ERR_VALUE(nodeoffset)) {
-		ARISC_ERR("get [allwinner,pmu0] device node error\n");
-		return -EINVAL;
-	}
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "pmu_bat_shutdown_ltf", &dts_cfg.pmu.pmu_bat_shutdown_ltf))) {
-		ARISC_ERR("parse pmu_bat_shutdown_ltf fail\n");
-		return -EINVAL;
-	}
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "pmu_bat_shutdown_htf", &dts_cfg.pmu.pmu_bat_shutdown_htf))) {
-		ARISC_ERR("parse pmu_bat_shutdown_htf fail\n");
-		return -EINVAL;
-	}
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "pmu_pwroff_vol", &dts_cfg.pmu.pmu_pwroff_vol))) {
-		ARISC_ERR("parse pmu_pwroff_vol fail\n");
-		return -EINVAL;
-	}
-	if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "power_start", &dts_cfg.pmu.power_start))) {
-		ARISC_ERR("parse power_start fail\n");
-		return -EINVAL;
-	}
-	ARISC_INF("pmu pmu_bat_shutdown_ltf:0x%x, pmu_bat_shutdown_htf:0x%x, pmu_pwroff_vol:0x%x, power_start:0x%x\n",
-		dts_cfg.pmu.pmu_bat_shutdown_ltf, dts_cfg.pmu.pmu_bat_shutdown_htf, dts_cfg.pmu.pmu_pwroff_vol, dts_cfg.pmu.power_start);
-#endif
-	//dts_cfg.pmu.pmu_bat_shutdown_ltf = 3200;
-	//dts_cfg.pmu.pmu_bat_shutdown_htf = 237;
-	//dts_cfg.pmu.pmu_pwroff_vol = 3300;
-	//dts_cfg.pmu.power_start = 0;
-
-	/* parse box_start_os node */
-	//nodeoffset = fdt_node_offset_by_compatible(working_fdt, -1, "allwinner,box_start_os");
-	nodeoffset = fdt_path_offset(working_fdt, "/soc/box_start_os0");
-	if (!IS_ERR_VALUE(nodeoffset)) {
-		dts_cfg.start_os.used = fdtdec_get_is_enabled(working_fdt, nodeoffset);
-		if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "start_type", &dts_cfg.start_os.start_type))) {
-			ARISC_ERR("parse box_start_os->start_type fail\n");
-		}
-		if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "irkey_used", &dts_cfg.start_os.irkey_used))) {
-			ARISC_ERR("parse box_start_os->irkey_used fail\n");
-		}
-		if (IS_ERR_VALUE(fdt_getprop_u32(working_fdt, nodeoffset, "pmukey_used", &dts_cfg.start_os.pmukey_used))) {
-			ARISC_ERR("parse box_start_os->pmukey_used fail\n");
-		}
-	}
 
 	return 0;
 }

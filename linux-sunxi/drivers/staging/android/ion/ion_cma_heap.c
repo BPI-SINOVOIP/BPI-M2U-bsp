@@ -39,7 +39,9 @@ struct ion_cma_buffer_info {
 	struct sg_table *table;
 };
 
+#ifdef CONFIG_DMA_CMA
 extern int dma_contiguous_area_maps(struct seq_file *s);
+#endif
 
 /*
  * Create scatter-list for the already allocated DMA buffer.
@@ -191,6 +193,7 @@ static struct ion_heap_ops ion_cma_ops = {
 	.unmap_kernel = ion_cma_unmap_kernel,
 };
 
+#ifdef CONFIG_DMA_CMA
 static int ion_cma_debug_show(struct ion_heap *heap, struct seq_file *sq, void *para)
 {
 	if (!heap || !sq)
@@ -199,6 +202,7 @@ static int ion_cma_debug_show(struct ion_heap *heap, struct seq_file *sq, void *
 		return (-ENODEV);
 	return dma_contiguous_area_maps(sq);
 }
+#endif
 
 struct ion_heap *ion_cma_heap_create(struct ion_platform_heap *data)
 {
@@ -214,7 +218,9 @@ struct ion_heap *ion_cma_heap_create(struct ion_platform_heap *data)
 	 * used to make the link with reserved CMA memory */
 	cma_heap->dev = data->priv;
 	cma_heap->heap.type = ION_HEAP_TYPE_DMA;
+#ifdef CONFIG_DMA_CMA
 	cma_heap->heap.debug_show = ion_cma_debug_show;
+#endif
 	return &cma_heap->heap;
 }
 

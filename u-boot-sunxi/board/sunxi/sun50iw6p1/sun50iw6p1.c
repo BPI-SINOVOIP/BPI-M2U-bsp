@@ -29,6 +29,8 @@
 #include <asm/io.h>
 #include <power/sunxi/pmu.h>
 #include <asm/arch/ccmu.h>
+#include <i2c.h>
+#include <sunxi_i2c.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -45,7 +47,7 @@ int board_init(void)
 {
 	u32 reg_val;
 	int cpu_status = 0;
-	cpu_status = readl(SUNXI_CPUXCFG_BASE+0x80);
+	cpu_status = readl(SUNXI_CPUX_CFG_BASE+0x80);
 	cpu_status &= (0xf<<24);
 
 	//note:
@@ -91,10 +93,6 @@ int dram_init(void)
 		gd->ram_size = get_ram_size((long *)PHYS_SDRAM_1, PHYS_SDRAM_1_SIZE);
 	}
 
-	//reserve trusted dram
-	if(gd->securemode == SUNXI_SECURE_MODE_WITH_SECUREOS)
-		gd->ram_size -= 64 * 1024 * 1024;
-
 	print_size(gd->ram_size, "");
 	putc('\n');
 
@@ -119,7 +117,7 @@ void board_mmc_pre_init(int card_num)
 	bd = gd->bd;
 	gd->bd->bi_card_num = card_num;
 	mmc_initialize(bd);
-  
+
 }
 
 int board_mmc_get_num(void)
@@ -166,6 +164,11 @@ extern int axp806_probe(void);
  */
 int platform_axp_probe(sunxi_axp_dev_t  *sunxi_axp_dev_pt[], int max_dev)
 {
+#ifdef CONFIG_SUNXI_MODULE_AXP
+	if (uboot_spare_head.boot_data.work_mode == WORK_MODE_USB_PRODUCT) {
+			i2c_set_bus_num(SUNXI_R_I2C0);
+			i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
+		}
 
 	if(axp806_probe())
 	{
@@ -173,12 +176,16 @@ int platform_axp_probe(sunxi_axp_dev_t  *sunxi_axp_dev_pt[], int max_dev)
 		sunxi_axp_dev_pt[0] = &sunxi_axp_null;
 		return 0;
 	}
-	
-	/* pmu type AXP81X */
+
+	/* pmu type AXP806 */
 	tick_printf("PMU: AXP806 found\n");
 	sunxi_axp_dev_pt[0] = &sunxi_axp_806;
 
-	//sunxi_axp_dev_pt[0] = &sunxi_axp_null;
+	/*set axp806 exist*/
+	uboot_spare_head.boot_ext[0].data[0] = 0x40;
+#else
+	sunxi_axp_dev_pt[0] = &sunxi_axp_null;
+#endif
 	//find one axp
 	return 1;
 
@@ -186,7 +193,7 @@ int platform_axp_probe(sunxi_axp_dev_t  *sunxi_axp_dev_pt[], int max_dev)
 
 char* board_hardware_info(void)
 {
-	static char * hardware_info  = "sun50iw2p1";
+	static char * hardware_info  = "sun50iw6p1";
 	return hardware_info;
 }
 
@@ -276,9 +283,31 @@ static void sunxi_random_ether_addr(void)
 }
 #endif
 
+#ifdef CONFIG_SUNXI_GETH
+extern int geth_initialize(bd_t *bis);
+#ifdef CONFIG_PHY_SUNXI_ACX00
+extern int ephy_init(void);
+#endif
+#endif
+
+
 int board_eth_init(bd_t *bis)
 {
 	int rc = 0;
+
+	int workmode = uboot_spare_head.boot_data.work_mode;
+	if (!((workmode == WORK_MODE_BOOT) ||
+		(workmode == WORK_MODE_CARD_PRODUCT) ||
+		(workmode == WORK_MODE_SPRITE_RECOVERY))) {
+		return 0;
+	}
+
+#ifdef CONFIG_SUNXI_GETH
+#ifdef CONFIG_PHY_SUNXI_ACX00
+	ephy_init();
+#endif
+	rc = geth_initialize(bis);
+#endif
 
 #if defined(CONFIG_USB_ETHER)
 	sunxi_random_ether_addr();

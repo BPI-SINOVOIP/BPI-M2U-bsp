@@ -19,11 +19,7 @@
 #define _SUNXI_CSI_H_
 
 #include "../platform/platform_cfg.h"
-
-#define VIDIOC_SUNXI_CSI_SET_CORE_CLK 			1
-#define VIDIOC_SUNXI_CSI_SET_M_CLK 			2
-
-#define CSI_CORE_CLK_RATE (300*1000*1000)
+#include "parser_reg.h"
 
 enum csi_pad {
 	CSI_PAD_SINK,
@@ -31,23 +27,12 @@ enum csi_pad {
 	CSI_PAD_NUM,
 };
 
-enum {
-	CSI_CORE_CLK = 0,
-	CSI_MASTER_CLK,
-	CSI_MISC_CLK,
-	CSI_CORE_CLK_SRC,
-	CSI_MASTER_CLK_24M_SRC,
-	CSI_MASTER_CLK_PLL_SRC,
-	CSI_CLK_NUM,
-};
-
-#define NOCLK 			0xff
-
-struct csi_pix_format {
-	unsigned int pix_width_alignment;
+struct csi_format {
+	unsigned int wd_align;
 	enum v4l2_mbus_pixelcode code;
-	u32 fmt_reg;
-	u8 data_alignment;
+	enum input_seq seq;
+	enum prs_input_fmt infmt;
+	unsigned int data_width;
 };
 
 struct csi_dev {
@@ -68,14 +53,14 @@ struct csi_dev {
 	unsigned int capture_mode;
 	struct list_head csi_list;
 	struct pinctrl *pctrl;
-	struct clk *clock[CSI_CLK_NUM];
-	struct v4l2_mbus_framefmt format;
-	struct csi_pix_format *csi_fmt;
-
+	struct v4l2_mbus_framefmt mf;
+	struct prs_output_size out_size;
+	struct csi_format *csi_fmt;
+	struct prs_ncsi_if_cfg ncsi_if;
 };
 
-void sunxi_csi_set_output_fmt(struct v4l2_subdev *sd, __u32 pixelformat);
 void sunxi_csi_dump_regs(struct v4l2_subdev *sd);
+void sunxi_csi_get_input_wh(int id, int *w, int *h);
 struct v4l2_subdev *sunxi_csi_get_subdev(int id);
 int sunxi_csi_platform_register(void);
 void sunxi_csi_platform_unregister(void);

@@ -548,6 +548,8 @@ int	dcache_status (void);
 void	dcache_enable (void);
 void	dcache_disable(void);
 void	mmu_disable(void);
+int	get_core_pos(void);
+
 #if defined(CONFIG_ARM)
 void	relocate_code(ulong);
 #else
@@ -806,6 +808,10 @@ void	udelay        (unsigned long);
 void mdelay(unsigned long);
 void __msdelay(unsigned long ms);
 void __usdelay(unsigned long usec);
+void cpu_spin_lock(unsigned int *lock);
+unsigned int cpu_spin_trylock(unsigned int *lock);
+void cpu_spin_unlock(unsigned int *lock);
+
 
 /* lib/uuid.c */
 #include <uuid.h>
@@ -852,7 +858,22 @@ int	printf(const char *fmt, ...)
 int	vprintf(const char *fmt, va_list args);
 int	tick_printf(const char *fmt, ...);
 int	sunxi_tick_printf(const char *fmt, ...);
+void printf_all(void);
+int dprintf(const char *fmt, ...);
+int uprintf(int log_level,const char *fmt, ...);
 
+#define LOG_LEVEL_FORCE         -1
+#define LOG_LEVEL_NONE          0
+#define LOG_LEVEL_ERROR         1
+#define LOG_LEVEL_WARNING       2
+#define LOG_LEVEL_NOTICE        3
+#define LOG_LEVEL_INFO          4
+
+#define pr_force(fmt,args...)    uprintf(LOG_LEVEL_FORCE, fmt ,##args)
+#define pr_error(fmt,args...)    uprintf(LOG_LEVEL_ERROR, fmt ,##args)
+#define pr_warning(fmt,args...)  uprintf(LOG_LEVEL_WARNING, fmt ,##args)
+#define pr_notice(fmt,args...)   uprintf(LOG_LEVEL_NOTICE, fmt ,##args)
+#define pr_msg(fmt,args...)      uprintf(LOG_LEVEL_INFO, fmt ,##args)
 
 /* stderr */
 #define eputc(c)		fputc(stderr, c)
@@ -1073,5 +1094,7 @@ static inline phys_addr_t map_to_sysmem(const void *ptr)
 #ifdef DO_DEPS_ONLY
 # include <environment.h>
 #endif
+
+#define CACHE_LINE_SIZE (64)
 
 #endif	/* __COMMON_H_ */

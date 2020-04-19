@@ -61,6 +61,12 @@ struct sensor_item sensor_list_t[] =
 	{	"gc2155"		,	0x78,		SENSOR_YUV	,	 PIXEL_NUM_2M		, CORE_CLK_RATE_FOR_2M},
 	{	"gc0328c"		,	0x42,		SENSOR_YUV	,	 PIXEL_NUM_0_3M		, CORE_CLK_RATE_FOR_2M},
 	{	"gc0328"		,	0x42,		SENSOR_YUV	,	 PIXEL_NUM_0_3M		, CORE_CLK_RATE_FOR_2M},
+	{	"nt99141"		,	0x54,		SENSOR_YUV	,	 PIXEL_NUM_2M		, CORE_CLK_RATE_FOR_2M},
+	{	"nt99142"		,	0x54,		SENSOR_YUV	,	 PIXEL_NUM_2M		, CORE_CLK_RATE_FOR_2M},
+	{	"bf3903"		,	0x6e,		SENSOR_YUV	,	 PIXEL_NUM_2M		, CORE_CLK_RATE_FOR_2M},
+	{       "h42_aw6121"            ,       0x36,           SENSOR_YUV      ,        PIXEL_NUM_5M           , CORE_CLK_RATE_FOR_5M},
+	{	"hm1055"	    	,	0x48,		SENSOR_YUV	,	 PIXEL_NUM_5M		, CORE_CLK_RATE_FOR_5M},
+	{       "ov2718_xc7027"         ,       0x36,           SENSOR_YUV      ,        PIXEL_NUM_0_3M         , CORE_CLK_RATE_FOR_3M},
 };
 int get_sensor_info(char *sensor_name, struct sensor_item *sensor_info)
 {

@@ -15,6 +15,7 @@
 config TEE_SUPPORT
 	bool "Trusted Execution Environment Support"
 	depends on ARCH_SUN50I
+	select DMA_SHARED_BUFFER
 	default n
 	---help---
 	  This implements the Trusted Execution Environment (TEE) Client

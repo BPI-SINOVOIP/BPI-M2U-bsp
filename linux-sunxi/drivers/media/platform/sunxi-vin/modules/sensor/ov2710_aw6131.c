@@ -1,11 +1,16 @@
-/* **************************************************************************************
- *ov2710_aw6131.c
- *A V4L2 driver for OV2710_AW6131 cameras
- *Copyright (c) 2014 by Allwinnertech Co., Ltd.http://www.allwinnertech.com
- *	Version		Author		Date				Description
- *	1.0			liu baihao	2016/1/15		OV2710_AW6131 YUV sensor Support(liubaihao@sina.com)
- ****************************************************************************************
+/*
+ * A V4L2 driver for ov2710_aw6131 YUV cameras.
+ *
+ * Copyright (c) 2017 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
+ *
+ * Authors:  Zhao Wei <zhaowei@allwinnertech.com>
+ *    Yang Feng <yangfeng@allwinnertech.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -48,24 +53,14 @@ MODULE_LICENSE("GPL");
 #define OV2710_READ_ADDR	(0x37)
 
 /*static struct delayed_work sensor_s_ae_ratio_work;*/
-static struct v4l2_subdev *glb_sd;
 static bool restart;
 #define SENSOR_NAME "ov2710_aw6131"
-/*
- * Information we maintain about a known sensor.
- */
-struct sensor_format_struct;	/* coming later */
 
 struct cfg_array {		/* coming later */
 	struct regval_list *regs;
 	int size;
 };
-static int sensor_init_common(struct v4l2_subdev *sd, u32 val);
 
-static inline struct sensor_info *to_state(struct v4l2_subdev *sd)
-{
-	return container_of(sd, struct sensor_info, sd);
-}
 
 /*
  * The default register settings
@@ -3697,8 +3692,8 @@ static int sensor_s_night_or_not(struct v4l2_subdev *sd, __s32 *value)
 	sensor_write(sd,   0xfffe, 0x14);
 	regs.addr = 0x002b;
 	sensor_read(sd,  regs.addr, &regs.data);
-	sensor_dbg("data = %d night_mode %d\n" , regs.data, night_mode);
-    if ((regs.data > 0x74) && (night_mode != 1)) {
+	sensor_dbg("data = %d night_mode %d\n", regs.data, night_mode);
+	if ((regs.data > 0x74) && (night_mode != 1)) {
 		sensor_write(sd, 0xfffe, 0x21);
 		sensor_write(sd, 0x0001, 0x82);
 		sensor_write(sd, 0x0003, 0xb1);
@@ -3728,8 +3723,7 @@ static int sensor_s_night_or_not(struct v4l2_subdev *sd, __s32 *value)
 		sensor_write(sd, 0xfffe, 0x80);
 		night_mode = 1;
 		sensor_dbg("night_mode\n");
-	}
-    else if ((regs.data < 0x6a) && (night_mode != 0)) {/*daymode*/
+	} else if ((regs.data < 0x6a) && (night_mode != 0)) {/*daymode*/
 		sensor_write(sd, 0xfffe, 0x21);
 		sensor_write(sd, 0x0001, 0x82);
 		sensor_write(sd, 0x0003, 0xb1);
@@ -3760,7 +3754,7 @@ static int sensor_s_night_or_not(struct v4l2_subdev *sd, __s32 *value)
 		night_mode = 0;
 		sensor_dbg("daymode\n");
 	} else {
-		sensor_dbg("data = %d night_mode %d\n" , regs.data, night_mode);
+		sensor_dbg("data = %d night_mode %d\n", regs.data, night_mode);
 	}
 	*value = night_mode;
 	return 0;
@@ -3823,19 +3817,6 @@ static int sensor_detect(struct v4l2_subdev *sd)
 	return 0;
 }
 
-static int sensor_init_common(struct v4l2_subdev *sd, u32 val)
-{
-	int ret;
-	sensor_dbg("sensor_init_restart\n");
-	ret = sensor_write_array(sd, sensor_default_regs, ARRAY_SIZE(sensor_default_regs));
-	if (ret < 0) {
-		sensor_err("write sensor_default_regs error\n");
-		return ret;
-	}
-
-	return 0;
-}
-
 static int sensor_init(struct v4l2_subdev *sd, u32 val)
 {
 	int ret;
@@ -3870,11 +3851,6 @@ static int sensor_init(struct v4l2_subdev *sd, u32 val)
 	info->tpf.numerator = 1;
 	info->tpf.denominator = 25;
 
-	ret = sensor_init_common(sd, val);
-	if (ret < 0) {
-		sensor_err("write sensor_default_regs error\n");
-		return ret;
-	}
 
 	sensor_debug(sd);
 #if 0
@@ -3885,34 +3861,6 @@ static int sensor_init(struct v4l2_subdev *sd, u32 val)
 
 	return 0;
 }
-
-static void sensor_cfg_req(struct v4l2_subdev *sd,
-						struct sensor_config *cfg)
-{
-	struct sensor_info *info = to_state(sd);
-	if (info == NULL) {
-		sensor_err("sensor is not initialized.\n");
-		return;
-	}
-	if (info->current_wins == NULL) {
-		sensor_err("sensor format is not initialized.\n");
-		return;
-	}
-
-	cfg->width = info->current_wins->width;
-	cfg->height = info->current_wins->height;
-	cfg->hoffset = info->current_wins->hoffset;
-	cfg->voffset = info->current_wins->voffset;
-	cfg->hts = info->current_wins->hts;
-	cfg->vts = info->current_wins->vts;
-	cfg->pclk = info->current_wins->pclk;
-	cfg->bin_factor = info->current_wins->bin_factor;
-	cfg->intg_min = info->current_wins->intg_min;
-	cfg->intg_max = info->current_wins->intg_max;
-	cfg->gain_min = info->current_wins->gain_min;
-	cfg->gain_max = info->current_wins->gain_max;
-}
-
 
 static long sensor_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
@@ -3931,7 +3879,7 @@ static long sensor_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case SET_FPS:
 		break;
-	case ISP_SET_EXP_GAIN:
+	case VIDIOC_VIN_SENSOR_EXP_GAIN:
 		sensor_s_exp_gain(sd, (struct sensor_exp_gain *)arg);
 		break;
 	case VIDIOC_VIN_SENSOR_CFG_REQ:
@@ -3943,13 +3891,7 @@ static long sensor_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	return ret;
 }
 
-static struct sensor_format_struct {
-	__u8 *desc;
-	enum v4l2_mbus_pixelcode mbus_code;
-	struct regval_list *regs;
-	int regs_size;
-	int bpp;   /* Bytes per pixel */
-} sensor_formats[] = {
+static struct sensor_format_struct sensor_formats[] = {
 	{
 		.desc		= "UYVY 4:2:2",
 		.mbus_code	= V4L2_MBUS_FMT_UYVY8_2X8,
@@ -3966,46 +3908,45 @@ static struct sensor_format_struct {
 static struct sensor_win_size sensor_win_sizes[] = {
 /* Full HD 1920 *1080 25fps*/
 	{
-	 .width = HD1080_WIDTH,
-	 .height = HD1080_HEIGHT,
-	 .hoffset = 0,
-	 .voffset = 0,
-	 .regs = sensor_1080p_25fps_regs,
-	 .regs_size = ARRAY_SIZE(sensor_1080p_25fps_regs),
-	 .set_size = NULL,
-	 } , {
-		     .width = HD720_WIDTH,
-		     .height = HD720_HEIGHT,
-		     .hoffset = 0,
-		     .voffset = 0,
-		     .regs = sensor_720p_30fps_regs,
-		     .regs_size = ARRAY_SIZE(sensor_720p_30fps_regs),
-		     .set_size = NULL,
-	 } , {
-			 .width = VGA_WIDTH,
-			 .height = VGA_HEIGHT,
-			 .hoffset = 0,
-			 .voffset = 0,
-			 .regs = sensor_480p_30fps_regs,
-			 .regs_size = ARRAY_SIZE(sensor_480p_30fps_regs),
-			 .set_size = NULL,
-
-	 } , {
-		     .width = VGA_WIDTH,
-		     .height = 360,
-		     .hoffset = 0,
-		     .voffset = 0,
-		     .regs = sensor_640x360p_30fps_regs,
-		     .regs_size = ARRAY_SIZE(sensor_640x360p_30fps_regs),
-		     .set_size = NULL,
-	 } , {
-			 .width = QVGA_WIDTH,
-			 .height = QVGA_HEIGHT,
-			 .hoffset = 0,
-			 .voffset = 0,
-			 .regs = sensor_320x240_30fps_regs,
-			 .regs_size = ARRAY_SIZE(sensor_320x240_30fps_regs),
-			 .set_size = NULL,
+		.width = HD1080_WIDTH,
+		.height = HD1080_HEIGHT,
+		.hoffset = 0,
+		.voffset = 0,
+		.regs = sensor_1080p_25fps_regs,
+		.regs_size = ARRAY_SIZE(sensor_1080p_25fps_regs),
+		.set_size = NULL,
+	 }, {
+		.width = HD720_WIDTH,
+		.height = HD720_HEIGHT,
+		.hoffset = 0,
+		.voffset = 0,
+		.regs = sensor_720p_30fps_regs,
+		.regs_size = ARRAY_SIZE(sensor_720p_30fps_regs),
+		.set_size = NULL,
+	 }, {
+		.width = VGA_WIDTH,
+		.height = VGA_HEIGHT,
+		.hoffset = 0,
+		.voffset = 0,
+		.regs = sensor_480p_30fps_regs,
+		.regs_size = ARRAY_SIZE(sensor_480p_30fps_regs),
+		.set_size = NULL,
+	 }, {
+		.width = VGA_WIDTH,
+		.height = 360,
+		.hoffset = 0,
+		.voffset = 0,
+		.regs = sensor_640x360p_30fps_regs,
+		.regs_size = ARRAY_SIZE(sensor_640x360p_30fps_regs),
+		.set_size = NULL,
+	 }, {
+		.width = QVGA_WIDTH,
+		.height = QVGA_HEIGHT,
+		.hoffset = 0,
+		.voffset = 0,
+		.regs = sensor_320x240_30fps_regs,
+		.regs_size = ARRAY_SIZE(sensor_320x240_30fps_regs),
+		.set_size = NULL,
 	}
 };
 #define N_WIN_SIZES (ARRAY_SIZE(sensor_win_sizes))
@@ -4015,46 +3956,6 @@ static int sensor_g_mbus_config(struct v4l2_subdev *sd,
 {
 	cfg->type = V4L2_MBUS_PARALLEL;
 	cfg->flags = V4L2_MBUS_MASTER | VREF_POL | HREF_POL | CLK_POL;
-
-	return 0;
-}
-/*
- * Implement G/S_PARM.  There is a "high quality" mode we could try
- * to do someday; for now, we just do the frame rate tweak.
- */
-static int sensor_g_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *parms)
-{
-	struct v4l2_captureparm *cp = &parms->parm.capture;
-	struct sensor_info *info = to_state(sd);
-
-	if (parms->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
-		return -EINVAL;
-
-	memset(cp, 0, sizeof(struct v4l2_captureparm));
-	cp->capability = V4L2_CAP_TIMEPERFRAME;
-	cp->capturemode = info->capture_mode;
-
-	return 0;
-}
-
-static int sensor_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *parms)
-{
-	struct v4l2_captureparm *cp = &parms->parm.capture;
-	struct sensor_info *info = to_state(sd);
-
-	sensor_dbg("sensor_s_parm\n");
-	if (parms->parm.capture.reserved[0] == 1) {
-		printk("sensor_s_parm camera restart\n");
-		restart = true;
-	}
-
-	if (parms->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
-		return -EINVAL;
-
-	if (info->tpf.numerator == 0)
-		return -EINVAL;
-
-	info->capture_mode = cp->capturemode;
 
 	return 0;
 }
@@ -4126,9 +4027,17 @@ static int sensor_g_chip_ident(struct v4l2_subdev *sd,
 
 static int sensor_reg_init(struct sensor_info *info)
 {
+	int ret;
 	struct v4l2_subdev *sd = &info->sd;
 	struct sensor_format_struct *sensor_fmt = info->fmt;
 	struct sensor_win_size *wsize = info->current_wins;
+
+	ret = sensor_write_array(sd, sensor_default_regs,
+			ARRAY_SIZE(sensor_default_regs));
+	if (ret < 0) {
+		sensor_err("write sensor_default_regs error\n");
+		return ret;
+	}
 
 	sensor_dbg("sensor_reg_init\n");
 	sensor_write_array(sd, sensor_fmt->regs, sensor_fmt->regs_size);
@@ -4139,7 +4048,6 @@ static int sensor_reg_init(struct sensor_info *info)
 	if (wsize->set_size)
 		wsize->set_size(sd);
 
-	info->fmt = sensor_fmt;
 	info->width = wsize->width;
 	info->height = wsize->height;
 	sensor_print("s_fmt set width = %d, height = %d\n", wsize->width,
@@ -4172,6 +4080,9 @@ static const struct v4l2_subdev_core_ops sensor_core_ops = {
 	.init = sensor_init,
 	.s_power = sensor_power,
 	.ioctl = sensor_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = sensor_compat_ioctl32,
+#endif
 };
 
 static const struct v4l2_subdev_video_ops sensor_video_ops = {
@@ -4180,24 +4091,6 @@ static const struct v4l2_subdev_video_ops sensor_video_ops = {
 	.s_stream = sensor_s_stream,
 	.g_mbus_config = sensor_g_mbus_config,
 };
-
-static void sensor_fill_mbus_fmt(struct v4l2_mbus_framefmt *mf,
-				 const struct sensor_win_size *ws, u32 code)
-{
-	mf->width = ws->width;
-	mf->height = ws->height;
-	mf->code = code;
-	mf->colorspace = V4L2_COLORSPACE_JPEG;
-	mf->field = V4L2_FIELD_NONE;
-}
-
-SENSOR_ENUM_MBUS_CODE;
-SENSOR_ENUM_FRAME_SIZE;
-SENSOR_FIND_MBUS_CODE;
-SENSOR_FIND_FRAME_SIZE;
-SENSOR_TRY_FORMAT;
-SENSOR_GET_FMT;
-SENSOR_SET_FMT;
 
 static const struct v4l2_subdev_pad_ops sensor_pad_ops = {
 	.enum_mbus_code = sensor_enum_mbus_code,
@@ -4229,11 +4122,15 @@ static int sensor_probe(struct i2c_client *client,
 	if (info == NULL)
 		return -ENOMEM;
 	sd = &info->sd;
-	glb_sd = sd;
 	cci_dev_probe_helper(sd, client, &sensor_ops, &cci_drv);
 	mutex_init(&info->lock);
 	restart = 0;
 	info->fmt = &sensor_formats[0];
+	info->fmt_pt = &sensor_formats[0];
+	info->win_pt = &sensor_win_sizes[0];
+	info->fmt_num = N_FMTS;
+	info->win_size_num = N_WIN_SIZES;
+	info->sensor_field = V4L2_FIELD_NONE;
 	info->af_first_flag = 1;
 
 	return 0;

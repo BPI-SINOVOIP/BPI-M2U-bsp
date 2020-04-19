@@ -85,34 +85,34 @@ void timer_exit(void)
 	return ;
 }
 
-void watchdog_disable(void)
-{
-	struct sunxi_timer_reg *timer_reg = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
-	struct sunxi_wdog *wdog = &timer_reg->wdog[0];
-	/* disable watchdog */
-	writel(0, &(wdog->mode));
-
-	return ;
-}
-
-void watchdog_enable(void)
-{
-	struct sunxi_timer_reg *timer_reg = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
-	struct sunxi_wdog *wdog = &timer_reg->wdog[0];
-	/* enable watchdog */
-	wdog->cfg = 1;
-	wdog->mode = 1;
-
-	return ;
-
-}
+//void watchdog_disable(void)
+//{
+//	struct sunxi_timer_reg *timer_reg = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
+//	struct sunxi_wdog *wdog = &timer_reg->wdog[0];
+//	/* disable watchdog */
+//	writel(0, &(wdog->mode));
+//
+//	return ;
+//}
+//
+//void watchdog_enable(void)
+//{
+//	struct sunxi_timer_reg *timer_reg = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
+//	struct sunxi_wdog *wdog = &timer_reg->wdog[0];
+//	/* enable watchdog */
+//	wdog->cfg = 1;
+//	wdog->mode = 1;
+//
+//	return ;
+//
+//}
 
 /* timer without interrupts */
 /* count the delay by seconds */
 ulong get_timer(ulong base)
 {
 	//return get_timer_masked()/1000 - base;
-	
+
 	//return ms
     return get_timer_masked() - base;
 }

@@ -1,7 +1,7 @@
 config ARM64
 	def_bool y
 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-	select ARCH_HAS_SG_CHAIN	
+	select ARCH_HAS_SG_CHAIN
 	select ARCH_HAS_OPP
 	select ARCH_USE_CMPXCHG_LOCKREF
 	select ARCH_HAS_OPP
@@ -124,6 +124,31 @@ config NEED_DMA_MAP_STATE
 config NEED_SG_DMA_LENGTH
 	def_bool y
 
+config ARM64_DMA_USE_IOMMU
+	bool
+	select ARM_HAS_SG_CHAIN
+	select NEED_SG_DMA_LENGTH
+
+if ARM64_DMA_USE_IOMMU
+
+config ARM64_DMA_IOMMU_ALIGNMENT
+	int "Maximum PAGE_SIZE order of alignment for DMA IOMMU buffers"
+	range 4 9
+	default 8
+	help
+	  DMA mapping framework by default aligns all buffers to the smallest
+	  PAGE_SIZE order which is greater than or equal to the requested buffer
+	  size. This works well for buffers up to a few hundreds kilobytes, but
+	  for larger buffers it just a waste of address space. Drivers which has
+	  relatively small addressing window (like 64Mib) might run out of
+	  virtual space with just a few allocations.
+
+	  With this parameter you can specify the maximum PAGE_SIZE order for
+	  DMA IOMMU buffers. Larger buffers will be aligned only to this
+	  specified order. The order is expressed as a power of two multiplied
+	  by the PAGE_SIZE.
+
+endif
 config SWIOTLB
 	def_bool y
 
@@ -139,6 +164,8 @@ config KERNEL_MODE_NEON
 source "init/Kconfig"
 
 source "kernel/Kconfig.freezer"
+
+source "kernel/Kconfig.dump"
 
 menu "Platform selection"
 
@@ -248,7 +275,6 @@ choice
 
 config ARCH_SUN50IW3P1
 	bool "Allwinner SUN50IW3P1"
-	select HAVE_UNSTABLE_SCHED_CLOCK
 	select SUNXI_SMC
 endchoice
 endif
@@ -262,8 +288,8 @@ choice
 
 config ARCH_SUN50IW6P1
 	bool "Allwinner SUN50IW6P1"
-	select HAVE_UNSTABLE_SCHED_CLOCK
 	select SUNXI_SMC
+	select ARCH_SUPPORTS_MSI
 endchoice
 endif
 
@@ -300,6 +326,26 @@ endif # end of ARCH_SUNXI
 endmenu
 
 menu "Bus support"
+
+config PCI
+	bool "PCI support"
+	help
+	  This feature enables support for PCI bus system. If you say Y
+	  here, the kernel will include drivers and infrastructure code
+	  to support PCI bus devices.
+
+config PCI_DOMAINS
+	def_bool PCI
+
+config PCI_DOMAINS_GENERIC
+	def_bool PCI
+
+config PCI_SYSCALL
+	def_bool PCI
+
+source "drivers/pci/Kconfig"
+source "drivers/pci/pcie/Kconfig"
+source "drivers/pci/hotplug/Kconfig"
 
 config ARM_AMBA
 	bool

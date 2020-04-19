@@ -10,8 +10,12 @@
 
 static int suspend;
 struct tv_info_t g_tv_info;
+#if defined(CONFIG_ARCH_SUN8IW7P1)
+static unsigned int cali[4] = {512, 512, 512, 512};
+#else
 static unsigned int cali[4] = {625, 625, 625, 625};
-static unsigned int offset[4] = {0, 0, 0, 0};
+#endif /*endif CONFIG_ARCH_SUN8IW7P1 */
+static int offset[4] = {0, 0, 0, 0};
 extern s32 disp_set_tv_func(struct disp_tv_func * func);
 extern uintptr_t disp_getprop_regbase(char *main_name,
 					char *sub_name, u32 index);
@@ -291,6 +295,48 @@ static struct disp_video_timings video_timing[] = {
 		.vactive_space = 0,
 		.trd_mode = 0,
 	},
+ 	{
+ 		.vic = 0,
+		.tv_mode = DISP_VGA_MOD_1280_720P_60,
+		.pixel_clk = 74250000,
+		.pixel_repeat = 0,
+		.x_res = 1280,
+		.y_res = 720,
+		.hor_total_time = 1650,
+		.hor_back_porch = 220,
+		.hor_front_porch = 110,
+		.hor_sync_time = 40,
+		.ver_total_time = 750,
+		.ver_back_porch = 20,
+		.ver_front_porch = 5,
+		.ver_sync_time = 5,
+		.hor_sync_polarity = 1,/* 0: negative, 1: positive */
+		.ver_sync_polarity = 1,/* 0: negative, 1: positive */
+		.b_interlace = 0,
+		.vactive_space = 0,
+		.trd_mode = 0,
+	},
+	{
+		.vic = 0,
+		.tv_mode = DISP_VGA_MOD_1024_768P_60,
+		.pixel_clk = 65000000,
+		.pixel_repeat = 0,
+		.x_res = 1024,
+		.y_res = 768,
+		.hor_total_time = 1344,
+		.hor_back_porch = 160,
+		.hor_front_porch = 24,
+		.hor_sync_time = 136,
+		.ver_total_time = 806,
+		.ver_back_porch = 29,
+		.ver_front_porch = 3,
+		.ver_sync_time = 6,
+		.hor_sync_polarity = 0,/* 0: negative, 1: positive */
+		.ver_sync_polarity = 0,/* 0: negative, 1: positive */
+		.b_interlace = 0,
+		.vactive_space = 0,
+		.trd_mode = 0,
+	},
 	{
 		.vic = 0,
 		.tv_mode = DISP_VGA_MOD_1920_1080P_60,
@@ -321,7 +367,7 @@ static struct disp_video_timings video_timing[] = {
 		} \
 	} while (0)
 
-/* #define TVDEBUG */
+#define TVDEBUG
 #if defined(TVDEBUG)
 #define TV_DBG(fmt, arg...)   printf("%s()%d - "fmt, __func__, __LINE__, ##arg)
 #else
@@ -507,7 +553,8 @@ static void tve_clk_config(u32 sel, u32 tv_mode)
 	int ret = 0;
 	bool find = false;
 	unsigned long rate = 0, prate = 0;
-	unsigned long parent_rate[] = {216000000, 297000000, 240000000};
+	unsigned long parent_rate[] = {216000000, 297000000, 240000000,
+				       432000000};
 	bool rate_exact = false;
 	unsigned long round;
 
@@ -561,6 +608,9 @@ static s32 tv_inside_init(int sel)
 	u32 sid = 0;
 	char main_key[20];
 	char sub_key[20];
+#if defined(CONFIG_ARCH_SUN8IW7P1)
+	int sid_turn = 0;
+#endif /*endif CONFIG_ARCH_SUN8IW7P1 */
 
 	sprintf(main_key, "tv%d", sel);
 
@@ -620,8 +670,23 @@ static s32 tv_inside_init(int sel)
 		sid = tve_low_get_sid(0x10);
 		if (0 == sid)
 			g_tv_info.screen[sel].sid = 0x200;
-		else
+		else {
+#if defined(CONFIG_ARCH_SUN8IW7P1)
+			if (sid & (1 << 9))
+				sid_turn = 0 + (sid & 0x1ff);
+			else
+				sid_turn = 0 - (sid & 0x1ff);
+
+			sid_turn += 91;
+
+			if (sid_turn >= 0)
+				sid_turn = (1 << 9) | sid_turn;
+			else
+				sid_turn = 0 - sid_turn;
+			sid = (u32)sid_turn;
+#endif
 			g_tv_info.screen[sel].sid = sid;
+		}
 
 		tve_low_set_reg_base(sel, g_tv_info.screen[sel].base_addr);
 		tve_clk_init(sel);
@@ -765,19 +830,29 @@ s32 tv_init(void)
 {
 	s32 i = 0, ret = 0;
 	char main_key[20];
-	char str[10];
+//	char str[10];
+	int value = 0;
 
 	for (i = 0; i < 2; i++) {
 		printf("%s:\n", __func__);
 		sprintf(main_key, "tv%d", i);
 
-		ret = disp_sys_script_get_item(main_key, "status", (int*)str, 2);
+/*		ret = disp_sys_script_get_item(main_key, "status", (int*)str, 2);
 		if (ret != 2) {
 			printf("fetch tv%d err.\n", i);
 			continue;
 		}
 		if (0 != strcmp(str, "okay"))
 			continue;
+*/
+		ret = disp_sys_script_get_item(main_key, "used", &value, 1);
+		if (ret != 1) {
+			printf("fetch tv%d err.\n", i);
+			continue;
+		}
+		if (1 != value)
+			continue;
+
 		tv_probe(i);
 	}
 
@@ -971,4 +1046,3 @@ s32 tv_hot_plugging_detect (u32 state)
 	}
 	return 0;
 }
-

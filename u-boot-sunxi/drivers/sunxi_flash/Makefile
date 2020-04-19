@@ -21,5 +21,9 @@
 
 obj-y += sunxi_flash.o
 obj-$(CONFIG_SUNXI_MODULE_SDMMC) += sdmmc.o
-obj-$(CONFIG_SUNXI_MODULE_NAND) += nand.o
+ifdef CONFIG_SUNXI_UBIFS
+	obj-$(CONFIG_SUNXI_MODULE_NAND) += nand_ubifs.o
+else
+	obj-$(CONFIG_SUNXI_MODULE_NAND) += nand.o
+endif
 obj-$(CONFIG_SUNXI_MODULE_SPINOR) += spinor.o

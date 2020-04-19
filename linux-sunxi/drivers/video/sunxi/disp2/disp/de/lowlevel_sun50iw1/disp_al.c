@@ -144,7 +144,7 @@ int disp_al_manager_disable_irq(unsigned int disp)
 
 int disp_al_enhance_apply(unsigned int disp, struct disp_enhance_config *config)
 {
-	if (config->flags & ENHANCE_MODE_DIRTY) {
+	if (config->flags & ENH_MODE_DIRTY) {
 		struct disp_csc_config csc_config;
 		de_dcsc_get_config(disp, &csc_config);
 		csc_config.enhance_mode = (config->info.mode >> 16);
@@ -171,12 +171,16 @@ int disp_al_enhance_tasklet(unsigned int disp)
 
 int disp_al_capture_init(unsigned int disp)
 {
-	return de_clk_enable(DE_CLK_WB);
+	de_clk_enable(DE_CLK_WB);
+	WB_EBIOS_DeReset(disp);
+	return 0;
 }
 
 int disp_al_capture_exit(unsigned int disp)
 {
-	return de_clk_disable(DE_CLK_WB);
+	WB_EBIOS_Reset(disp);
+	de_clk_disable(DE_CLK_WB);
+	return 0;
 }
 
 int disp_al_capture_sync(u32 disp)
@@ -317,6 +321,13 @@ int disp_al_lcd_cfg(u32 screen_id, disp_panel_para * panel, panel_extend_para *e
 		}
 #endif
 	}
+
+	return 0;
+}
+
+int disp_al_lcd_cfg_ext(u32 screen_id, panel_extend_para *extend_panel)
+{
+	tcon0_cfg_ext(screen_id, extend_panel);
 
 	return 0;
 }
@@ -534,7 +545,9 @@ int disp_al_tv_cfg(u32 screen_id, struct disp_video_timings *video_info)
 	return 0;
 }
 
-int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info, struct disp_vdevice_interface_para *para)
+int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info,
+			struct disp_vdevice_interface_para *para,
+			u8 config_tcon_only)
 {
 	struct lcd_clk_info clk_info;
 	disp_panel_para info;
@@ -577,8 +590,8 @@ int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info, st
 	disp_al_lcd_get_clk_info(screen_id, &clk_info, &info);
 	clk_info.tcon_div = 11;//fixme
 	tcon0_set_dclk_div(screen_id, clk_info.tcon_div);
-
-	tcon1_yuv_range(screen_id, 1);
+	if (LCD_HV_IF_CCIR656_2CYC == info.lcd_hv_if)
+		tcon1_yuv_range(screen_id, 1);
 	if (0 != tcon0_cfg(screen_id, &info))
 		DE_WRN("lcd cfg fail!\n");
 	else
@@ -754,4 +767,3 @@ int disp_al_get_display_size(unsigned int screen_id, unsigned int *width, unsign
 
 	return 0;
 }
-

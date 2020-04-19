@@ -57,6 +57,18 @@
 #define LOCK_EN_PLL_PERIPH1    (1<<12)
 #define LOCK_EN_NEW_MODE       (1<<28)
 
+/* clock ID */
+#define AXI_BUS         (0)
+#define AHB1_BUS0       (1)
+#define AHB1_BUS1       (2)
+#define AHB1_LVDS       (3)
+#define APB1_BUS0       (4)
+#define APB2_BUS0       (5)
+
+#define SPI3_CKID               ((AHB1_BUS0 << 8) | 23)
+#define SPI2_CKID               ((AHB1_BUS0 << 8) | 22)
+#define SPI1_CKID               ((AHB1_BUS0 << 8) | 21)
+#define SPI0_CKID               ((AHB1_BUS0 << 8) | 20)
 
 
 /* cfg list */
@@ -130,6 +142,21 @@
 #define DMA_GATING_BASE                     CCMU_BUS_CLK_GATING_REG0
 #define DMA_GATING_PASS                     (1)
 #define DMA_GATING_BIT                      (6)
+
+/* ehci */
+#define BUS_CLK_GATING_REG 0x60
+#define BUS_SOFTWARE_RESET_REG 0x2c0
+#define USBPHY_CONFIG_REG 0xcc
+
+#define USBEHCI0_RST_BIT 26
+#define USBEHCI0_GATIING_BIT 26
+#define USBPHY0_RST_BIT 0
+#define USBPHY0_SCLK_GATING_BIT 8
+
+#define USBEHCI1_RST_BIT 27
+#define USBEHCI1_GATIING_BIT 27
+#define USBPHY1_RST_BIT 1
+#define USBPHY1_SCLK_GATING_BIT 9
 
 #endif
 

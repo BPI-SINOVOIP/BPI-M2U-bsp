@@ -27,14 +27,17 @@ aw_private_data aw_private = {
 		.regulator      = NULL,
 		.regulator_id   = "vdd-gpu",
 		.clk[0]         = {
-			.clk_name   = "pll",
-			.clk_handle = NULL,
+			.clk_name       = "pll",
+			.clk_handle     = NULL,
+			.parent_clk_num = -1,
+			.need_set_freq  = 1
 		},
 		.clk[1]         = {
-			.clk_name   = "mali",
-			.clk_handle = NULL,
+			.clk_name       = "mali",
+			.clk_handle     = NULL,
+			.parent_clk_num = 0,
+			.need_set_freq  = 1
 		},
-		.dvfs_status   = 0,
 		.vf_table[0]   = {
 			.vol  = 1100,
 			.freq = 144,

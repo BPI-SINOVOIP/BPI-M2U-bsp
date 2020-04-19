@@ -66,7 +66,7 @@ static int sunxi_clk_is_lock(struct sunxi_clk_factors *factor)
 			reg = SET_BITS(factor->lock_en_bit, 1, reg, 1);
 			factor_writel(factor, reg, factor->pll_lock_ctrl_reg);
 
-			while(loop--) {
+			while (--loop) {
 				reg = factor_readl(factor,factor->lock_reg);
 				if(GET_BITS(factor->lock_bit, 1, reg)) {
 					udelay(20);
@@ -84,12 +84,11 @@ static int sunxi_clk_is_lock(struct sunxi_clk_factors *factor)
 			reg = SET_BITS(28, 1, reg, 0);
 			factor_writel(factor, reg, factor->pll_lock_ctrl_reg);
 
-			if(!loop) {
+			if (!loop) {
 #if (defined CONFIG_FPGA_V4_PLATFORM) || (defined CONFIG_FPGA_V7_PLATFORM)
 				printk("clk %s wait lock timeout\n", factor->hw.clk->name);
 				return 0;
 #else
-				WARN(1, "clk %s wait lock timeout\n", factor->hw.clk->name);
 				return -1;
 #endif
 			}
@@ -97,7 +96,7 @@ static int sunxi_clk_is_lock(struct sunxi_clk_factors *factor)
 		}
 		case PLL_LOCK_OLD_MODE:
 		case PLL_LOCK_NONE_MODE: {
-			while(loop--) {
+			while (--loop) {
 				reg = factor_readl(factor,factor->lock_reg);
 				if(GET_BITS(factor->lock_bit, 1, reg)) {
 					udelay(20);
@@ -107,11 +106,10 @@ static int sunxi_clk_is_lock(struct sunxi_clk_factors *factor)
 				}
 			}
 
-			if(!loop) {
+			if (!loop) {
 #if (defined CONFIG_FPGA_V4_PLATFORM) || (defined CONFIG_FPGA_V7_PLATFORM)
 				printk("clk %s wait lock timeout\n", factor->hw.clk->name);
 #else
-				WARN(1, "clk %s wait lock timeout\n", factor->hw.clk->name);
 				return -1;
 #endif
 			}
@@ -130,6 +128,10 @@ static int sunxi_clk_fators_enable(struct clk_hw *hw)
 	struct sunxi_clk_factors_config *config = factor->config;
 	unsigned long reg;
 	unsigned long flags = 0;
+
+	/* enable the pll in boot, don't enable it again*/
+	if (factor->flags & CLK_IGNORE_ENABLE_DISABLE)
+		return 0;
 
 	/* check if the pll enabled already */
 	reg = factor_readl(factor, factor->reg);
@@ -176,6 +178,10 @@ static void sunxi_clk_fators_disable(struct clk_hw *hw)
 	unsigned long reg;
 	unsigned long flags = 0;
 
+	/* when the pll is not in use, don't disable it */
+	if (factor->flags & CLK_IGNORE_ENABLE_DISABLE)
+		return;
+
 	/* check if the pll disabled already */
 	reg = factor_readl(factor, factor->reg);
 	if(!GET_BITS(config->enshift, 1, reg))
@@ -217,6 +223,8 @@ static int sunxi_clk_fators_is_enabled(struct clk_hw *hw)
 	unsigned long reg;
 	unsigned long flags = 0;
 
+	if (factor->flags & CLK_IGNORE_ENABLE_DISABLE)
+		return hw->clk->enable_count ? 1 : 0;
 	if(factor->lock)
 		spin_lock_irqsave(factor->lock, flags);
 

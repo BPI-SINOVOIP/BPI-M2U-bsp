@@ -645,11 +645,16 @@ static const struct sunxi_desc_pin sun8iw10p1_pins[] = {
 		  SUNXI_FUNCTION(0x7, "io_disabled")),
 #endif
 };
+
+#define IRQ_BANK_NUM 4
+static const unsigned sun8iw10p1_irq_bank_base[IRQ_BANK_NUM] = {0};
+
 static const struct sunxi_pinctrl_desc sun8iw10p1_pinctrl_data = {
 	.pins = sun8iw10p1_pins,
 	.npins = ARRAY_SIZE(sun8iw10p1_pins),
 	.pin_base = 0,
-	.irq_banks = 4,
+	.irq_banks = IRQ_BANK_NUM,
+	.irq_bank_base = sun8iw10p1_irq_bank_base,
 };
 
 static int sun8iw10p1_pinctrl_probe(struct platform_device *pdev)

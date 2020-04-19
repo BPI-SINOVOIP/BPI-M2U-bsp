@@ -44,7 +44,7 @@ static long soc_info_ioctl(struct file *file, unsigned int ioctl_num,
 		unsigned long ioctl_param)
 {
 	int ret = 0;
-	char id[8] = "";
+	char id[9] = "";
 
 	pr_debug("IOCTRL cmd: %#x, param: %#lx\n", ioctl_num, ioctl_param);
 	switch (ioctl_num) {
@@ -110,6 +110,13 @@ static ssize_t sys_info_show(struct class *class,
 		sprintf(tmpbuf + i*8, "%08x", databuf[i]);
 	tmpbuf[128] = 0;
 	size += sprintf(buf + size, "sunxi_chipid      : %s\n", tmpbuf);
+
+	/* serial */
+	sunxi_get_serial((u8 *)databuf);
+	for (i = 0; i < 4; i++)
+		sprintf(tmpbuf + i*8, "%08x", databuf[i]);
+	tmpbuf[128] = 0;
+	size += sprintf(buf + size, "sunxi_serial      : %s\n", tmpbuf);
 
 	/* chiptype */
 	sunxi_get_soc_chipid_str(tmpbuf);

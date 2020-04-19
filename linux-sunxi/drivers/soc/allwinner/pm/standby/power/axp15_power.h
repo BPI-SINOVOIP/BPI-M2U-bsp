@@ -73,4 +73,8 @@ enum {
 #define AXP15_DCDC3EN      AXP15_LDO3456_DC1234_CTL
 #define AXP15_DCDC4EN      AXP15_LDO3456_DC1234_CTL
 
+#ifdef CONFIG_DUAL_AXP_USED
+extern s32 secondary_pmu_enter_sleep(void);
+#endif
+
 #endif				/* __AXP15_POWER_H__ */

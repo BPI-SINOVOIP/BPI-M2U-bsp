@@ -357,7 +357,11 @@ struct multi_unseq_mem_s
 	struct unseq_mem_config  *unseq_mem;
 };
 
-#define SUNXI_EFEX_RECV_MEM_SIZE	(4*1024 * 1024)
+#if defined (CONFIG_SUNXI_SPINOR)
+#define SUNXI_EFEX_RECV_MEM_SIZE	(2 * 1024 * 1024)
+#else
+#define SUNXI_EFEX_RECV_MEM_SIZE	(4 * 1024 * 1024)
+#endif
 
 
 typedef struct
@@ -389,6 +393,7 @@ efex_trans_set_t;
 #define  SUNXI_EFEX_UNSEQ_MEM_FOR_READ  (0x7f06)
 #define  SUNXI_EFEX_UNSEQ_MEM_FOR_WRITE (0x7f07)
 #define  SUNXI_EFEX_FULLIMG_SIZE_TAG    (0x7f10)
+#define  SUNXI_EFEX_EXT4_UBIFS_TAG      (0x7ff0)
 
 #define  SUNXI_EFEX_FLASH_TAG           (0x8000)
 
@@ -400,6 +405,12 @@ efex_trans_set_t;
 #define  SUNXI_EFEX_VERIFY_ADDSUM		(1)
 #define  SUNXI_EFEX_VERIFY_CRC32		(2)
 
+/* ubifs functions */
+extern int sunxi_chk_ubifs_sb(void *sb_buf);
+extern void sunxi_disable_mtd_ubi_mode(void);
+extern void sunxi_enable_mtd_ubi_mode(void);
+
+extern u8 ubifs_sb_packed[4096];
 
 #endif
 

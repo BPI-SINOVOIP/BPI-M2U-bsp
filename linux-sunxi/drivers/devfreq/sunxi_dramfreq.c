@@ -55,29 +55,49 @@ static unsigned int sunxi_dramfreq_table[LV_END] = {
 	168000, //LV_4
 };
 
+/**
+ * @key_masters_int_idx
+ * the key_masters_int_idx:
+ * first dimension that is master what need to interrupt.
+ * second dimension that is property what we care.
+ * eg:
+ * master	master_access_bit	in_which_list_num
+ */
 #if defined(CONFIG_ARCH_SUN8IW10)
-static int key_masters_int_idx[MASTER_MAX][2] = {
+static int key_masters_int_idx[MASTER_MAX][3] = {
 #ifdef CONFIG_EINK_PANEL_USED
-	{ MASTER_EINK0, 5 },
-	{ MASTER_EDMA,  6 },
-	{ MASTER_EINK1, 7 },
+	{ MASTER_EINK0, 5,    0 },
+	{ MASTER_EDMA,  6,    0 },
+	{ MASTER_EINK1, 7,    0 },
 #else
-	{ MASTER_DE,    9 },
+	{ MASTER_DE,    9,    0 },
 #endif
-	{ MASTER_CSI,   3 },
+	{ MASTER_CSI,   3,    0 },
 };
 #elif defined(CONFIG_ARCH_SUN8IW11)
-static int key_masters_int_idx[MASTER_MAX][2] = {
-	{ MASTER_GPU,   1 },
-	{ MASTER_CSI,   5 },
-	{ MASTER_DE,   13 },
+static int key_masters_int_idx[MASTER_MAX][3] = {
+	{ MASTER_GPU,   1,    0 },
+	{ MASTER_CSI,   5,    0 },
+	{ MASTER_DE,   13,    0 },
 };
 #elif defined(CONFIG_ARCH_SUN50IW2)
-static int key_masters_int_idx[MASTER_MAX][2] = {
-	{ MASTER_GPU,   1 },
-	{ MASTER_CSI,   5 },
-	{ MASTER_DE,   10 },
+static int key_masters_int_idx[MASTER_MAX][3] = {
+	{ MASTER_GPU,   1,    0 },
+	{ MASTER_CSI,   5,    0 },
+	{ MASTER_DE,   10,    0 },
 };
+#elif defined(CONFIG_ARCH_SUN50IW3)
+static int key_masters_int_idx[MASTER_MAX][3] = {
+	{ MASTER_GPU,   1,    0 },
+	{ MASTER_VE,    4,    0 },
+	{ MASTER_DE,   16,    0 },
+};
+#elif defined(CONFIG_ARCH_SUN50IW6)
+/* the sun50iw6 doesn't support dramfreq, but need to offer cur_freq attr */
+static int key_masters_int_idx[MASTER_MAX][3] = {
+	{ MASTER_NULL, -1,   -1 },
+};
+
 #endif
 
 struct sunxi_dramfreq *dramfreq = NULL;
@@ -307,12 +327,15 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 				unsigned int freq)
 {
 	volatile unsigned int reg_val;
-	unsigned int rank_num, trefi, trfc, ctrl_freq;
+	unsigned int trefi, trfc, ctrl_freq;
 	unsigned int i, n = 4;
 	unsigned int div, source;
 	unsigned int vtf_status;
 	unsigned int timeout = 1000000;
 	struct dram_para_t *para = &dramfreq->dram_para;
+#if !defined(CONFIG_ARCH_SUN50IW3)
+	unsigned int rank_num;
+#endif
 
 	/* calculate source and divider */
 	if (para->dram_tpr9 != 0) {
@@ -338,7 +361,7 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 #if defined(CONFIG_ARCH_SUN50IW1)
 		source = 1;
 #elif defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW11) || \
-	defined(CONFIG_ARCH_SUN50IW2)
+	defined(CONFIG_ARCH_SUN50IW2) || defined(CONFIG_ARCH_SUN50IW3)
 		source = (para->dram_tpr13 >> 6) & 0x1;
 #endif
 		div = para->dram_clk / freq ;
@@ -362,7 +385,7 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 		writel(reg_val, dramfreq->dramctl_base + VTFCR);
 	}
 #elif defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW11) || \
-	defined(CONFIG_ARCH_SUN50IW2)
+	defined(CONFIG_ARCH_SUN50IW2) || defined(CONFIG_ARCH_SUN50IW3)
 	vtf_status = (reg_val & (0x3<<8));
 	if (vtf_status) {
 		reg_val &= ~(0x3<<8);
@@ -382,9 +405,18 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 	reg_val |= ((trfc<<0)|(trefi<<16));
 	writel(reg_val, dramfreq->dramctl_base + RFSHTMG);
 
+#if defined(CONFIG_ARCH_SUN50IW3)
+	reg_val = ((trefi << 15) & 0x0fff0000);
+	writel(reg_val, dramfreq->dramctl_base + RFSHCTL1);
+#endif
+
 	/* change ODT status for power save */
 	if (!((para->dram_tpr13 >> 12) & 0x1)) {
+#if !defined(CONFIG_ARCH_SUN50IW3)
 		if (freq > 400) {
+#else
+		if (freq > 600) {
+#endif
 			if ((para->dram_odt_en & 0x1)) {
 				for (i = 0; i < n; i++) {
 					/* byte 0/byte 1 */
@@ -394,11 +426,13 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 					writel(reg_val, dramfreq->dramctl_base + DXnGCR0(i));
 				}
 
+#if !defined(CONFIG_ARCH_SUN50IW3)
 				rank_num = readl(dramfreq->dramcom_base + MC_WORK_MODE) & 0x1;
 				if (rank_num)
 					writel(0x00000303, dramfreq->dramctl_base + ODTMAP);
 				else
 					writel(0x00000201, dramfreq->dramctl_base + ODTMAP);
+#endif
 			}
 		} else {
 			if ((para->dram_odt_en & 0x1)) {
@@ -409,7 +443,9 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 					reg_val |= (0x2<<4);
 					writel(reg_val, dramfreq->dramctl_base + DXnGCR0(i));
 				}
+#if !defined(CONFIG_ARCH_SUN50IW3)
 				writel(0x0, dramfreq->dramctl_base + ODTMAP);
+#endif
 			}
 		}
 	}
@@ -421,14 +457,16 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 	writel(reg_val, dramfreq->ccu_base + CCM_DRAM_CFG_REG);
 
 	/* set clock source in CCMU */
-	reg_val &= ~(0x3<<20);
-	reg_val |= (source<<20);
+	reg_val &= ~(0x3<<CCM_DRAM_CFG_REG_PLL0_1_BIT);
+	reg_val |= (source<<CCM_DRAM_CFG_REG_PLL0_1_BIT);
 	writel(reg_val, dramfreq->ccu_base + CCM_DRAM_CFG_REG);
 
 	/* set MDFS register */
 	reg_val = readl(dramfreq->dramcom_base + MC_MDFSCR);
 	reg_val |= (0x1<<4);   //bypass
+#if !defined(CONFIG_ARCH_SUN50IW3)
 	reg_val |= (0x1<<13);  //pad hold
+#endif
 	reg_val &= ~(0x1U<<1); //DFS mode
 	writel(reg_val, dramfreq->dramcom_base + MC_MDFSCR);
 
@@ -458,7 +496,7 @@ static int mdfs_dfs(unsigned int freq_jump, struct sunxi_dramfreq *dramfreq,
 		vtf_status |= (0x1<<8);
 		writel(reg_val, dramfreq->dramctl_base + VTFCR);
 #elif defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW11) || \
-	defined(CONFIG_ARCH_SUN50IW2)
+	defined(CONFIG_ARCH_SUN50IW2) || defined(CONFIG_ARCH_SUN50IW3)
 		reg_val = readl(dramfreq->dramctl_base + VTFCR);
 		vtf_status |= (0x3<<8);
 		writel(reg_val, dramfreq->dramctl_base + VTFCR);
@@ -476,12 +514,12 @@ static int sunxi_dramfreq_get_cur_freq(struct device *dev, unsigned long *freq)
 	ktime_t calltime = ktime_get();
 #endif
 
-	if ((readl(dramfreq->ccu_base + 0xF4) >> 20) & 0x1)
+	if ((readl(dramfreq->ccu_base + CCM_DRAM_CFG_REG) >> CCM_DRAM_CFG_REG_PLL0_1_BIT) & 0x1)
 		pll_ddr_rate = clk_get_rate(dramfreq->clk_pll_ddr1) / 1000;
 	else
 		pll_ddr_rate = clk_get_rate(dramfreq->clk_pll_ddr0) / 1000;
 
-	dram_div_m = (readl(dramfreq->ccu_base + 0xF4) & 0x3) + 1;
+	dram_div_m = (readl(dramfreq->ccu_base + CCM_DRAM_CFG_REG) & 0x3) + 1;
 	*freq = pll_ddr_rate / 2 / dram_div_m;
 
 #ifdef CONFIG_DEBUG_FS
@@ -500,7 +538,10 @@ unsigned long dramfreq_get(void)
 
 	if (dramfreq->ccu_base == NULL
 		|| dramfreq->clk_pll_ddr0 == NULL
-		|| dramfreq->clk_pll_ddr1 == NULL)
+#if !defined(CONFIG_ARCH_SUN50IW6)
+		|| dramfreq->clk_pll_ddr1 == NULL
+#endif
+		)
 		return 0;
 
 	sunxi_dramfreq_get_cur_freq(NULL, &cur_freq);
@@ -650,6 +691,11 @@ static int sunxi_dramfreq_target(struct device *dev,
 	unsigned long cur_freq, valid_freq;
 #ifdef CONFIG_CPU_FREQ
 	struct cpufreq_policy policy;
+#endif
+
+#if defined(CONFIG_ARCH_SUN50IW6)
+	/* the sun50iw6 doesn't support dramfreq, but need to offer cur_freq attr */
+		return 0;
 #endif
 
 	for (i = 0; i < MASTER_MAX; i++)
@@ -828,86 +874,160 @@ static void sunxi_dramfreq_masters_state_init(struct sunxi_dramfreq *dramfreq)
 	int i;
 
 	for (i = 0; i < MASTER_MAX; i++)
+#if defined(CONFIG_ARCH_SUN50IW3)
+		dramfreq->key_masters[i] = (i == MASTER_DE) ? 1 : 0;
+#else
 		dramfreq->key_masters[i] = (i == MASTER_CSI) ? 0 : 1;
+#endif
 }
 
 #ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
 static void sunxi_dramfreq_irq_clear_flag(struct sunxi_dramfreq *dramfreq)
 {
-	writel(0xFFFFFFFF, dramfreq->dramcom_base + MDFS_IRQ_STATUS0);
-	writel(0xFFFFFFFF, dramfreq->dramcom_base + MDFS_IRQ_STATUS1);
+	int i;
+	for (i = 0; i < dramfreq->master_reg_num; i++) {
+		writel(0xFFFFFFFF, dramfreq->dramcom_base + MDFS_IRQ_ACCESS_STATUS(i));
+		writel(0xFFFFFFFF, dramfreq->dramcom_base + MDFS_IRQ_IDLE_STATUS(i));
+	}
+}
+
+static void sunxi_dramfreq_read_irq_status(struct sunxi_dramfreq *dramfreq)
+{
+	int i;
+	for (i = 0; i < dramfreq->master_reg_num; i++) {
+		dramfreq->irq_access_status[i] = readl(dramfreq->dramcom_base + MDFS_IRQ_ACCESS_STATUS(i));
+		dramfreq->irq_idle_status[i]   = readl(dramfreq->dramcom_base + MDFS_IRQ_IDLE_STATUS(i));
+	}
+}
+
+static void sunxi_dramfreq_read_irq_mask_status(struct sunxi_dramfreq *dramfreq)
+{
+	int i;
+	for (i = 0; i < dramfreq->master_reg_num; i++) {
+		dramfreq->irq_access_mask_sta[i] = readl(dramfreq->dramcom_base + MDFS_IRQ_ACCESS_MASK_STA(i));
+		dramfreq->irq_idle_mask_sta[i] = readl(dramfreq->dramcom_base + MDFS_IRQ_IDLE_MASK_STA(i));
+	}
+}
+
+static void sunxi_dramfreq_write_irq_mask_status(struct sunxi_dramfreq *dramfreq)
+{
+	int i;
+	for (i = 0; i < dramfreq->master_reg_num; i++) {
+		writel(dramfreq->irq_access_mask_sta[i], dramfreq->dramcom_base + MDFS_IRQ_ACCESS_MASK_STA(i));
+		writel(dramfreq->irq_idle_mask_sta[i], dramfreq->dramcom_base + MDFS_IRQ_IDLE_MASK_STA(i));
+	}
+}
+
+static void sunxi_dramfreq_read_irq_enable_status(struct sunxi_dramfreq *dramfreq,
+					unsigned int *reg_value)
+{
+	int i;
+	for (i = 0; i < dramfreq->master_reg_num; i++)
+		*(reg_value + i) = readl(dramfreq->dramcom_base + MDFS_MASTER_ENABLE(i));
+}
+
+static void sunxi_dramfreq_write_irq_enable_status(struct sunxi_dramfreq *dramfreq,
+					unsigned int *reg_value)
+{
+	int i;
+	for (i = 0; i < dramfreq->master_reg_num; i++)
+		writel(*(reg_value + i), dramfreq->dramcom_base + MDFS_MASTER_ENABLE(i));
 }
 
 static void sunxi_dramfreq_irq_mask_control(struct sunxi_dramfreq *dramfreq,
 					bool valid)
 {
 	unsigned int i;
-	unsigned int access_value, idle_value;
+	int idx, reg_list_num;
 
-	access_value = readl(dramfreq->dramcom_base + MDFS_IRQ_MASK_STATUS0);
-	idle_value   = readl(dramfreq->dramcom_base + MDFS_IRQ_MASK_STATUS1);
-
+	sunxi_dramfreq_read_irq_mask_status(dramfreq);
 	for (i = 0; i < MASTER_MAX; i++) {
+		idx = key_masters_int_idx[i][1];
+		reg_list_num = key_masters_int_idx[i][2];
+		if (idx < 0 || reg_list_num < 0) {
+			pr_err("%s: the key master doesn't exit", __func__);
+			return;
+		}
+
 		if (valid) {
-			access_value |= (0x1 << key_masters_int_idx[i][1]);
-			idle_value   |= (0x1 << key_masters_int_idx[i][1]);
+			dramfreq->irq_access_mask_sta[reg_list_num] |= (0x1 << idx);
+			dramfreq->irq_idle_mask_sta[reg_list_num]   |= (0x1 << idx);
 		} else {
-			access_value &= (~(0x1 << key_masters_int_idx[i][1]));
-			idle_value   &= (~(0x1 << key_masters_int_idx[i][1]));
+			dramfreq->irq_access_mask_sta[reg_list_num] &= (~(0x1 << idx));
+			dramfreq->irq_idle_mask_sta[reg_list_num]   &= (~(0x1 << idx));
 		}
 	}
-	writel(access_value, dramfreq->dramcom_base + MDFS_IRQ_MASK_STATUS0);
-	writel(idle_value,   dramfreq->dramcom_base + MDFS_IRQ_MASK_STATUS1);
+	sunxi_dramfreq_write_irq_mask_status(dramfreq);
 }
 
 static void sunxi_dramfreq_irq_enable_control(struct sunxi_dramfreq *dramfreq,
 					bool enable)
 {
 	unsigned int i;
-	unsigned int value;
+	int idx, reg_list_num;
+	unsigned int reg_value[MASTER_REG_NUM] = {0};
 
-	value = readl(dramfreq->dramcom_base + MDFS_MASTER_ENABLE);
+	sunxi_dramfreq_read_irq_enable_status(dramfreq, reg_value);
+	for (i = 0; i < MASTER_MAX; i++) {
+		idx = key_masters_int_idx[i][1];
+		reg_list_num = key_masters_int_idx[i][2];
+		if (idx < 0 || reg_list_num < 0) {
+			pr_err("%s: the key master doesn't exit", __func__);
+			return;
+		}
+		if (enable)
+			reg_value[reg_list_num] |= (0x1 << idx);
+		else
+			reg_value[reg_list_num] &= (~(0x1 << idx));
+	}
+	sunxi_dramfreq_write_irq_enable_status(dramfreq, reg_value);
+}
+
+static void sunxi_dramfreq_irq_judgment_and_clear(struct sunxi_dramfreq *dramfreq, bool *phandled)
+{
+	int idx, reg_list_num;
+	unsigned int i;
 
 	for (i = 0; i < MASTER_MAX; i++) {
-		if (enable)
-			value |= (0x1 << key_masters_int_idx[i][1]);
-		else
-			value &= (~(0x1 << key_masters_int_idx[i][1]));
+		idx = key_masters_int_idx[i][1];
+		reg_list_num = key_masters_int_idx[i][2];
+		if (idx < 0 || reg_list_num < 0) {
+			pr_err("%s: the key master doesn't exit", __func__);
+			return;
+		}
+
+		if ((dramfreq->irq_access_status[reg_list_num] >> idx) & 0x1) {
+			dramfreq->key_masters[i] = 1;
+			dramfreq->irq_access_status[reg_list_num] |= (0x1 << idx);
+			writel(dramfreq->irq_access_status[reg_list_num],
+				dramfreq->dramcom_base + MDFS_IRQ_ACCESS_STATUS(reg_list_num));
+			*phandled = true;
+		} else if ((dramfreq->irq_idle_status[reg_list_num] >> idx) & 0x1) {
+			dramfreq->key_masters[i] = 0;
+			dramfreq->irq_idle_status[reg_list_num] |= (0x1 << idx);
+			writel(dramfreq->irq_idle_status[reg_list_num],
+				dramfreq->dramcom_base + MDFS_IRQ_IDLE_STATUS(reg_list_num));
+			*phandled = true;
+		}
 	}
 
-	writel(value, dramfreq->dramcom_base + MDFS_MASTER_ENABLE);
 }
 
 static irqreturn_t sunxi_dramfreq_irq_handler(int irq, void *data)
 {
 	struct sunxi_dramfreq *dramfreq = (struct sunxi_dramfreq *)data;
-	unsigned int i, idx;
-	unsigned int irq_access, irq_idle;
 	bool handled = false;
 
-	irq_access = readl(dramfreq->dramcom_base + MDFS_IRQ_STATUS0);
-	irq_idle   = readl(dramfreq->dramcom_base + MDFS_IRQ_STATUS1);
-
-	for (i = 0; i < MASTER_MAX; i++) {
-		idx = key_masters_int_idx[i][1];
-		if ((irq_access >> idx) & 0x1) {
-			dramfreq->key_masters[i] = 1;
-			irq_access |= (0x1 << idx);
-			writel(irq_access,
-				dramfreq->dramcom_base + MDFS_IRQ_STATUS0);
-			handled = true;
-		} else if ((irq_idle >> idx) & 0x1) {
-			dramfreq->key_masters[i] = 0;
-			irq_idle |= (0x1 << idx);
-			writel(irq_idle,
-				dramfreq->dramcom_base + MDFS_IRQ_STATUS1);
-			handled = true;
-		}
-	}
+	sunxi_dramfreq_read_irq_status(dramfreq);
+	sunxi_dramfreq_irq_judgment_and_clear(dramfreq, &handled);
 
 	if (!handled) {
-		DRAMFREQ_ERR("(IRQ) access=0x%x, idle=0x%x\n",
-				irq_access, irq_idle);
+		int i;
+		for (i = 0; i < dramfreq->master_reg_num; i++) {
+			DRAMFREQ_ERR("(IRQ) irq_access_sta%d=0x%x, irq_idle_sta%d=0x%x\n",
+					i, dramfreq->irq_access_status[i],
+					i, dramfreq->irq_idle_status[i]);
+		}
 		return IRQ_NONE;
 	}
 
@@ -1120,13 +1240,14 @@ static int sunxi_dramfreq_resource_init(struct platform_device *pdev,
 		ret = -EINVAL;
 		goto out;
 	}
-
+#if !defined(CONFIG_ARCH_SUN50IW6)
 	dramfreq->clk_pll_ddr1 = of_clk_get(pdev->dev.of_node, 1);
 	if (IS_ERR(dramfreq->clk_pll_ddr1)) {
 		DRAMFREQ_ERR("Get clk_pll_ddr1 failed!\n");
 		ret = -EINVAL;
 		goto out;
 	}
+#endif
 
 #ifdef CONFIG_DEVFREQ_DRAM_FREQ_BUSFREQ
 	clk_ahb1 = of_clk_get(pdev->dev.of_node, 2);
@@ -1259,7 +1380,7 @@ static void sunxi_dramfreq_hw_init(struct sunxi_dramfreq *dramfreq)
 	volatile unsigned int reg_val;
 
 #ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY
-	writel(0x18f, dramfreq->dramcom_base + 0x0c);
+	writel(0x18f, dramfreq->dramcom_base + MC_TIME_MEASUREMENT);
 
 	/* set master idle period: 1000ms */
 	writel(0x3e7, dramfreq->dramcom_base + MDFS_BWC_PRD);
@@ -1291,8 +1412,12 @@ static int sunxi_dramfreq_probe(struct platform_device *pdev)
 		DRAMFREQ_ERR("Init dram para failed!\n");
 		goto err;
 	} else if (ret == -EINVAL) {
-		printk("[ddrfreq] disabled!\n");
+#if defined(CONFIG_ARCH_SUN50IW6)
+		pr_info("[ddrfreq] disabled, but continue to get freq!\n");
+#else
+		pr_info("[ddrfreq] disabled!\n");
 		goto err;
+#endif
 	}
 
 	ret = sunxi_dramfreq_resource_init(pdev, dramfreq);
@@ -1311,7 +1436,7 @@ static int sunxi_dramfreq_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, dramfreq);
 	sunxi_dramfreq_get_cur_freq(&pdev->dev, &sunxi_dramfreq_profile.initial_freq);
 	dramfreq->devfreq = devfreq_add_device(&pdev->dev, &sunxi_dramfreq_profile,
-					   "adaptive", NULL);
+						SUNXI_DRAM_FREQ_GOVERNOR, NULL);
 	if (IS_ERR(dramfreq->devfreq)) {
 		DRAMFREQ_ERR("Add devfreq device failed!\n");
 		ret = PTR_ERR(dramfreq->devfreq);
@@ -1323,6 +1448,7 @@ static int sunxi_dramfreq_probe(struct platform_device *pdev)
 	dramfreq->devfreq->max_freq = dramfreq->max;
 	dramfreq->devfreq->min_freq = dramfreq->min;
 
+	dramfreq->master_reg_num = MASTER_REG_NUM;
 	dramfreq->pause = 1;
 	dramfreq->governor_state_update = sunxi_dramfreq_governor_state_update;
 
@@ -1371,10 +1497,12 @@ static int sunxi_dramfreq_remove(struct platform_device *pdev)
 	if (dramfreq->devfreq)
 		devfreq_remove_device(dramfreq->devfreq);
 
+#if !defined(CONFIG_ARCH_SUN50IW6)
 	if (dramfreq->clk_pll_ddr1) {
 		clk_put(dramfreq->clk_pll_ddr1);
 		dramfreq->clk_pll_ddr1 = NULL;
 	}
+#endif
 
 	if (dramfreq->clk_pll_ddr0) {
 		clk_put(dramfreq->clk_pll_ddr0);
@@ -1447,6 +1575,12 @@ static int sunxi_dramfreq_resume(struct platform_device *pdev)
 	struct sunxi_dramfreq *dramfreq = platform_get_drvdata(pdev);
 	unsigned long cur_freq;
 
+	/*
+	 * we should init hw,
+	 * otherwise dram hw will block when change freq.
+	 */
+	sunxi_dramfreq_hw_init(dramfreq);
+
 	if (!strcmp(dramfreq->devfreq->governor_name, "adaptive")) {
 		sunxi_dramfreq_get_cur_freq(&pdev->dev, &cur_freq);
 		if (dramfreq->devfreq->previous_freq != cur_freq)
@@ -1454,7 +1588,6 @@ static int sunxi_dramfreq_resume(struct platform_device *pdev)
 
 		if (!sunxi_dramfreq_cur_pause) {
 			dramfreq->pause = 0;
-			sunxi_dramfreq_hw_init(dramfreq);
 			/* set master access init state */
 			sunxi_dramfreq_masters_state_init(dramfreq);
 #ifndef CONFIG_DEVFREQ_DRAM_FREQ_WITH_SOFT_NOTIFY

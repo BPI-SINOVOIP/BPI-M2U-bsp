@@ -25,7 +25,7 @@ s32 tve_low_set_sid_base(void __iomem *address)
 	return 0;
 }
 
-s32 tve_low_init(u32 sel, u32 *dac_no, u32 *cali, u32 *offset,
+s32 tve_low_init(u32 sel, u32 *dac_no, u32 *cali, s32 *offset,
 		 u32 *dac_type, u32 num)
 {
 	u32 val = (*cali) ? (*cali) : 0x285;

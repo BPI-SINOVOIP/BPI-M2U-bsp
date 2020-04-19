@@ -107,15 +107,9 @@ struct vin_mm {
 	struct ion_handle *handle;
 };
 
-extern int os_gpio_request(struct gpio_config *gpio_list,
-			   __u32 group_count_max);
-extern int os_gpio_set(struct gpio_config *gpio_list, __u32 group_count_max);
-extern int os_gpio_release(u32 p_handler, __s32 if_release_to_default_status);
-extern int os_gpio_write(u32 p_handler, __u32 value_to_gpio,
-			 const char *gpio_name, int force_value_flag);
-extern int os_gpio_set_status(u32 p_handler, __u32 if_set_to_output_status,
-			      const char *gpio_name);
-extern int os_mem_alloc(struct vin_mm *mem_man);
-extern void os_mem_free(struct vin_mm *mem_man);
+extern int os_gpio_set(struct gpio_config *gpio_list);
+extern int os_gpio_write(u32 gpio, __u32 out_value, int force_value_flag);
+extern int os_mem_alloc(struct device *dev, struct vin_mm *mem_man);
+extern void os_mem_free(struct device *dev, struct vin_mm *mem_man);
 
 #endif	/*__VIN__OS__H__*/

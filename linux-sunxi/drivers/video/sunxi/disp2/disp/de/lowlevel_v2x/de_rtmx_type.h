@@ -66,15 +66,18 @@ union __vi_lay_attr_reg_t {
 	unsigned int dwval;
 	struct {
 		unsigned int lay_en:1;
-		unsigned int r0:3;
+		unsigned int alpmode:2;
+		unsigned int r0:1;
 		unsigned int lay_fcolor_en:1;
 		unsigned int r1:3;
 		unsigned int lay_fmt:5;
 		unsigned int r2:2;
 		unsigned int ui_sel:1;
-		unsigned int r3:7;
+		unsigned int alpctl:2;
+		unsigned int r3:2;
+		unsigned int brust:3;
 		unsigned int lay_top_down:1;
-		unsigned int r4:8;
+		unsigned int alpha:8;
 	} bits;
 };
 /* 0x0+N*0x30(N=0,1,2,3) */

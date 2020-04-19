@@ -103,7 +103,7 @@ s32 tve_low_close(u32 sel)
 	return 0;
 }
 
-s32 tve_low_set_tv_mode(u32 sel, enum disp_tv_mode mode, u32 cali)
+s32 tve_low_set_tv_mode(u32 sel, enum disp_tv_mode mode, u32 *cali)
 {
 	u32 deflick  = 0;
 	u32 reg_sync = 0;
@@ -471,6 +471,7 @@ s32 tve_low_set_tv_mode(u32 sel, enum disp_tv_mode mode, u32 cali)
 	case DISP_VGA_MOD_1440_900P_60:
 	case DISP_VGA_MOD_1920_1080P_60:
 	case DISP_VGA_MOD_1920_1200P_60:
+	case DISP_VGA_MOD_1280_720P_60:
 		TVE_WUINT32(sel, TVE_004, 0x08000000);
 		break;
 

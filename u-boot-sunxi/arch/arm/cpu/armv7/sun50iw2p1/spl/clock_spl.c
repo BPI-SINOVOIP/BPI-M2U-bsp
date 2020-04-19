@@ -40,9 +40,16 @@ void set_pll_cpux_axi(void)
 	writel((1<<16) | (3<<8) | (2<<0), CCMU_CPUX_AXI_CFG_REG);
 	__msdelay(1);
 
+#if 0
 	//set PLL_CPUX, the  default  clk is 408M  ,PLL_OUTPUT= 24M*N*K/( M*P)
 	writel((0x1000), CCMU_PLL_CPUX_CTRL_REG);
 	writel((1<<31) | readl(CCMU_PLL_CPUX_CTRL_REG), CCMU_PLL_CPUX_CTRL_REG);
+#endif
+	//set PLL_CPUX, the  default  clk is 1008M  ,PLL_OUTPUT= 24M*N*K/( M*P)
+	reg_val = readl(CCMU_PLL_CPUX_CTRL_REG);
+	reg_val &= ~((1<<31) | (0x03 << 16) | (0x1f << 8) | (0x03 << 4) | (0x03 << 0));
+	reg_val |=  ((1<<31) | (0 << 16) | (20<<8) | (1<<4) | (0 << 0)) ;
+	writel(reg_val, CCMU_PLL_CPUX_CTRL_REG);
 	__msdelay(1);
 	//wait PLL_CPUX stable
 #ifndef FPGA_PLATFORM
@@ -61,6 +68,12 @@ void set_pll_cpux_axi(void)
 
 void set_pll_periph0_ahb_apb(void)
 {
+	if((1U << 31)&readl(CCMU_PLL_PERIPH0_CTRL_REG))
+	{
+		//fel has enable pll_periph0
+		printf("periph0 has been enabled\n");
+		return;
+	}
 	//change ahb src before set pll6
 	writel((0x01 << 12) | (readl(CCMU_AHB1_APB1_CFG_REG)&(~(0x3<<12))), CCMU_AHB1_APB1_CFG_REG);
 
@@ -76,9 +89,10 @@ void set_pll_periph0_ahb_apb(void)
 	//set AHB1/APB1 clock  divide ratio
 	//ahb1 clock src is PLL6,                           (0x03<< 12)
 	//apb1 clk src is ahb1 clk src, divide  ratio is 2  (1<<8)
-	//ahb1 pre divide  ratio is 2:    0:1  , 1:2,  2:3,   3:4 (2<<6)
-	//PLL6:AHB1:APB1 = 600M:200M:100M ,
-	writel((1<<8) | (2<<6) | (0<<4), CCMU_AHB1_APB1_CFG_REG);
+	//ahb1 pre divide  ratio is 3:    0:1  , 1:2,  2:3,   3:4 (2<<6)
+	//ahb1 divide  ratio is 2:        0:1  , 1:2,  2:4,   3:8 (1<<4)
+	//PLL6:AHB1:APB1 = 600M:100M:50M
+	writel((1<<8) | (2<<6) | (1<<4), CCMU_AHB1_APB1_CFG_REG);
 	writel((0x03 << 12)|readl(CCMU_AHB1_APB1_CFG_REG), CCMU_AHB1_APB1_CFG_REG);
 	__msdelay(1);
 }

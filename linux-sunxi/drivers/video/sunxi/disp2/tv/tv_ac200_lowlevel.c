@@ -19,10 +19,12 @@ static s32 aw1683_rd_reg(u16 addr, u16* val)
 	return 0;
 }
 
-
-s32 aw1683_tve_init(void)
+s32 aw1683_tve_init(const u16 *p_dac_cali)
 {
 	u16 data;
+
+	if (p_dac_cali == NULL)
+		return -1;
 
 	//clk for tve
 	aw1683_wr_reg(0x001a, 0x0003);
@@ -32,20 +34,18 @@ s32 aw1683_tve_init(void)
 	aw1683_wr_reg(0x0018, 0x0001);
 	aw1683_wr_reg(0x0018, 0x000f);
 
+
 	//sid for tve
-	aw1683_rd_reg(0x8002, &data);
-	if(data == 0)
-	{
-		aw1683_wr_reg(0x4306, 0x28f);
-	}
-	else if(data < 0x3f5 && data > 0)
-	{
-		aw1683_wr_reg(0x4306, data+10);
-	}
+	if (*p_dac_cali == 0)
+		aw1683_rd_reg(0x8002, &data);
 	else
-	{
+		data = *p_dac_cali;
+	if (data == 0)
+		aw1683_wr_reg(0x4306, 0x28f);
+	else if (data < 0x3f5 && data > 0)
+		aw1683_wr_reg(0x4306, data + 10);
+	else
 		aw1683_wr_reg(0x4306, data);
-	}
 
 	//tve anto check
 	aw1683_wr_reg(0x4008,0x12a0);	//dac enable
@@ -200,7 +200,7 @@ s32 aw1683_tve_set_mode(u32 mode)
 		aw1683_wr_reg(0x413e, 0x0000);
 		aw1683_wr_reg(0x43a0, 0x0001);
 		aw1683_wr_reg(0x43a2, 0x0003);
-		aw1683_wr_reg(0x5014, 0x2148);
+		aw1683_wr_reg(0x5014, 0x2149);
 		aw1683_wr_reg(0x4130, 0x0380);
 		aw1683_wr_reg(0x4132, 0x2009);	//2004
 		aw1683_wr_reg(0x4000, 0x0300);
@@ -214,8 +214,15 @@ s32 aw1683_tve_set_mode(u32 mode)
 
 s32 aw1683_tve_open(void)
 {
+	u16 data;
 	aw1683_wr_reg(0x4008,0x02a1);
 	aw1683_wr_reg(0x4000,0x0301);
+	aw1683_rd_reg(0x4008, &data);
+	if (data != 0x02a1)
+		return -1;
+	aw1683_rd_reg(0x4000, &data);
+	if (data != 0x0301)
+		return -1;
 
 	return 0;
 }
@@ -225,6 +232,12 @@ s32 aw1683_tve_close(void)
 	aw1683_wr_reg(0x4000,0x0300);
 	aw1683_wr_reg(0x4008,0x02a0);
 
+	return 0;
+}
+
+s32 aw1683_enable_chip(void)
+{
+	aw1683_wr_reg(0x0002, 0x0001);
 	return 0;
 }
 
@@ -258,4 +271,3 @@ s32 aw1683_tve(void)
 	return RET_OK;
 }
 #endif
-

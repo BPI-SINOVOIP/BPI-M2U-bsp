@@ -1,17 +1,14 @@
 /*
- ******************************************************************************
+ * vin_core.h for video manage
  *
- * vin_core.h
+ * Copyright (c) 2017 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
  *
- * Hawkview ISP - vin_core.h module
+ * Authors:  Zhao Wei <zhaowei@allwinnertech.com>
+ *	Yang Feng <yangfeng@allwinnertech.com>
  *
- * Copyright (c) 2015 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
- *
- * Version		Author         Date		    Description
- *
- *   3.0		Yang Feng   	2015/12/02	ISP Tuning Tools Support
- *
- ******************************************************************************
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 
 #ifndef _VIN_CORE_H_
@@ -35,9 +32,9 @@
 #include "../vin-csi/bsp_csi.h"
 #include "../vin-mipi/bsp_mipi_csi.h"
 #include "../vin-isp/bsp_isp.h"
-#include "../vin-isp/bsp_isp_algo.h"
 #include "../utility/vin_supply.h"
 #include "vin_video.h"
+#include "../vin.h"
 
 #define MAX_FRAME_MEM   (150*1024*1024)
 #define MIN_WIDTH       (32)
@@ -48,10 +45,11 @@
 #define DUMP_ISP		(1 << 1)
 
 struct vin_status_info {
-	unsigned int id;
 	unsigned int width;
 	unsigned int height;
-	unsigned int pix_fmt;
+	unsigned int h_off;
+	unsigned int v_off;
+	unsigned int err_cnt;
 	unsigned int buf_cnt;
 	unsigned int buf_size;
 	unsigned int buf_rest;
@@ -68,127 +66,49 @@ struct vin_coor {
 	unsigned int y2;
 };
 
-enum vin_sub_device_regulator {
-	ENUM_IOVDD,
-	ENUM_AVDD,
-	ENUM_DVDD,
-	ENUM_AFVDD,
-	ENUM_FLVDD,
-	ENUM_MAX_REGU,
-};
-
-struct vin_power {
-	struct regulator *pmic;
-	int power_vol;
-	char power_str[32];
-};
-struct sensor_instance {
-	char cam_name[I2C_NAME_SIZE];
-	int cam_addr;
-	int cam_type;
-	int is_isp_used;
-	int is_bayer_raw;
-	int vflip;
-	int hflip;
-	int act_addr;
-	char act_name[I2C_NAME_SIZE];
-	char isp_cfg_name[I2C_NAME_SIZE];
-};
-
-struct sensor_list {
-	int use_sensor_list;
-	int used;
-	int csi_sel;
-	int device_sel;
-	int twi_id;
-	int power_set;
-	int detect_num;
-	char sensor_pos[32];
-	int valid_idx;
-	struct vin_power power[ENUM_MAX_REGU];
-	struct gpio_config gpio[MAX_GPIO_NUM];
-	struct sensor_instance inst[MAX_DETECT_NUM];
-};
-
-enum module_type {
-	VIN_MODULE_TYPE_CCI,
-	VIN_MODULE_TYPE_I2C,
-	VIN_MODULE_TYPE_SPI,
-	VIN_MODULE_TYPE_GPIO,
-	VIN_MODULE_TYPE_MAX,
-};
-
-struct vin_act_info {
-	struct v4l2_subdev *sd;
-	enum module_type type;
-	int id;
-};
-
-struct vin_flash_info {
-	struct v4l2_subdev *sd;
-	enum module_type type;
-	int id;
-};
-
-struct vin_sensor_info {
-	struct v4l2_subdev *sd;
-	enum module_type type;
-	int id;
-};
-
-struct vin_module_info {
-	struct vin_act_info act[MAX_DETECT_NUM];
-	struct vin_flash_info flash;
-	struct vin_sensor_info sensor[MAX_DETECT_NUM];
-	int id;
-};
-
-struct modules_config {
-	struct vin_module_info modules;
-	struct sensor_list sensors;
-	int bus_sel;
-	int flash_used;
-	int act_used;
-};
-
-struct vin_pipeline_cfg {
-	int mipi_ind;
-	int csi_ind;
-	int isp_ind;
-	int scaler_ind;
-};
-
 struct vin_core {
 	struct platform_device *pdev;
+	unsigned int is_empty;
 	int id;
+	void __iomem *base;
 	/* various device info */
 	struct vin_vid_cap vid_cap;
-	/* about system resource */
-	struct regulator *vin_system_power[3];
-	int vin_sensor_power_cnt;
-	/* about vfe channel */
+	/* about vin channel */
+	unsigned int total_rx_ch;
 	unsigned int cur_ch;
 	/* about some global info */
-	enum v4l2_mbus_type mbus_type;
+	unsigned int rear_sensor;
+	unsigned int front_sensor;
+	unsigned int sensor_sel;
 	unsigned int csi_sel;
 	unsigned int mipi_sel;
-	unsigned int scaler_sel;
-	struct modules_config modu_cfg;
-	unsigned int platform_id;
-	struct vin_pipeline_cfg pipe_cfg;
-
+	unsigned int isp_sel;
+	unsigned int vipp_sel;
+	unsigned int isp_tx_ch;
+	unsigned int hflip;
+	unsigned int vflip;
+	unsigned int vflip_delay;
+	unsigned int stream_idx;
+	unsigned int vin_clk;
+	struct sensor_exp_gain exp_gain;
 	struct v4l2_device *v4l2_dev;
 	const struct vin_pipeline_ops *pipeline_ops;
 	int support_raw;
-	struct v4l2_subdev *csi_sd;
 	int irq;
 	struct vin_status_info vin_status;
 };
 
 static inline struct sensor_instance *get_valid_sensor(struct vin_core *vinc)
 {
-	int valid_idx = vinc->modu_cfg.sensors.valid_idx;
-	return &vinc->modu_cfg.sensors.inst[valid_idx];
+	struct vin_md *vind = dev_get_drvdata(vinc->v4l2_dev->dev);
+	int valid_idx = NO_VALID_SENSOR;
+
+	valid_idx = vind->modules[vinc->sensor_sel].sensors.valid_idx;
+
+	if (valid_idx == NO_VALID_SENSOR)
+		return NULL;
+
+	return &vind->modules[vinc->sensor_sel].sensors.inst[valid_idx];
 }
 int sunxi_vin_debug_register_driver(void);
 void sunxi_vin_debug_unregister_driver(void);
@@ -198,7 +118,5 @@ struct vin_core *sunxi_vin_core_get_dev(int index);
 void vin_get_fmt_mplane(struct vin_frame *frame, struct v4l2_format *f);
 struct vin_fmt *vin_find_format(const u32 *pixelformat, const u32 *mbus_code,
 				  unsigned int mask, int index, bool have_code);
-int vin_core_check_sensor_list(struct vin_core *vinc, int i);
-
 #endif /*_VIN_CORE_H_*/
 

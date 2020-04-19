@@ -218,6 +218,10 @@ extern int ubi_part(char *part_name, const char *vid_header_offset);
 extern int ubi_volume_write(char *volume, void *buf, size_t size);
 extern int ubi_volume_read(char *volume, char *buf, size_t size);
 
+/* sunxi ubifs functions */
+int sunxi_do_ubi(int flag, int argc, char * const argv[]);
+int sunxi_ubi_volume_read(char *volume, loff_t offp, char *buf, size_t size);
+
 extern struct ubi_device *ubi_devices[];
 
 #endif

@@ -435,15 +435,15 @@ static int axp_pinctrl_gpio_of_xlate(struct gpio_chip *gc,
 					u32 *flags)
 {
 	struct gpio_config *config = NULL;
-	int pin, base;
+	int pin, base, pmu_num;
 
 	pr_debug("%s enter... gpiospec->args[0] = %d,\"\
 			+ \" gpiospec->args[1] = %d\n",
 			__func__, gpiospec->args[0], gpiospec->args[1]);
 
-	base = AXP_PIN_BASE;
+	pmu_num = *(int *)gc->dev->platform_data;
+	base = pmu_num ? AXP_PIN_BASE + SECONDARY_PMU_OFFSET : AXP_PIN_BASE;
 	pin = base + gpiospec->args[1];
-
 	pin = pin-gc->base;
 	if (pin > gc->ngpio)
 		return -EINVAL;
@@ -456,6 +456,9 @@ static int axp_pinctrl_gpio_of_xlate(struct gpio_chip *gc,
 		config->pull = gpiospec->args[4];
 		config->data = gpiospec->args[5];
 	}
+
+	pr_debug("%s: gpio base=%d ngpio=%d pin=%d\n", axp_name[pmu_num],
+				gc->base, gc->ngpio, pin);
 
 	return pin;
 }
@@ -578,7 +581,8 @@ static int axp_pinctrl_build_state(struct device *dev, struct axp_pinctrl *pctl)
 struct axp_pinctrl *axp_pinctrl_register(struct device *dev,
 					struct axp_dev *axp_dev,
 					struct axp_pinctrl_desc *desc,
-					struct axp_gpio_ops *ops)
+					struct axp_gpio_ops *ops,
+					int pmu_num)
 {
 	struct pinctrl_desc *pctrl_desc;
 	struct axp_pinctrl      *pctl;
@@ -636,6 +640,7 @@ struct axp_pinctrl *axp_pinctrl_register(struct device *dev,
 
 	/* initialize axp-gpio-chip */
 	pctl->gpio_chip.dev              = dev;
+	pctl->gpio_chip.dev->platform_data = &axp_dev->pmu_num;
 	pctl->gpio_chip.label            = MODULE_NAME;
 	pctl->gpio_chip.owner            = THIS_MODULE;
 	pctl->gpio_chip.request          = axp_gpio_request;
@@ -646,7 +651,9 @@ struct axp_pinctrl *axp_pinctrl_register(struct device *dev,
 	pctl->gpio_chip.set              = axp_gpio_set;
 	pctl->gpio_chip.of_xlate         = axp_pinctrl_gpio_of_xlate;
 	pctl->gpio_chip.of_gpio_n_cells  = 6;
-	pctl->gpio_chip.base             = AXP_PIN_BASE;
+	pctl->gpio_chip.base             = pmu_num ?
+					AXP_PIN_BASE + SECONDARY_PMU_OFFSET :
+					AXP_PIN_BASE;
 	pctl->gpio_chip.ngpio            = desc->npins;
 	pctl->gpio_chip.can_sleep        = 0,
 

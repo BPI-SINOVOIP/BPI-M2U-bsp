@@ -257,6 +257,13 @@ int disp_al_lcd_cfg(u32 screen_id, disp_panel_para * panel, panel_extend_para *e
 	return 0;
 }
 
+int disp_al_lcd_cfg_ext(u32 screen_id, panel_extend_para *extend_panel)
+{
+	tcon0_cfg_ext(screen_id, extend_panel);
+
+	return 0;
+}
+
 int disp_al_lcd_enable(u32 screen_id, disp_panel_para * panel)
 {
 	tcon0_open(screen_id, panel);
@@ -516,7 +523,9 @@ int disp_al_vga_cfg(u32 screen_id, struct disp_video_timings *video_info)
 }
 #endif
 
-int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info, struct disp_vdevice_interface_para *para)
+int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info,
+			struct disp_vdevice_interface_para *para,
+			u8 config_tcon_only)
 {
 	struct lcd_clk_info clk_info;
 	disp_panel_para info;
@@ -564,7 +573,12 @@ int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info, st
 		DE_WRN("lcd cfg fail!\n");
 	else
 		DE_INF("lcd cfg ok!\n");
-	tcon0_src_select(screen_id, LCD_SRC_DE, al_priv.disp_disp[screen_id]);
+	if (!config_tcon_only)
+		tcon0_src_select(screen_id, LCD_SRC_DE,
+				 al_priv.disp_disp[screen_id]);
+	else
+		DE_INF("%s:config_tcon_only is %d\n", __func__,
+		       config_tcon_only);
 
 	return 0;
 }
@@ -757,4 +771,3 @@ int disp_al_get_display_size(unsigned int screen_id, unsigned int *width, unsign
 
 	return 0;
 }
-

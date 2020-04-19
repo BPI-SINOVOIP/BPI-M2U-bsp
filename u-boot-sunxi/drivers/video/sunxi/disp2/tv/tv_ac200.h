@@ -79,4 +79,6 @@ int tv_ac200_init(void);
 
 extern struct ac200_tv_priv tv_priv;
 extern struct disp_video_timings tv_video_timing[];
+extern struct ac200_tv_priv tv_priv;
+extern u32 ac200_twi_addr;
 #endif

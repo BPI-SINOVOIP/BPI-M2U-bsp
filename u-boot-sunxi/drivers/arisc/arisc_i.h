@@ -54,19 +54,19 @@
 
 #define ARISC_INF(format, args...)                          \
 	if(DEBUG_LEVEL_INF & (0xf0 >> (arisc_debug_level +1)))  \
-		tick_printf("[ARISC] :"format, ##args);
+		pr_msg("[ARISC] :"format, ##args);
 
 #define ARISC_LOG(format, args...)                                      \
 	if(DEBUG_LEVEL_LOG & (0xf0 >> (arisc_debug_level +1)))	\
-		tick_printf("[ARISC] :"format, ##args);
+		pr_msg("[ARISC] :"format, ##args);
 
 #define ARISC_WRN(format, args...)                          \
 	if(DEBUG_LEVEL_WRN & (0xf0 >> (arisc_debug_level +1)))  \
-		printf("[ARISC WARING] :"format, ##args);
+		pr_warning("[ARISC WARING] :"format, ##args);
 
 #define ARISC_ERR(format, args...)                          \
 	if(DEBUG_LEVEL_ERR & (0xf0 >> (arisc_debug_level +1)))  \
-		printf("[ARISC ERROR] :"format, ##args);
+		pr_error("[ARISC ERROR] :"format, ##args);
 
 #else /* ARISC_DEBUG_ON */
 #define ARISC_INF(...)

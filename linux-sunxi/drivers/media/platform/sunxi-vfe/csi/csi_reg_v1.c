@@ -5,9 +5,13 @@
 #include "csi_reg_v1.h"
 #include "../utility/vfe_io.h"
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 #define ADDR_BIT_R_SHIFT 0
 #define CLK_POL 0	/*0:RISING, 1:FAILING*/
-
+#else
+#define ADDR_BIT_R_SHIFT 2
+#define CLK_POL 1	/*0:RISING, 1:FAILING*/
+#endif
 volatile void __iomem *csi_base_addr[2];
 enum csi_input_fmt input_fmt;
 

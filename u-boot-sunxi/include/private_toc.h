@@ -111,20 +111,56 @@ typedef struct sbrom_toc0_config
 	unsigned int       boot_cpu;           //
 	special_gpio_cfg    a15_power_gpio;  //the gpio config is to a15 extern power enable gpio
 	unsigned int       next_exe_pa;
-    unsigned int       secure_without_OS;   //secure boot without semelis
-    unsigned int       debug_mode;         //1:turn on printf; 0 :turn off printf
+	unsigned int       secure_without_OS;   //secure boot without semelis
+	unsigned char       debug_mode;         //1:turn on printf; 0 :turn off printf
+	unsigned char       power_mode;          /* 0:axp , 1: dummy pmu  */
+	unsigned char       reserver[2];
 	unsigned int		card_work_mode;
 	unsigned int      	res[2];   			// 总共1024字节
 
 }
 sbrom_toc0_config_t;
 
-#define ITEM_SCP_NAME             "scp"
-#define ITEM_MONITOR_NAME         "monitor"
-#define ITEM_UBOOT_NAME           "u-boot"
-#define ITEM_LOGO_NAME            "logo"
-#define ITEM_SHUTDOWNCHARGE_LOGO_NAME   "shutdowncharge"
-#define ITEM_ANDROIDCHARGE_LOGO_NAME    "androidcharge"
+#define RSA_BIT			(2048)
+#define PK_MAX_LEN_BIT		(RSA_BIT*2)
+#define PK_MAX_LEN_BYTE		(PK_MAX_LEN_BIT >> 3)
+
+typedef struct SBROM_TOC0_KEY_ITEM_info {
+	unsigned int	vendor_id;
+	unsigned int	KEY0_PK_mod_len;
+	unsigned int	KEY0_PK_e_len;
+	unsigned int	KEY1_PK_mod_len;
+	unsigned int	KEY1_PK_e_len;
+	unsigned int	sign_len;
+	unsigned char	KEY0_PK[PK_MAX_LEN_BYTE];
+	unsigned char	KEY1_PK[PK_MAX_LEN_BYTE];
+	unsigned char	reserve[32];
+	unsigned char	sign[256];
+} SBROM_TOC0_KEY_ITEM_info_t;
+
+typedef struct SBROM_TOC0_ITEM_info {
+	u32 name;
+	u32 data_offset;
+	u32 data_len;
+	u32 status;
+	u32 type;
+	u32 run_addr;
+	u32 reserved_1;
+	u32 end;
+}  SBROM_TOC0_ITEM_info_t;
+
+
+#define ITEM_SCP_NAME			"scp"
+#define ITEM_MONITOR_NAME		"monitor"
+#define ITEM_UBOOT_NAME			"u-boot"
+#define ITEM_LOGO_NAME			"logo"
+#define ITEM_DTB_NAME			"dtb"
+#define ITEM_SOCCFG_NAME		"soc-cfg"
+#define ITEM_BDCFG_NAME			"board-cfg"
+#define ITEM_SHUTDOWNCHARGE_LOGO_NAME	"shutdowncharge"
+#define ITEM_ANDROIDCHARGE_LOGO_NAME	"androidcharge"
+#define ITEM_EMMC_FW_NAME		"emmc-fw"
+#define ITEM_NAME_SBROMSW_KEY		0x010303
 
 #endif     //  ifndef __toc_h
 

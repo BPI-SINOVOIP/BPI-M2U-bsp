@@ -16,7 +16,11 @@
 
 #define CCSC00_OFST	0xAA050
 /* device0 channel0 (or device1 channel0 support vep) */
+#if defined(CONFIG_ARCH_SUN8IW17P1)
+#define CCSC01_OFST 0xF0000
+#else
 #define CCSC01_OFST 0xFA050
+#endif /*endif CONFIG_ARCH_SUN8IW17P1 */
 /* device0 channel1 (or device1 channel1 support vep) */
 #define CCSC10_OFST 0xA0000
 /* device1 channel0 not support vep */

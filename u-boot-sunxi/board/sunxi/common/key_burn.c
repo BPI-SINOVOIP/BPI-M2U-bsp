@@ -81,12 +81,12 @@ int sunxi_keydata_burn_by_usb(void)
 		return 0;
 	}
 
-	if(workmode != WORK_MODE_BOOT)		//非启动模式，不执行
+	if(workmode != WORK_MODE_BOOT)
 	{
 		printf("out of usb burn from boot: not boot mode\n");
 		return 0;
 	}
-	if(gd->vbus_status == SUNXI_VBUS_NOT_EXIST)	//vbus不存在，不执行
+	if(gd->vbus_status != SUNXI_VBUS_PC)
 	{
 		printf("out of usb burn from boot: without usb\n");
 		return 0;
@@ -126,8 +126,6 @@ int sunxi_keydata_burn_by_usb(void)
 				return 0;
 			}
 		}
-#else
-	     return -1;
 #endif
 	}
 #ifdef CONFIG_SUNXI_SECURE_STORAGE

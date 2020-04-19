@@ -19,18 +19,20 @@
 #define _SUNXI_CCI_H_
 
 #include "../platform/platform_cfg.h"
-struct cci_platform_data {
-	unsigned int cci_sel;
-};
+
 struct cci_dev {
-	unsigned int cci_sel;
 	struct platform_device *pdev;
 	unsigned int id;
 	spinlock_t slock;
 	int irq;
+	int use_cnt;
 	wait_queue_head_t wait;
 
 	void __iomem *base;
+
+	struct list_head cci_list;
+	struct pinctrl *pctrl;
+	struct clk *clock;
 };
 
 #endif /*_SUNXI_CCI_H_*/

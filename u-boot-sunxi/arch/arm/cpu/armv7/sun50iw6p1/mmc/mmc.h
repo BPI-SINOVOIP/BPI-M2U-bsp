@@ -151,6 +151,14 @@
 #define EXT_CSD_CARD_TYPE	196	/* RO */
 #define EXT_CSD_REV		192	/* RO */
 #define EXT_CSD_SEC_CNT		212	/* RO, 4 bytes */
+#define EXT_CSD_BOOT_MULT		226	/* RO */
+#define EXT_CSD_PARTITIONING_SUPPORT	160	/* RO */
+#define EXT_CSD_RPMB_MULT		168	/* RO */
+#define EXT_CSD_BOOT_BUS_WIDTH		177
+#define EXT_CSD_GP_SIZE_MULT		143	/* R/W */
+#define EXT_CSD_HC_WP_GRP_SIZE		221	/* RO */
+#define EXT_CSD_HC_ERASE_GRP_SIZE	224	/* RO */
+
 
 /*
  * EXT_CSD field definitions
@@ -190,6 +198,34 @@
 #define EXT_CSD_TIMING_HS	           1	/* High speed */
 #define EXT_CSD_TIMING_HS200	       2	/* HS200 */
 #define EXT_CSD_TIMING_HS400	       3	/* HS400 */
+
+
+/* MMC_SWITCH boot modes */
+#define MMC_SWITCH_MMCPART_NOAVAILABLE	(0xff)
+#define MMC_SWITCH_PART_ACCESS_MASK		(0x7)
+#define MMC_SWITCH_PART_SUPPORT			(0x1)
+#define MMC_SWITCH_PART_BOOT_PART_MASK	(0x7 << 3)
+#define MMC_SWITCH_PART_BOOT_PART_NONE	(0x0)
+#define MMC_SWITCH_PART_BOOT_PART_1		(0x1)
+#define MMC_SWITCH_PART_BOOT_PART_2		(0x2)
+#define MMC_SWITCH_PART_BOOT_USER		(0x7)
+#define MMC_SWITCH_PART_BOOT_ACK_MASK	(0x1 << 6)
+#define MMC_SWITCH_PART_BOOT_ACK_ENB	(0x1)
+
+/* MMC_SWITCH boot condition */
+#define MMC_SWITCH_MMCBOOT_BUS_NOAVAILABLE	(0xff)
+#define MMC_SWITCH_BOOT_MODE_MASK			(0x3 << 3)
+#define MMC_SWITCH_BOOT_SDR_NORMAL			(0x0)
+#define MMC_SWITCH_BOOT_SDR_HS				(0x1)
+#define MMC_SWITCH_BOOT_DDR					(0x2)
+#define MMC_SWITCH_BOOT_RST_BUS_COND_MASK	(0x1 << 2)
+#define MMC_SWITCH_BOOT_RST_BUS_COND		(0x0)
+#define MMC_SWITCH_BOOT_RETAIN_BUS_COND		(0x1)
+#define MMC_SWITCH_BOOT_BUS_WIDTH_MASK		(0x3 << 0)
+#define MMC_SWITCH_BOOT_BUS_SDRx1_DDRx4		(0x0)
+#define MMC_SWITCH_BOOT_BUS_SDRx4_DDRx4		(0x1)
+#define MMC_SWITCH_BOOT_BUS_SDRx8_DDRx8		(0x2)
+
 
 #define R1_ILLEGAL_COMMAND		(1 << 22)
 #define R1_APP_CMD			(1 << 5)
@@ -343,8 +379,10 @@ struct boot_sdmmc_private_info_t {
 	#define EXT_PARA0_TUNING_SUCCESS_FLAG (1U<<0)
 	u32 ext_para0;
 
-	/* ext_para1/2/3 reseved for future */
+	/**GPIO 1.8V bias setting***/
+	#define  EXT_PARA1_1V8_GPIO_BIAS	0x1 
 	u32 ext_para1;
+	/* ext_para/2/3 reseved for future */
 	u32 ext_para2;
 	u32 ext_para3;
 };
@@ -389,8 +427,17 @@ struct mmc {
 	char revision[8+8]; //char revision[8+1];	 /* CID:  PRV */
 
     uint speed_mode;
+
+	uint boot_support;
+	uchar boot_bus_cond;
+	u64 capacity_boot;
+	u64 capacity_rpmb;
+	u64 capacity_gp[4];
 };
 
 #define mmc_host_is_spi(mmc)	((mmc)->host_caps & MMC_MODE_SPI)
+
+extern int mmc_switch_part(int dev_num, unsigned int part_num);
+extern u64 mmc_get_boot_cap(int dev_num);
 
 #endif /* _MMC_H_ */

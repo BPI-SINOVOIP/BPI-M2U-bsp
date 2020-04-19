@@ -12,7 +12,7 @@ u32 read_prcm_wvalue(u32 addr,void __iomem * ADDA_PR_CFG_REG)
 	writel(reg, ADDA_PR_CFG_REG);
 
 	reg = readl(ADDA_PR_CFG_REG);
-	reg &= ~(0x1f<<16);
+	reg &= ~(ADDR_WIDTH<<16);
 	reg |= (addr<<16);
 	writel(reg, ADDA_PR_CFG_REG);
 
@@ -31,7 +31,7 @@ void write_prcm_wvalue(u32 addr, u32 val,void __iomem * ADDA_PR_CFG_REG)
 	writel(reg, ADDA_PR_CFG_REG);
 
 	reg = readl(ADDA_PR_CFG_REG);
-	reg &= ~(0x1f<<16);
+	reg &= ~(ADDR_WIDTH<<16);
 	reg |= (addr<<16);
 	writel(reg, ADDA_PR_CFG_REG);
 

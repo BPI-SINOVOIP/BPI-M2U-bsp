@@ -8,18 +8,25 @@
 static bool hdmi_io_used[HDMI_IO_NUM]={0};
 static disp_gpio_set_t hdmi_io[HDMI_IO_NUM];
 static u32 io_enable_count = 0;
+static u32 io_regulator_enable_count;
 #if defined(__LINUX_PLAT__)
 static struct semaphore *run_sem = NULL;
 static struct task_struct * HDMI_task;
 #endif
 static bool hdmi_cec_support;
 static char hdmi_power[25];
+static char hdmi_io_regulator[25];
 static bool hdmi_power_used;
+static bool hdmi_io_regulator_used;
 static bool hdmi_used;
 static bool boot_hdmi = false;
 #if defined(__CLK_SUPPORT__)
 static struct clk *hdmi_clk = NULL;
 static struct clk *hdmi_ddc_clk = NULL;
+static struct clk *hdmi_clk_parent;
+#if defined(CONFIG_ARCH_SUN8IW12P1)
+static struct clk *hdmi_cec_clk;
+#endif /*endif CONFIG_ARCH */
 #endif
 static u32 power_enable_count = 0;
 static u32 clk_enable_count = 0;
@@ -56,6 +63,7 @@ unsigned int hdmi_get_soc_version(void)
 {
     unsigned int version = 0;
 #if defined(CONFIG_ARCH_SUN8IW7)
+#if defined(SUN8IW7P1_REV_A) || defined(SUN8IW7P2_REV_B)
 	unsigned int chip_ver = sunxi_get_soc_ver();
 
 	switch (chip_ver) {
@@ -67,6 +75,9 @@ unsigned int hdmi_get_soc_version(void)
 		case SUN8IW7P2_REV_B:
 			version = 1;
 	}
+#else
+	version = 1;
+#endif
 #endif
 	return version;
 }
@@ -127,6 +138,13 @@ static int hdmi_clk_enable(void)
 		clk_disable(hdmi_clk);
 	}
 
+#if defined(CONFIG_ARCH_SUN8IW12P1)
+	if (hdmi_cec_clk)
+		ret = clk_prepare_enable(hdmi_cec_clk);
+	if (0 != ret)
+		__wrn("enable hdmi cec clk fail\n");
+#endif
+
 	return ret;
 }
 
@@ -136,20 +154,97 @@ static int hdmi_clk_disable(void)
 		clk_disable(hdmi_clk);
 	if (hdmi_ddc_clk)
 		clk_disable(hdmi_ddc_clk);
+#if defined(CONFIG_ARCH_SUN8IW12P1)
+	if (hdmi_cec_clk)
+		clk_disable(hdmi_cec_clk);
+#endif
 
 	return 0;
+}
+
+static bool hdmi_is_divide_by(unsigned long dividend,
+			       unsigned long divisor)
+{
+	bool divide = false;
+	unsigned long temp;
+
+	if (divisor == 0)
+		goto exit;
+
+	temp = dividend / divisor;
+	if (dividend == (temp * divisor))
+		divide = true;
+
+exit:
+	return divide;
 }
 
 static int hdmi_clk_config(u32 vic)
 {
 	int index = 0;
+	unsigned long rate = 0, rate_set = 0;
+	unsigned long rate_round, rate_parent;
+	int i;
 
 	index = hdmi_core_get_video_info(vic);
-	if (hdmi_clk)
-		clk_set_rate(hdmi_clk, video_timing[index].pixel_clk);
+	rate = video_timing[index].pixel_clk *
+		(video_timing[index].pixel_repeat + 1);
+	rate_parent = clk_get_rate(hdmi_clk_parent);
+	if (!hdmi_is_divide_by(rate_parent, rate)) {
+		if (hdmi_is_divide_by(297000000, rate))
+				clk_set_rate(hdmi_clk_parent, 297000000);
+		else if (hdmi_is_divide_by(594000000, rate))
+				clk_set_rate(hdmi_clk_parent, 594000000);
+	}
+
+	if (hdmi_clk) {
+		clk_set_rate(hdmi_clk, rate);
+		rate_set = clk_get_rate(hdmi_clk);
+	}
+
+	if (hdmi_clk && (rate_set != rate)) {
+		for (i = 1; i < 10; i++) {
+			rate_parent = rate * i;
+			rate_round = clk_round_rate(hdmi_clk_parent,
+								rate_parent);
+			if (rate_round == rate_parent) {
+				clk_set_rate(hdmi_clk_parent, rate_parent);
+				clk_set_rate(hdmi_clk, rate);
+				break;
+			}
+		}
+		if (i == 10)
+			printf("clk_set_rate fail.need %ldhz,but get %ldhz\n",
+				rate, rate_set);
+	}
 
 	return 0;
 }
+
+unsigned int hdmi_clk_get_div(void)
+{
+	unsigned long rate = 1, rate_parent = 1;
+	unsigned int div = 4;
+
+	if (!hdmi_clk || !hdmi_clk_parent) {
+		__wrn("%s, get clk div fail\n", __func__);
+		goto exit;
+	}
+
+	if (hdmi_clk)
+		rate = clk_get_rate(hdmi_clk);
+	if (hdmi_clk_parent)
+		rate_parent = clk_get_rate(hdmi_clk_parent);
+
+	if (rate != 0)
+		div = rate_parent / rate;
+	else
+		__wrn("%s, hdmi clk rate is ZERO!\n", __func__);
+
+exit:
+	return div;
+}
+
 #else
 static int hdmi_clk_enable(void){return 0;}
 static int hdmi_clk_disable(void){return 0;}
@@ -219,6 +314,12 @@ static struct disp_hdmi_mode hdmi_mode_tbl[] = {
 	{DISP_TV_MOD_720P_60HZ_3D_FP,     HDMI720P_60_3D_FP, },
 	{DISP_TV_MOD_3840_2160P_30HZ,     HDMI3840_2160P_30, },
 	{DISP_TV_MOD_3840_2160P_25HZ,     HDMI3840_2160P_25, },
+	{DISP_TV_MOD_3840_2160P_24HZ,     HDMI3840_2160P_24, },
+	{DISP_TV_MOD_4096_2160P_24HZ,     HDMI4096_2160P_24, },
+	{DISP_TV_MOD_1280_1024P_60HZ,     HDMI1280_1024,     },
+	{DISP_TV_MOD_1024_768P_60HZ,      HDMI1024_768,      },
+	{DISP_TV_MOD_900_540P_60HZ,       HDMI900_540,       },
+	{DISP_TV_MOD_1920_720P_60HZ,      HDMI1920_720,      },
 };
 
 u32 hdmi_get_vic(u32 mode)
@@ -299,6 +400,13 @@ static s32 hdmi_mode_support(u32 mode)
 			find = true;
 			break;
 		}
+	}
+
+	if (find && (mode == DISP_TV_MOD_1280_1024P_60HZ
+		|| mode == DISP_TV_MOD_1024_768P_60HZ
+		|| mode == DISP_TV_MOD_900_540P_60HZ
+		|| mode == DISP_TV_MOD_1920_720P_60HZ)) {
+		return 1;
 	}
 
 	if (find) {
@@ -548,21 +656,30 @@ s32 hdmi_init(void)
 	uintptr_t reg_base;
 	int value;
 	int node_offset = 0;
-	char str[10] = {0};
+//	char str[10] = {0};
 
 	hdmi_used = 0;
 	b_hdmi_suspend_pre = b_hdmi_suspend = false;
 	hdmi_power_used = 0;
 
-	ret = disp_sys_script_get_item("hdmi", "status", (int*)str, 2);
+/*	ret = disp_sys_script_get_item("hdmi", "status", (int*)str, 2);
 	if (ret != 2) {
 		printf("fetch hdmi err.\n");
 		return -1;
 	}
 	if (0 != strcmp(str, "okay"))
 		return -1;
+*/
+	ret = disp_sys_script_get_item(FDT_HDMI_PATH, "hdmi_used", &value, 1);
+	if (ret != 1) {
+		printf("fetch hdmi err.\n");
+		return -1;
+	}
+	if (value != 1)
+		return -1;
 
 	hdmi_used = 1;
+
 #if defined(__LINUX_PLAT__)
 	/*  parse boot para */
 	value = disp_boot_para_parse();
@@ -610,6 +727,15 @@ s32 hdmi_init(void)
 		goto err_clk_get;
 	}
 
+#if defined(CONFIG_ARCH_SUN8IW12P1)
+	hdmi_cec_clk = of_clk_get(node_offset, 2);
+	if (hdmi_cec_clk == NULL) {
+		__wrn("fail to get clk for hdmi cec\n");
+		goto err_clk_get;
+	}
+#endif
+
+	hdmi_clk_parent = clk_get_parent(hdmi_clk);
 	/* parse io config */
 	hdmi_parse_io_config();
 	mutex_init(&mlock);
@@ -656,6 +782,20 @@ s32 hdmi_init(void)
 				goto err_power;
 			}
 		}
+	}
+
+	ret = disp_sys_script_get_item("hdmi", "hdmi_io_regulator",
+				       (int *)hdmi_io_regulator, 2);
+	if (2 == ret) {
+		hdmi_io_regulator_used = 1;
+		mutex_lock(&mlock);
+		ret = hdmi_power_enable(hdmi_io_regulator);
+		mutex_unlock(&mlock);
+		if (0 != ret)
+			__wrn("fail to enable hdmi io power %s\n",
+			      hdmi_io_regulator);
+		else
+			++io_regulator_enable_count;
 	}
 
 	ret = disp_sys_script_get_item("hdmi", "hdmi_cts_compatibility", &value, 1);

@@ -5,6 +5,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/delay.h>
+#include <linux/notifier.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
@@ -15,6 +16,8 @@
 #endif
 #include "axp-core.h"
 #include "axp-regulator.h"
+
+RAW_NOTIFIER_HEAD(axp_regu_notifier);
 
 #if defined(CONFIG_AW_AXPDUMMY) && defined(CONFIG_SUNXI_ARISC)
 struct ldo_type_name_mapping {
@@ -228,6 +231,7 @@ static s32 axp_enable(struct regulator_dev *rdev)
 	struct axp_regulator_info *info = rdev_get_drvdata(rdev);
 	struct axp_regmap *regmap = info->regmap;
 	int i, flag = 0;
+	int ret = 0;
 	struct axp_dev *cur_axp_dev;
 
 	AXP_DEBUG(AXP_REGU, info->pmu_num, "enable %s\n",
@@ -252,8 +256,15 @@ static s32 axp_enable(struct regulator_dev *rdev)
 
 	BUG_ON(flag == 0);
 
-	return axp_regmap_update(regmap, rdev->desc->enable_reg,
+	ret = axp_regmap_update(regmap, rdev->desc->enable_reg,
 			info->enable_val, rdev->desc->enable_mask);
+
+	/* After enable regulator we have to wait for regulator lock, which
+	 * means regulator voltage is stable and is available for use */
+	if (!ret)
+		udelay(1500);
+
+	return ret;
 }
 
 static s32 axp_disable(struct regulator_dev *rdev)
@@ -515,6 +526,7 @@ static s32 regu_device_tree_do_parse(struct device_node *node,
 				struct regulator_init_data *axp_init_data,
 				s32 (*get_dep_cb)(const char *))
 {
+	int ret;
 	u32 ldo_count = 0, ldo_index = 0;
 	char name[32] = {0};
 	s32 num = 0, supply_num = 0, i = 0, j = 0, var = 0;
@@ -622,7 +634,11 @@ static s32 regu_device_tree_do_parse(struct device_node *node,
 					regu_consumer_supply;
 		}
 	}
-	return 0;
+
+	ret = __raw_notifier_call_chain(&axp_regu_notifier, AXP_READY,
+					NULL, -1, NULL);
+
+	return notifier_to_errno(ret);
 }
 
 s32 axp_regulator_dt_parse(struct device_node *node,

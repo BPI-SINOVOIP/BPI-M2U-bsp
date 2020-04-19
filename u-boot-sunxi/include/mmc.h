@@ -79,6 +79,10 @@
 #define MMC_CMD_SET_BLOCK_COUNT         23
 #define MMC_CMD_WRITE_SINGLE_BLOCK	24
 #define MMC_CMD_WRITE_MULTIPLE_BLOCK	25
+#define MMC_CMD_SET_WRITE_PROT			28/* ac,sets the write protect bit of the addressed group ,R1b*/
+#define MMC_CMD_CLR_WRITE_PROT			29/* ac, clears the write protect bit of the addressed group ,R1b*/
+#define MMC_CMD_SEND_WRITE_PROT 		30/* adtc,ask the card to send status of the write protection bits,R1*/
+#define MMC_CMD_SEND_WRITE_PROT_TYPE	31/* adtc,ask the card to send type of the write protection,R1*/
 #define MMC_CMD_ERASE_GROUP_START	35
 #define MMC_CMD_ERASE_GROUP_END		36
 #define MMC_CMD_ERASE			38
@@ -171,6 +175,7 @@
 #define EXT_CSD_PARTITIONING_SUPPORT	160	/* RO */
 #define EXT_CSD_RST_N_FUNCTION		162	/* R/W */
 #define EXT_CSD_RPMB_MULT		168	/* RO */
+#define EXT_CSD_USER_WP     171 /* R/W */
 #define EXT_CSD_ERASE_GROUP_DEF		175	/* R/W */
 #define EXT_CSD_BOOT_BUS_WIDTH		177
 #define EXT_CSD_PART_CONF		179	/* R/W */
@@ -196,6 +201,9 @@
 #define EXT_CSD_REV		192	/* RO */
 #define EXT_CSD_SEC_CNT		212	/* RO, 4 bytes */
 #define EXT_CSD_SECURE_REMOAL_TYPE 16 /* R/W */
+#define EXT_CSD_FFU_STATUS      26      /* RO */
+#define EXT_CSD_MODE_OPERATION_CODES    29 /* W */
+#define EXT_CSD_MODE_CONFIG     30      /* R/W */
 #define EXT_CSD_FLUSH_CACHE		32      /* W */
 #define EXT_CSD_CACHE_CTRL		33      /* R/W */
 #define EXT_CSD_POWER_OFF_NOTIFICATION	34	/* R/W */
@@ -214,6 +222,7 @@
 #define EXT_CSD_SANITIZE_START		165     /* W */
 #define EXT_CSD_WR_REL_PARAM		166	/* RO */
 #define EXT_CSD_RPMB_MULT		168	/* RO */
+#define EXT_CSD_FW_CONFIG       169 /* R/W */
 #define EXT_CSD_BOOT_WP			173	/* R/W */
 #define EXT_CSD_ERASE_GROUP_DEF		175	/* R/W */
 #define EXT_CSD_PART_CONFIG		179	/* R/W */
@@ -250,10 +259,16 @@
 #define EXT_CSD_GENERIC_CMD6_TIME	248	/* RO */
 #define EXT_CSD_CACHE_SIZE		    249	/* RO, 4 bytes */
 #define EXT_CSD_PWR_CL_DDR_200_360	253	/* RO */
+#define EXT_CSD_FIRMWARE_VERSION    254 /* 254-261, RO */
 #define EXT_CSD_PRE_EOL_INFO        267 /* RO */
 #define EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_A 268 /* RO */
 #define EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B 269 /* RO */
 #define EXT_CSD_VENDOR_HEALTH_REPORT 270 /* 270-301, RO */
+#define EXT_CSD_NUM_OF_FW_SECTS_PROGRAMMED /* 302-305, RO */
+#define EXT_CSD_FFU_ARG             487 /* 487-490, RO */
+#define EXT_CSD_OPERATION_CODES_TIMEOUT 491 /* RO */
+#define EXT_CSD_FFU_FEATURES        492 /* RO */
+#define EXT_CSD_SUPPORTED_MODES     493 /* RO */
 #define EXT_CSD_TAG_UNIT_SIZE		498	/* RO */
 #define EXT_CSD_DATA_TAG_SUPPORT	499	/* RO */
 #define EXT_CSD_MAX_PACKED_WRITES	500	/* RO */
@@ -324,6 +339,30 @@
 #define EXT_CSD_SEC_BD_BLK_EN	(1U << 2)
 #define EXT_CSD_SEC_GB_CL_EN	(1U << 4)
 #define EXT_CSD_SEC_SANITIZE	(1U << 6)  /* v4.5 only */
+
+/* -- EXT_CSD[29] MODE_OPERATION_CODES  */
+#define EXT_CSD_FFU_INSTALL             (1U << 1)
+#define EXT_CSD_FFU_ABORT               (1U << 2)
+
+/* -- EXT_CSD[30] MODE_CONFIG  */
+#define EXT_CSD_NORMAL_MODE             (0)
+#define EXT_CSD_FFU_MODE                (1)
+#define EXT_CSD_VENDOR_SPECIFIC_MODE    (2)
+
+/* MMC_SWITCH EXT_CSD USER_WP[171] */
+#define MMC_SWITCH_USER_WP_PERM_PSWD_DIS    (0x1 << 7)
+#define MMC_SWITCH_USER_WP_CD_PERM_WP_DIS   (0x1 << 6)
+#define MMC_SWITCH_USER_WP_US_PERM_WP_DIS   (0x1 << 4)
+#define MMC_SWITCH_USER_WP_US_PWR_WP_DIS    (0x1 << 3)
+#define MMC_SWITCH_USER_WP_US_PERM_WP_EN    (0x1 << 2)
+#define MMC_SWITCH_USER_WP_US_PWR_WP_EN     (0x1 << 0)
+
+#define EXT_CSD_RST_N_ENABLE            (0x1)
+
+
+#define PART_SUPPORT		(0x1)
+#define PART_ENH_ATTRIB		(0x1f)
+
 
 /* MMC_SWITCH boot modes */
 #define MMC_SWITCH_MMCPART_NOAVAILABLE	(0xff)
@@ -503,9 +542,11 @@ struct boot_sdmmc_private_info_t {
 	#define EXT_PARA0_ID                  (0x55000000)
 	#define EXT_PARA0_TUNING_SUCCESS_FLAG (1U<<0)
 	u32 ext_para0;
-
-	/* ext_para1/2/3 reseved for future */
+	
+	/**GPIO 1.8V bias setting***/
+	#define  EXT_PARA1_1V8_GPIO_BIAS	0x1 
 	u32 ext_para1;
+	/* ext_para/2/3 reseved for future */
 	u32 ext_para2;
 	u32 ext_para3;
 };
@@ -530,11 +571,21 @@ struct mmc_platform_caps {
 #define DRV_PARA_ENABLE_EMMC_SANITIZE_WHEN_ERASE  (1U<<1)
 	uint drv_erase_feature;
 
+	/* struct mmc/drv_wp_feature */
+#define DRV_PARA_ENABLE_EMMC_USER_PART_WP     (1U<<0)
+	uint drv_wp_feature;
+
+	/* struct mmc/drv_hce_feature */
+#define DRV_PARA_ENABLE_EMMC_HC_CAP_UNIT     (1U<<0)
+	uint drv_hc_cap_unit_feature;
+
 #define AUTO_SAMPLE_MODE   (2)
 #define MAUNAL_SAMPLE_MODE (1)
 	uint sample_mode;
 
 	uint io_is_1v8;
+
+	uint cal_delay_unit;
 
 #define BOOT0_PARA_USE_INTERNAL_DEFAULT_TIMING_PARA (1U<<0)
 /* 0: pass through struct sdly;  1: pass through boot_odly/sdly_* */
@@ -570,11 +621,21 @@ struct mmc_platform_caps {
 #define DRV_PARA_DISABLE_MMC_MODE_DDR_52MHz	(1 << 6) /* can run at 52Mhz with DDR mode -- HSDDR52_DDR50 */
 #define DRV_PARA_DISABLE_MMC_MODE_HS200     (1 << 7) /* can run at 200/208MHz with SDR mode -- HS200_SDR104*/
 #define DRV_PARA_DISABLE_MMC_MODE_HS400     (1 << 8) /* can run at 200MHz with DDR mode -- HS400 */
+#define DRV_PARA_ENABLE_EMMC_HW_RST         (1 << 16) /* support to enable eMMC HW Rst when product */
 	u32 host_caps_mask;
 
 	struct tune_sdly sdly;
 
 	u32 force_boot_tuning;
+
+	/* enable the flow of field firmware update(FFU) flow */
+	u32 enable_ffu;
+	/* the byte length of emmc firmware, if it is 0, use the length get from toc0 header. if it is 0xffffffff, invalid len */
+	u32 emmc_fw_byte_len;
+	/* emmc_fw_ver0[31:0] = ext_csd[257] | ext_csd[256] | ext_csd[255] | ext_csd[254] */
+	u32 emmc_fw_ver0;
+	/* emmc_fw_ver1[31:0] = ext_csd[261] | ext_csd[260] | ext_csd[259] | ext_csd[258] */
+	u32 emmc_fw_ver1;
 };
 
 struct mmc_config {
@@ -641,6 +702,12 @@ struct mmc {
 	uint trim_discard_timeout;
 	uint secure_erase_timeout;
 	uint secure_trim_timeout;
+
+	uint csd_perm_wp;
+	uint csd_wp_grp_size;
+	/*uint drv_wp_feature;*/
+	uint wp_grp_size; /* write protect group size */
+
 
 	uchar secure_feature; // extcsd[231]
 	uchar secure_removal_type; //extcsd[16]
@@ -843,5 +910,7 @@ int sunxi_mmc_tuning_exit(void);
 int mmc_init_product(struct mmc *mmc);
 int mmc_exit(void);
 
+void mmc_update_config_for_sdly(struct mmc *mmc);
+void mmc_update_config_for_dragonboard(int card_no);
 
 #endif /* _MMC_H_ */

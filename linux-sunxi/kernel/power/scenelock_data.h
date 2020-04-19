@@ -7,6 +7,12 @@
 #include "scenelock_data_sun50iw1p1.h"
 #elif defined(CONFIG_ARCH_SUN50IW2P1)
 #include "scenelock_data_sun50iw2p1.h"
+#elif defined(CONFIG_ARCH_SUN50IW3P1)
+#include "scenelock_data_sun50iw3p1.h"
+#elif defined(CONFIG_ARCH_SUN50IW6P1)
+#include "scenelock_data_sun50iw6p1.h"
+#elif defined(CONFIG_ARCH_SUN8IW5P1)
+#include "scenelock_data_sun8iw5p1.h"
 #elif defined(CONFIG_ARCH_SUN8IW6P1)
 #include "scenelock_data_sun8iw6p1.h"
 #elif defined(CONFIG_ARCH_SUN8IW8P1)
@@ -15,6 +21,8 @@
 #include "scenelock_data_sun8iw10p1.h"
 #elif defined(CONFIG_ARCH_SUN8IW11P1)
 #include "scenelock_data_sun8iw11p1.h"
+#elif defined(CONFIG_ARCH_SUN8IW17P1)
+#include "scenelock_data_sun8iw17p1.h"
 #elif defined(CONFIG_ARCH_SUN9IW1P1)
 #include "scenelock_data_sun9iw1p1.h"
 #endif

@@ -20,13 +20,8 @@
 
 #include "bsp_isp.h"
 #include "isp_platform_drv.h"
-
 #include "bsp_isp_comm.h"
-#include "bsp_isp_algo.h"
 
-#define  Q16_1_1                  ((1 << 16) >> 0)
-#define  Q16_1_2                  ((1 << 16) >> 1)
-#define  Q16_1_4                  ((1 << 16) >> 2)
 static int isp_platform_id;
 struct isp_bsp_fun_array *fun_array_curr;
 
@@ -49,35 +44,21 @@ void bsp_isp_channel_disable(unsigned long id, enum isp_channel ch)
 {
 	fun_array_curr->isp_ch_enable(id, ch, 0);
 }
-void bsp_isp_video_capture_start(unsigned long id)
-{
 
-	fun_array_curr->isp_capture_start(id, VCAP_EN);
+void bsp_isp_capture_start(unsigned long id)
+{
+	fun_array_curr->isp_capture_start(id);
 }
 
-void bsp_isp_video_capture_stop(unsigned long id)
+void bsp_isp_capture_stop(unsigned long id)
 {
-
-	fun_array_curr->isp_capture_stop(id, VCAP_EN);
-}
-
-void bsp_isp_image_capture_start(unsigned long id)
-{
-
-	fun_array_curr->isp_capture_start(id, SCAP_EN);
-}
-
-void bsp_isp_image_capture_stop(unsigned long id)
-{
-
-	fun_array_curr->isp_capture_stop(id, SCAP_EN);
+	fun_array_curr->isp_capture_stop(id);
 }
 
 unsigned int bsp_isp_get_para_ready(unsigned long id)
 {
 	return fun_array_curr->isp_get_para_ready(id);
 }
-
 
 void bsp_isp_set_para_ready(unsigned long id)
 {
@@ -114,7 +95,7 @@ int bsp_isp_int_get_enable(unsigned long id)
 }
 
 
-void bsp_isp_set_statistics_addr(unsigned long id, unsigned int addr)
+void bsp_isp_set_statistics_addr(unsigned long id, dma_addr_t addr)
 {
 	fun_array_curr->isp_set_statistics_addr(id, addr);
 }
@@ -144,10 +125,10 @@ void bsp_isp_set_map_saved_addr(unsigned long id, unsigned long vaddr)
 	fun_array_curr->map_saved_dram_addr(id, vaddr);
 }
 
-void bsp_isp_update_lut_lens_gamma_table(unsigned long id, struct isp_table_addr *tbl_addr)
+void bsp_isp_update_lens_gamma_table(unsigned long id, struct isp_table_addr *tbl_addr)
 {
-	fun_array_curr->isp_set_table_addr(id, LUT_LENS_GAMMA_TABLE,
-		(unsigned long)(tbl_addr->isp_def_lut_tbl_dma_addr));
+	fun_array_curr->isp_set_table_addr(id, LENS_GAMMA_TABLE,
+		(unsigned long)(tbl_addr->isp_lsc_tbl_dma_addr));
 }
 
 void bsp_isp_update_drc_table(unsigned long id, struct isp_table_addr *tbl_addr)
@@ -156,43 +137,34 @@ void bsp_isp_update_drc_table(unsigned long id, struct isp_table_addr *tbl_addr)
 		(unsigned long)(tbl_addr->isp_drc_tbl_dma_addr));
 }
 
-void bsp_isp_init(unsigned long id, struct isp_init_para *para)
+void bsp_isp_update_table(unsigned long id, unsigned short flag)
 {
-	unsigned int i, j;
-
-	enum isp_src_interface isp_src_sel[] = {ISP_CSI0, ISP_CSI1, ISP_CSI2};
-
-	enum isp_src isp_src_ch[] = {ISP_SRC0, ISP_SRC1};
-
-	j = 0;
-
-	for (i = 0; i < MAX_ISP_SRC_CH_NUM; i++) {
-
-		if (para->isp_src_ch_en[i] == 1) {
-			if (fun_array_curr->isp_set_interface)
-				fun_array_curr->isp_set_interface(id,
-							isp_src_sel[i],
-							isp_src_ch[j]);
-			j++;
-			if (para->isp_src_ch_mode == ISP_SINGLE_CH) {
-				if (j == 1)
-					break;
-			} else if (para->isp_src_ch_mode == ISP_DUAL_CH) {
-				if (j == 2)
-					break;
-			}
-		}
-	}
+	fun_array_curr->isp_update_table(id, flag);
 }
 
-
-void bsp_isp_exit(unsigned long id)
+void bsp_isp_set_speed_mode(unsigned long id, unsigned int speed_mode)
 {
-	bsp_isp_disable(id);
-	bsp_isp_irq_disable(id, ISP_IRQ_EN_ALL);
-	bsp_isp_video_capture_stop(id);
+	fun_array_curr->isp_set_speed_mode(id, speed_mode);
 }
 
+void bsp_isp_src0_enable(unsigned long id)
+{
+	fun_array_curr->isp_src0_en(id, 1);
+}
+
+void bsp_isp_src0_disable(unsigned long id)
+{
+	fun_array_curr->isp_src0_en(id, 0);
+}
+void bsp_isp_set_input_fmt(unsigned long id, enum isp_input_seq fmt)
+{
+	fun_array_curr->isp_set_input_fmt(id, (unsigned int)fmt);
+}
+
+void bsp_isp_set_ob_zone(unsigned long id, struct isp_size_settings *ss)
+{
+	fun_array_curr->isp_set_size(id, &ss->ob_black, &ss->ob_valid, &ss->ob_start);
+}
 
 void bsp_isp_print_reg_saved(unsigned long id)
 {

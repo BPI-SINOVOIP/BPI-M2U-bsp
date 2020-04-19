@@ -97,7 +97,24 @@ void save_irq_status(volatile __u32 val);
 /*for secure debug, add by huangshr
  *data: 2014-10-20
  */
+#if defined(CONFIG_ARCH_SUN8IW6P1) || \
+	defined(CONFIG_ARCH_SUN9IW1P1) || \
+	defined(CONFIG_ARCH_SUN3IW1P1)
+void pm_secure_mem_status_init(void);
+#elif defined(CONFIG_ARCH_SUN8IW1P1) || \
+	defined(CONFIG_ARCH_SUN8IW3P1) || \
+	defined(CONFIG_ARCH_SUN8IW5P1) || \
+	defined(CONFIG_ARCH_SUN8IW7P1) || \
+	defined(CONFIG_ARCH_SUN8IW8P1) || \
+	defined(CONFIG_ARCH_SUN8IW10P1) || \
+	defined(CONFIG_ARCH_SUN8IW11P1) || \
+	defined(CONFIG_ARCH_SUN8IW17P1) || \
+	defined(CONFIG_ARCH_SUN50IW1P1) || \
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1)
 void pm_secure_mem_status_init(char *name);
+#endif
 void pm_secure_mem_status_init_nommu(void);
 void pm_secure_mem_status_clear(void);
 void pm_secure_mem_status_exit(void);

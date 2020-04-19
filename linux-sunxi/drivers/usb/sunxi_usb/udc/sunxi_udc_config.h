@@ -25,7 +25,9 @@
 #include <linux/usb/ch9.h>
 
 #define  SW_UDC_DOUBLE_FIFO       /* double FIFO          */
+#ifndef CONFIG_ARCH_SUN3IW1
 #define  SW_UDC_DMA
+#endif
 
 /* only SUN8IW5 and later ic support inner dma,
  * former ic(eg. SUN8IW1, SUN8IW3, SUN8IW2 etc) use outer dma */

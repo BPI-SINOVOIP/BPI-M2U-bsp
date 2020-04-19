@@ -33,8 +33,6 @@
 #include <drv_types.h>
 #include <linux/sys_config.h>
 
-
-
 #ifdef CONFIG_PLATFORM_ARM_SUNxI
 extern int sunxi_usb_disable_hcd(__u32 usbc_no);
 extern int sunxi_usb_enable_hcd(__u32 usbc_no);

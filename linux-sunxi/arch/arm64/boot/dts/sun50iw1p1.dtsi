@@ -443,7 +443,7 @@
 			compatible = "allwinner,sunxi-timer";
 			device_type = "timer";
 			reg = <0x0 0x01c20c00 0x0 0x90>;
-			interrupts = <GIC_SPI 18 IRQ_TYPE_EDGE_RISING>;
+			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
 			clock-frequency = <24000000>;
 			timer-prescale = <16>;
 		};
@@ -686,11 +686,13 @@
 			      <0x0 0x01f015c0 0x0 0x4>;/*analog baseadress*/
 			clocks = <&clk_pll_audiox4>,<&clk_adda_com>;
 
-			pinctrl-names = "aif2-default","aif3-default","aif2-sleep","aif3-sleep";
+			pinctrl-names = "aif2-default","aif3-default","dmic-default","aif2-sleep","aif3-sleep","dmic-sleep";
 			pinctrl-0 = <&aif2_pins_a>;
 			pinctrl-1 = <&aif3_pins_a>;
-			pinctrl-2 = <&aif2_pins_b>;
-			pinctrl-3 = <&aif3_pins_b>;
+			pinctrl-2 = <&dmic_pins_a>;
+			pinctrl-3 = <&aif2_pins_b>;
+			pinctrl-4 = <&aif3_pins_b>;
+			pinctrl-5 = <&dmic_pins_b>;
 
 			/*gpio-spk=<&pio 6 7 0>;*/
 			gpio-spk = <&pio PH 7 1 1 1 1>;
@@ -707,6 +709,7 @@
 			dachpf_cfg =  <0x0>;
  			aif1_lrlk_div = <0x40>;
  			aif2_lrlk_div = <0x40>;
+			dmic_used = <0x01>;
 			aif2config = <0x0>;
 			aif3config = <0x0>;
 			pa_sleep_time = <0x15e>;
@@ -1220,7 +1223,7 @@
 			device_type = "Vdevice";
 			pinctrl-names = "default";
 			pinctrl-0 = <&vdevice_pins_a>;
-			test-gpios = <&pio PB 2 1 2 2 1>;
+			test-gpios = <&pio PG 13 1 2 2 1>;
 			status = "okay";
 		};
 
@@ -1331,15 +1334,27 @@
 			interrupts = <GIC_SPI 31 IRQ_TYPE_NONE>;
 			clocks = <&clk_hosc>,<&clk_ths>;
 			sensor_num = <3>;
+			combine_num = <2>;
 			shut_temp= <120>;
 			status = "okay";
 
-			combine0:combine0{
+			ths_combine0:ths_combine0{
+				compatible = "allwinner,ths_combine0";
 				#thermal-sensor-cells = <1>;
-				combine_cnt = <3>;
-				combine_type = "max";
-				combine_chn = <0 1 2>;
+				combine_sensor_num = <1>;
+				combine_sensor_type = "cpu";
+				combine_sensor_temp_type = "max";
+				combine_sensor_id = <0>;
 			};
+			ths_combine1:ths_combine1{
+				compatible = "allwinner,ths_combine1";
+				#thermal-sensor-cells = <1>;
+				combine_sensor_num = <2>;
+				combine_sensor_type = "gpu";
+				combine_sensor_temp_type = "max";
+				combine_sensor_id = <1 2>;
+			};
+
 		};
 
 		cpu_budget_cooling:cpu_budget_cool{
@@ -1369,11 +1384,11 @@
 		};
 
 		thermal-zones{
-			soc_thermal{
+			cpu_thermal_zone{
 
 				polling-delay-passive = <500>;
 				polling-delay = <2000>;
-				thermal-sensors = <&combine0 0>;
+				thermal-sensors = <&ths_combine0 0>;
 
 				trips{
 					cpu_trip0:t0{
@@ -1396,17 +1411,7 @@
 						type = "passive";
 						hysteresis = <0>;
 					};
-					gpu_trip0:t4{
-						temperature = <85>;
-						type = "passive";
-						hysteresis = <0>;
-					};
-					gpu_trip1:t5{
-						temperature = <95>;
-						type = "passive";
-						hysteresis = <0>;
-					};
-					crt_trip:t6{
+					crt_trip0:t4{
 						temperature = <110>;
 						type = "critical";
 						hysteresis = <0>;
@@ -1434,6 +1439,33 @@
 						trip = <&cpu_trip3>;
 						cooling-device = <&cpu_budget_cooling 5 6>;
 					};
+				};
+			};
+			gpu_thermal_zone{
+
+				polling-delay-passive = <500>;
+				polling-delay = <2000>;
+				thermal-sensors = <&ths_combine1 1>;
+
+				trips{
+					gpu_trip0:t0{
+						temperature = <85>;
+						type = "passive";
+						hysteresis = <0>;
+					};
+					gpu_trip1:t1{
+						temperature = <95>;
+						type = "passive";
+						hysteresis = <0>;
+					};
+					crt_trip1:t2{
+						temperature = <110>;
+						type = "critical";
+						hysteresis = <0>;
+					};
+				};
+
+				cooling-maps{
 					bind4{
 						contribution = <0>;
 						trip = <&gpu_trip0>;
@@ -1454,17 +1486,17 @@
 			interrupts = <GIC_SPI 30 IRQ_TYPE_NONE>;
 			status = "okay";
 			key_cnt = <5>;
-			key1 = <240 115>;
-			key2 = <500 114>;
-			key3 = <700 139>;
-			key4 = <890 28>;
-			key5 = <2000 102>;
+			key0 = <190 115>;
+			key1 = <390 114>;
+			key2 = <600 139>;
+			key3 = <800 28>;
+			key4 = <900 102>;
 		};
 
 		gmac0: eth@01c30000 {
 			compatible = "allwinner,sunxi-gmac";
 			reg = <0x0 0x01c30000 0x0 0x40000>,
-			    <0x0 0x01c00000 0x0 0x30>;
+			    <0x0 0x01c00030 0x0 0x8>;
 			pinctrl-names = "default";
 			pinctrl-0     = <&gmac_pins_a>;
 			interrupts      = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
@@ -1474,9 +1506,10 @@
 			phy-mode = "rgmii";
 			tx-delay = <7>;
 			rx-delay = <31>;
-			gmac_power1 = "axp81x_dldo2:2500000";
-			gmac_power2 = "axp81x_eldo2:1800000";
-			gmac_power3 = "axp81x_fldo1:1200000";
+			phy-rst;
+			gmac-power0;
+			gmac-power1;
+			gmac-power2;
 			status = "disable";
 		};
 	};

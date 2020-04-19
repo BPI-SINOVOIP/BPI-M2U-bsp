@@ -694,7 +694,7 @@ static void autohotplug_task_timer(unsigned long data)
 {
 	unsigned long expires;
 
-	if (hotplug_enable)
+	if (hotplug_enable && autohotplug_task)
 		wake_up_process(autohotplug_task);
 
 	if (!timer_pending(&hotplug_task_timer)) {
@@ -767,7 +767,8 @@ static int autohotplug_cpu_lock(int num_core)
 	}
 
 	atomic_set(&g_hotplug_lock, num_core);
-	wake_up_process(autohotplug_task);
+	if (autohotplug_task)
+		wake_up_process(autohotplug_task);
 	mutex_unlock(&hotplug_enable_mutex);
 
 	return 0;
@@ -961,7 +962,7 @@ void autohotplug_attr_add(const char *name, unsigned int *value, umode_t mode,
 
 static int autohotplug_attr_init(void)
 {
-	memset(&autohotplug_data, sizeof(autohotplug_data), 0);
+	memset(&autohotplug_data, 0, sizeof(autohotplug_data));
 
 #ifdef CONFIG_CPU_AUTOHOTPLUG_STATS
 	autohotplug_attr_stats_init();
@@ -999,6 +1000,9 @@ static int autohotplug_attr_init(void)
 static int reboot_notifier_call(struct notifier_block *this,
 						unsigned long code, void *_cmd)
 {
+	kthread_stop(autohotplug_task);
+	autohotplug_task = NULL;
+
 	/* disable auto hotplug */
 	autohotplug_enable_from_sysfs(0, NULL);
 
@@ -1076,7 +1080,8 @@ static void autohotplug_input_mode(bool input_mode)
 		load_down_stable_us = down_stable_us_bak;
 	}
 
-	wake_up_process(autohotplug_task);
+	if (autohotplug_task)
+		wake_up_process(autohotplug_task);
 }
 
 static void autohotplug_do_input_timer(unsigned long data)
@@ -1249,7 +1254,7 @@ static int autohotplug_init(void)
 
 	return 0;
 }
-device_initcall(autohotplug_init);
+subsys_initcall(autohotplug_init);
 
 #ifdef CONFIG_DEBUG_FS
 static struct dentry *debugfs_autohotplug_root;

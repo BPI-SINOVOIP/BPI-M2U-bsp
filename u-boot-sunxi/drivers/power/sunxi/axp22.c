@@ -774,6 +774,24 @@ int axp22_set_int_enable(uchar *addr)
 
 	return 0;
 }
+s32 axp22_usb_vbus_output(int hight)
+{
+	u8 tmp;
+
+	if(!hight)
+		return 0;
+
+	if (axp_i2c_read(AXP22_ADDR,BOOT_POWER22_IPS_SET,&tmp)) {
+			printf("axp22x read ips set error\n");
+			return -1;
+	}
+	tmp |= 0x04;
+	if(axp_i2c_write(AXP22_ADDR, BOOT_POWER22_IPS_SET, tmp)) {
+		printf("axp22x write ips set error\n");
+		return -1;
+	}
+	return 1;
+}
 
 
 sunxi_axp_module_init("axp22", SUNXI_AXP_22X);

@@ -20,12 +20,18 @@
  * Detail information of registers
  */
 #define	CSIC_DMA_EN_REG_OFF			0X000
-#define	CSIC_DMA_EN				0
-#define	CSIC_DMA_EN_MASK			(0X1 << CSIC_DMA_EN)
+#define	CSIC_DMA_TOP_EN				0
+#define CSIC_DMA_TOP_EN_MASK			(0X1 << CSIC_DMA_TOP_EN)
 #define	CSIC_CLK_CNT_EN				1
 #define	CSIC_CLK_CNT_EN_MASK			(0X1 << CSIC_CLK_CNT_EN)
 #define	CSIC_CLK_CNT_SPL			2
 #define	CSIC_CLK_CNT_SPL_MASK			(0X1 << CSIC_CLK_CNT_SPL)
+#define	CSIC_FBC_EN				3
+#define	CSIC_FBC_EN_MASK			(0X1 << CSIC_FBC_EN)
+#define	CSIC_DMA_EN				4
+#define	CSIC_DMA_EN_MASK			(0X1 << CSIC_DMA_EN)
+#define	CSIC_FRAME_CNT_EN			5
+#define	CSIC_FRAME_CNT_EN_MASK			(0X1 << CSIC_FRAME_CNT_EN)
 
 #define	CSIC_DMA_CFG_REG_OFF			0X004
 #define	MIN_SDR_WR_SIZE				0
@@ -126,6 +132,12 @@
 #define	CSIC_DMA_LINE_CNT_REG_OFF		0X058
 #define	LINE_CNT_NUM				0
 #define	LINE_CNT_NUM_MASK			(0X1FFF << LINE_CNT_NUM)
+
+#define CSIC_DMA_FRM_CNT_REG_OFF		0X05C
+#define CSIC_DMA_CLR_DIS			16
+#define CSIC_DMA_CLR_DIS_MASK			(0X7FFF << CSIC_DMA_CLR_DIS)
+#define CSIC_DMA_FRM_CNT			0
+#define CSIC_DMA_FRM_CNT_MASK			(0XFFFF << CSIC_DMA_FRM_CNT)
 
 #define	CSIC_DMA_FRM_CLK_CNT_REG_OFF		0X060
 #define	FRM_CLK_CNT				0

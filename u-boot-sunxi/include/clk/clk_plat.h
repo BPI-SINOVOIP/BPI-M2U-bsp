@@ -68,6 +68,7 @@
             (((reg) & SETMASK(width, shift)) >> (shift))
 #define SET_BITS(shift, width, reg, val) \
             (((reg) & CLRMASK(width, shift)) | (val << (shift)))
+#define DEFINE_SPINLOCK(lock) int lock
 
 
 typedef unsigned char u8;

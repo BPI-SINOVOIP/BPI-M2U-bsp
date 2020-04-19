@@ -6,4 +6,4 @@ config CSI_VIN
 
 config CCI
 	tristate "use internal cci"
-	default m
+	default y

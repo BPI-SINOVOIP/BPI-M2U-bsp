@@ -12,6 +12,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/kernel.h>
 #include <linux/spinlock.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
@@ -32,6 +33,9 @@
 #include "sunxi_ss.h"
 #include "sunxi_ss_proc.h"
 #include "sunxi_ss_reg.h"
+#ifdef CONFIG_CRYPTO_SUNXI_SS_KL
+#include "sunxi_ss_kl.h"
+#endif
 
 #ifdef CONFIG_OF
 #include <linux/of.h>
@@ -71,6 +75,24 @@ void ss_reset(void)
 	sunxi_periph_reset_deassert(ss_dev->mclk);
 }
 
+#ifdef SS_RSA_CLK_ENABLE
+void ss_clk_set(u32 rate)
+{
+#ifdef CONFIG_EVB_PLATFORM
+	int ret = 0;
+
+	ret = clk_get_rate(ss_dev->mclk);
+	if (ret == rate)
+		return;
+
+	SS_DBG("Change the SS clk to %d MHz.\n", rate/1000000);
+	ret = clk_set_rate(ss_dev->mclk, rate);
+	if (ret != 0)
+		SS_ERR("clk_set_rate(%d) failed! return %d\n", rate, ret);
+#endif
+}
+#endif
+
 static int ss_aes_key_is_weak(const u8 *key, unsigned int keylen)
 {
 	s32 i;
@@ -84,7 +106,7 @@ static int ss_aes_key_is_weak(const u8 *key, unsigned int keylen)
 	return 1;
 }
 
-static int ss_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key, 
+static int ss_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
 				unsigned int keylen)
 {
 	int ret = 0;
@@ -155,6 +177,20 @@ static int ss_aes_cts_encrypt(struct ablkcipher_request *req)
 static int ss_aes_cts_decrypt(struct ablkcipher_request *req)
 {
 	return ss_aes_crypt(req, SS_DIR_DECRYPT, SS_METHOD_AES, SS_AES_MODE_CTS);
+}
+#endif
+
+#ifdef SS_XTS_MODE_ENABLE
+static int ss_aes_xts_encrypt(struct ablkcipher_request *req)
+{
+	return ss_aes_crypt(req,
+			SS_DIR_ENCRYPT, SS_METHOD_AES, SS_AES_MODE_XTS);
+}
+
+static int ss_aes_xts_decrypt(struct ablkcipher_request *req)
+{
+	return ss_aes_crypt(req,
+			SS_DIR_DECRYPT, SS_METHOD_AES, SS_AES_MODE_XTS);
 }
 #endif
 
@@ -279,12 +315,12 @@ static int ss_des3_cbc_decrypt(struct ablkcipher_request *req)
 #ifdef SS_RSA_ENABLE
 static int ss_rsa_encrypt(struct ablkcipher_request *req)
 {
-	return ss_aes_crypt(req, SS_DIR_ENCRYPT, SS_METHOD_RSA, SS_AES_MODE_CBC);
+	return ss_aes_crypt(req, SS_DIR_ENCRYPT, SS_METHOD_RSA, CE_RSA_OP_M_EXP);
 }
 
 static int ss_rsa_decrypt(struct ablkcipher_request *req)
 {
-	return ss_aes_crypt(req, SS_DIR_DECRYPT, SS_METHOD_RSA, SS_AES_MODE_CBC);
+	return ss_aes_crypt(req, SS_DIR_DECRYPT, SS_METHOD_RSA, CE_RSA_OP_M_EXP);
 }
 #endif
 
@@ -365,7 +401,7 @@ int ss_rng_reset(struct crypto_rng *tfm, u8 *seed, unsigned int slen)
 	return 0;
 }
 
-static int ss_flow_request(ss_comm_ctx_t *comm)
+int ss_flow_request(ss_comm_ctx_t *comm)
 {
 	int i;
 	unsigned long flags = 0;
@@ -388,7 +424,7 @@ static int ss_flow_request(ss_comm_ctx_t *comm)
 	return i;
 }
 
-static void ss_flow_release(ss_comm_ctx_t *comm)
+void ss_flow_release(ss_comm_ctx_t *comm)
 {
 	unsigned long flags = 0;
 
@@ -431,6 +467,11 @@ static void sunxi_ss_cra_exit(struct crypto_tfm *tfm)
 {
 	SS_ENTER();
 	ss_flow_release(crypto_tfm_ctx(tfm));
+
+	/* sun8iw6 and sun9iw1 need reset SS controller after each operation. */
+#ifdef SS_IDMA_ENABLE
+	ss_reset();
+#endif
 }
 
 static int ss_hash_init(struct ahash_request *req, int type, int size, char *iv)
@@ -584,8 +625,14 @@ static int ss_sha512_init(struct ahash_request *req)
 		.ivsize 	 = iv_size, \
 	}, \
 }
-#define DECLARE_SS_RSA_ALG(type, bitwidth)	DECLARE_SS_ASYM_ALG(type, bitwidth, (bitwidth/8), (bitwidth/8))
-#define DECLARE_SS_DH_ALG(type, bitwidth)	DECLARE_SS_RSA_ALG(type, bitwidth)
+#ifndef SS_SUPPORT_CE_V3_2
+#define DECLARE_SS_RSA_ALG(type, bitwidth) \
+		DECLARE_SS_ASYM_ALG(type, bitwidth, (bitwidth/8), (bitwidth/8))
+#else
+#define DECLARE_SS_RSA_ALG(type, bitwidth) \
+		DECLARE_SS_ASYM_ALG(type, bitwidth, (bitwidth/8), 0)
+#endif
+#define DECLARE_SS_DH_ALG(type, bitwidth) DECLARE_SS_RSA_ALG(type, bitwidth)
 
 #define DECLARE_SS_RNG_ALG(ltype) \
 { \
@@ -609,6 +656,9 @@ static struct crypto_alg sunxi_ss_algs[] =
 #endif
 #ifdef SS_CTS_MODE_ENABLE
 	DECLARE_SS_AES_ALG(AES, aes, cts, 1, AES_MIN_KEY_SIZE),
+#endif
+#ifdef SS_XTS_MODE_ENABLE
+	DECLARE_SS_AES_ALG(AES, aes, xts, 1, AES_MIN_KEY_SIZE),
 #endif
 #ifdef SS_OFB_MODE_ENABLE
 	DECLARE_SS_AES_ALG(AES, aes, ofb, AES_BLOCK_SIZE, AES_MIN_KEY_SIZE),
@@ -654,6 +704,7 @@ static struct crypto_alg sunxi_ss_algs[] =
 	DECLARE_SS_DH_ALG(dh, 4096),
 #endif
 #ifdef SS_ECC_ENABLE
+#ifndef SS_SUPPORT_CE_V3_2
 	DECLARE_SS_ASYM_ALG(ecdh, 160, 160/8, 160/8),
 	DECLARE_SS_ASYM_ALG(ecdh, 224, 224/8, 224/8),
 	DECLARE_SS_ASYM_ALG(ecdh, 256, 256/8, 256/8),
@@ -662,6 +713,16 @@ static struct crypto_alg sunxi_ss_algs[] =
 	DECLARE_SS_ASYM_ALG(ecc_sign, 224, 224/8, (224/8)*2),
 	DECLARE_SS_ASYM_ALG(ecc_sign, 256, 256/8, (256/8)*2),
 	DECLARE_SS_ASYM_ALG(ecc_sign, 521, ((521+31)/32)*4, ((521+31)/32)*4*2),
+#else
+	DECLARE_SS_ASYM_ALG(ecdh, 160, 160/8, 0),
+	DECLARE_SS_ASYM_ALG(ecdh, 224, 224/8, 0),
+	DECLARE_SS_ASYM_ALG(ecdh, 256, 256/8, 0),
+	DECLARE_SS_ASYM_ALG(ecdh, 521, ((521+31)/32)*4, 0),
+	DECLARE_SS_ASYM_ALG(ecc_sign, 160, 160/8, 0),
+	DECLARE_SS_ASYM_ALG(ecc_sign, 224, 224/8, 0),
+	DECLARE_SS_ASYM_ALG(ecc_sign, 256, 256/8, 0),
+	DECLARE_SS_ASYM_ALG(ecc_sign, 521, ((521+31)/32)*4, 0),
+#endif
 	DECLARE_SS_RSA_ALG(ecc_verify, 512),
 	DECLARE_SS_RSA_ALG(ecc_verify, 1024),
 #endif
@@ -755,6 +816,26 @@ static int sunxi_ss_res_request(struct platform_device *pdev)
 	struct device_node *pnode = pdev->dev.of_node;
 	sunxi_ss_t *sss = platform_get_drvdata(pdev);
 
+#ifdef SS_IDMA_ENABLE
+	int i;
+	for (i = 0; i < SS_FLOW_NUM; i++) {
+		sss->flows[i].buf_src =	kmalloc(SS_DMA_BUF_SIZE, GFP_KERNEL);
+		if (sss->flows[i].buf_src == NULL) {
+			SS_ERR("Can not allocate DMA source buffer\n");
+			return -ENOMEM;
+		}
+		sss->flows[i].buf_src_dma = virt_to_phys(sss->flows[i].buf_src);
+
+		sss->flows[i].buf_dst = kmalloc(SS_DMA_BUF_SIZE, GFP_KERNEL);
+		if (sss->flows[i].buf_dst == NULL) {
+			SS_ERR("Can not allocate DMA source buffer\n");
+			return -ENOMEM;
+		}
+		sss->flows[i].buf_dst_dma = virt_to_phys(sss->flows[i].buf_dst);
+		init_completion(&sss->flows[i].done);
+	}
+#endif
+
 	sss->irq = irq_of_parse_and_map(pnode, SS_RES_INDEX);
 	if (sss->irq == 0) {
 		SS_ERR("Failed to get the SS IRQ.\n");
@@ -766,7 +847,7 @@ static int sunxi_ss_res_request(struct platform_device *pdev)
 		SS_ERR("Cannot request IRQ\n");
 		return ret;
 	}
-	
+
 #ifdef CONFIG_OF
 	sss->base_addr = of_iomap(pnode, SS_RES_INDEX);
 	if (sss->base_addr == NULL) {
@@ -781,7 +862,19 @@ static int sunxi_ss_res_request(struct platform_device *pdev)
 /* Release the resource: IRQ, mem */
 static int sunxi_ss_res_release(sunxi_ss_t *sss)
 {
+#ifdef SS_IDMA_ENABLE
+	int i;
+#endif
+
 	iounmap(sss->base_addr);
+
+#ifdef SS_IDMA_ENABLE
+	for (i = 0; i < SS_FLOW_NUM; i++) {
+		kfree(sss->flows[i].buf_src);
+		kfree(sss->flows[i].buf_dst);
+	}
+#endif
+
 	free_irq(sss->irq, sss);
 	return 0;
 }
@@ -807,11 +900,16 @@ static int sunxi_ss_hw_init(sunxi_ss_t *sss)
 		return PTR_RET(sss->mclk);
 	}
 
+#ifdef SS_RSA_CLK_ENABLE
+	if (of_property_read_u32_array(pnode, "clock-frequency",
+		&sss->gen_clkrate, 2)) {
+#else
 	if (of_property_read_u32(pnode, "clock-frequency", &sss->gen_clkrate)) {
+#endif
 		SS_ERR("Unable to get clock-frequency.\n");
 		return -EINVAL;
 	}
-	SS_DBG("The clock frequency: %d\n", sss->gen_clkrate);
+	SS_DBG("The clk freq: %d, %d\n", sss->gen_clkrate, sss->rsa_clkrate);
 
 #ifdef CONFIG_EVB_PLATFORM
 	ret = clk_set_parent(sss->mclk, pclk);
@@ -833,7 +931,7 @@ static int sunxi_ss_hw_init(sunxi_ss_t *sss)
 		SS_ERR("Couldn't enable module clock\n");
 		return -EBUSY;
 	}
-	
+
 	clk_put(pclk);
 	return 0;
 }
@@ -929,8 +1027,16 @@ static ssize_t sunxi_ss_status_show(struct device *dev,
 	buf[0] = 0;
 	for (i=0; i<SS_FLOW_NUM; i++) {
 		snprintf(buf+strlen(buf), PAGE_SIZE-strlen(buf),
-			"The flow %d state: %s \n",
-			i, avail[sss->flows[i].available]
+			"The flow %d state: %s\n"
+#ifdef SS_IDMA_ENABLE
+			"    Src: 0x%p / 0x%08x\n"
+			"    Dst: 0x%p / 0x%08x\n"
+#endif
+			, i, avail[sss->flows[i].available]
+#ifdef SS_IDMA_ENABLE
+			, sss->flows[i].buf_src, sss->flows[i].buf_src_dma
+			, sss->flows[i].buf_dst, sss->flows[i].buf_dst_dma
+#endif
 		);
 	}
 
@@ -1097,12 +1203,19 @@ static int __init sunxi_ss_init(void)
 		return ret;
 	}
 
+#ifdef CONFIG_CRYPTO_SUNXI_SS_KL
+	ret = sunxi_ss_kl_init();
+#endif
 	return ret;
 }
 
 static void __exit sunxi_ss_exit(void)
 {
     platform_driver_unregister(&sunxi_ss_driver);
+
+#ifdef CONFIG_CRYPTO_SUNXI_SS_KL
+	sunxi_ss_kl_exit();
+#endif
 }
 
 module_init(sunxi_ss_init);

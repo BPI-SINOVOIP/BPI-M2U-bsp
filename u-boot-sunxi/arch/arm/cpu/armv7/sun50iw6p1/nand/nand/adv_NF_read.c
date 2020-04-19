@@ -62,22 +62,25 @@ __s32 load_and_check_in_one_blk( __u32 blk_num, void *buf, __u32 size, __u32 blk
 	__u32 blk_base = blk_num * blk_size;
 	__s32  status;
 
-
 	for( copy_base = blk_base, copy_end = copy_base + size, blk_end = blk_base + blk_size;
-         copy_end <= blk_end;
-         copy_base += size, copy_end = copy_base + size )
-    {
-        status = NF_read( copy_base >> NF_SCT_SZ_WIDTH, (void *)buf, size >> NF_SCT_SZ_WIDTH ); // 读入一个备份
-        if( status == NF_OVERTIME_ERR )
-            return ADV_NF_OVERTIME_ERR;
-        else if( status == NF_ECC_ERR )
-        	continue;
+		copy_end <= blk_end;
+		copy_base += size, copy_end = copy_base + size )
+	{
+		status = NF_read( copy_base >> NF_SCT_SZ_WIDTH, (void *)buf, size >> NF_SCT_SZ_WIDTH ); // 读入一个备份
+		if( status == NF_OVERTIME_ERR )
+			return ADV_NF_OVERTIME_ERR;
+		else if( status == NF_ECC_ERR )
+			continue;
 
-        /* 校验备份是否完好，如果完好，则程序返回OK */
-        if( verify_addsum( (__u32 *)buf, size ) == 0 )
-        {
-            //printf("The file stored in %X of block %u is perfect.\n", ( copy_base - blk_base ), blk_num );
+		/* 校验备份是否完好，如果完好，则程序返回OK */
+		if( verify_addsum( (__u32 *)buf, size ) == 0 )
+		{
+			//printf("The file stored in %X of block %u is perfect.\n", ( copy_base - blk_base ), blk_num );
 			return ADV_NF_OK;
+		}
+		else
+		{
+			printf("checksum error.\n");
 		}
 	}
 
@@ -108,10 +111,10 @@ __s32 load_in_many_blks( __u32 start_blk, __u32 last_blk_num, void *buf,
 {
 	__u32 buf_base;
 	__u32 buf_off;
-    __u32 size_loaded;
-    __u32 cur_blk_base;
-    __u32 rest_size;
-    __u32 blk_num;
+	__u32 size_loaded;
+	__u32 cur_blk_base;
+	__u32 rest_size;
+	__u32 blk_num;
 	__u32 blk_size_load;
 	__u32 lsb_page_type;
 
@@ -122,28 +125,27 @@ __s32 load_in_many_blks( __u32 start_blk, __u32 last_blk_num, void *buf,
 		blk_size_load = blk_size;
 
 	for( blk_num = start_blk, buf_base = (__u32)buf, buf_off = 0;
-         blk_num <= last_blk_num && buf_off < size;
-         blk_num++ )
+		blk_num <= last_blk_num && buf_off < size;
+		blk_num++ )
     {
-    	printf("current block is %d and last block is %d.\n", blk_num, last_blk_num);
-    	if( NF_read_status( blk_num ) == NF_BAD_BLOCK )		// 如果当前块是坏块，则进入下一块
-    		continue;
+	printf("current block is %d and last block is %d.\n", blk_num, last_blk_num);
+	if( NF_read_status( blk_num ) == NF_BAD_BLOCK )		// 如果当前块是坏块，则进入下一块
+		continue;
 
-    	cur_blk_base = blk_num * blk_size;
-    	rest_size = size - buf_off ;                        // 未载入部分的尺寸
-    	size_loaded = ( rest_size < blk_size_load ) ?  rest_size : blk_size_load ;  // 确定此次待载入的尺寸
+	cur_blk_base = blk_num * blk_size;
+	rest_size = size - buf_off ;                        // 未载入部分的尺寸
+	size_loaded = ( rest_size < blk_size_load ) ?  rest_size : blk_size_load ;  // 确定此次待载入的尺寸
 
-    	if( NF_read( cur_blk_base >> NF_SCT_SZ_WIDTH, (void *)buf_base, size_loaded >> NF_SCT_SZ_WIDTH )
-    		== NF_OVERTIME_ERR )
-       		return ADV_NF_OVERTIME_ERR;
+	if( NF_read( cur_blk_base >> NF_SCT_SZ_WIDTH, (void *)buf_base, size_loaded >> NF_SCT_SZ_WIDTH )
+	== NF_OVERTIME_ERR )
+		return ADV_NF_OVERTIME_ERR;
 
-    	buf_base += size_loaded;
-    	buf_off  += size_loaded;
-    }
+	buf_base += size_loaded;
+	buf_off  += size_loaded;
+	}
 
-
-    *blks = blk_num - start_blk;                            // 总共涉及的块数
-    if( buf_off == size )
+	*blks = blk_num - start_blk;                            // 总共涉及的块数
+	if( buf_off == size )
 		return ADV_NF_OK;                                          // 成功，返回OK
 	else
 	{

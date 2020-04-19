@@ -1,31 +1,41 @@
-#include"g2d_driver_i.h"
-#include<linux/g2d_driver.h>
+/*
+ * Allwinner SoCs g2d driver.
+ *
+ * Copyright (C) 2016 Allwinner.
+ *
+ * This file is licensed under the terms of the GNU General Public
+ * License version 2.  This program is licensed "as is" without any
+ * warranty of any kind, whether express or implied.
+ */
 
-#define G2D_BYTE_ALIGN(x) ( ( (x + (4*1024-1)) >> 12) << 12)			 /* alloc based on 4K byte */
+#include"g2d_driver_i.h"
+
+/* alloc based on 4K byte */
+#define G2D_BYTE_ALIGN(x) (((x + (4*1024-1)) >> 12) << 12)
 static struct info_mem g2d_mem[MAX_G2D_MEM_INDEX];
-static int	g2d_mem_sel = 0;
+static int g2d_mem_sel;
 static enum g2d_scan_order scan_order;
 static struct mutex global_lock;
 
-static struct class	*g2d_class;
-static struct cdev	*g2d_cdev;
-static dev_t		 devid ;
-__g2d_drv_t			 g2d_ext_hd;
-__g2d_info_t		 para;
+static struct class *g2d_class;
+static struct cdev *g2d_cdev;
+static dev_t devid;
+__g2d_drv_t g2d_ext_hd;
+__g2d_info_t para;
 
 #if !defined(CONFIG_OF)
-static struct resource g2d_resource[2] =
-{
+static struct resource g2d_resource[2] = {
+
 	[0] = {
-		.start	= SUNXI_MP_PBASE,
-		.end	= SUNXI_MP_PBASE + 0x000fffff,
-		.flags	= IORESOURCE_MEM,
-	},
+	       .start = SUNXI_MP_PBASE,
+	       .end = SUNXI_MP_PBASE + 0x000fffff,
+	       .flags = IORESOURCE_MEM,
+	       },
 	[1] = {
-		.start	= INTC_IRQNO_DE_MIX,
-		.end	= INTC_IRQNO_DE_MIX,
-		.flags	= IORESOURCE_IRQ,
-	},
+	       .start = INTC_IRQNO_DE_MIX,
+	       .end = INTC_IRQNO_DE_MIX,
+	       .flags = IORESOURCE_IRQ,
+	       },
 };
 #endif
 
@@ -34,7 +44,7 @@ __s32 drv_g2d_init(void)
 	g2d_init_para init_para;
 
 	DBG("drv_g2d_init\n");
-	init_para.g2d_base		= (__u32)para.io;
+	init_para.g2d_base = (__u32) para.io;
 	memset(&g2d_ext_hd, 0, sizeof(__g2d_drv_t));
 	init_waitqueue_head(&g2d_ext_hd.queue);
 	g2d_init(&init_para);
@@ -44,16 +54,20 @@ __s32 drv_g2d_init(void)
 
 void *g2d_malloc(__u32 bytes_num, __u32 *phy_addr)
 {
-	void* address = NULL;
+	void *address = NULL;
 
 #if defined(CONFIG_ION_SUNXI)
 	u32 actual_bytes;
+
 	if (bytes_num != 0) {
 		actual_bytes = PAGE_ALIGN(bytes_num);
 
-		address = dma_alloc_coherent(para.dev, actual_bytes, (dma_addr_t*)phy_addr, GFP_KERNEL);
+		address = dma_alloc_coherent(para.dev, actual_bytes,
+					     (dma_addr_t *) phy_addr,
+					     GFP_KERNEL);
 		if (address) {
-			DBG("dma_alloc_coherent ok, address=0x%p, size=0x%x\n", (void*)(*(unsigned long*)phy_addr), bytes_num);
+			DBG("dma_alloc_coherent ok, address=0x%p, size=0x%x\n",
+			    (void *)(*(unsigned long *)phy_addr), bytes_num);
 			return address;
 		} else {
 			ERR("dma_alloc_coherent fail, size=0x%x\n", bytes_num);
@@ -68,17 +82,18 @@ void *g2d_malloc(__u32 bytes_num, __u32 *phy_addr)
 
 	if (bytes_num != 0) {
 		map_size = PAGE_ALIGN(bytes_num);
-		page = alloc_pages(GFP_KERNEL,get_order(map_size));
+		page = alloc_pages(GFP_KERNEL, get_order(map_size));
 		if (page != NULL) {
 			address = page_address(page);
-			if (NULL == address)	{
-				free_pages((unsigned long)(page),get_order(map_size));
+			if (address == NULL) {
+				free_pages((unsigned long)(page),
+					   get_order(map_size));
 				ERR("page_address fail!\n");
 				return NULL;
 			}
 			*phy_addr = virt_to_phys(address);
 			return address;
-		}	else {
+		} else {
 			ERR("alloc_pages fail!\n");
 			return NULL;
 		}
@@ -94,31 +109,29 @@ void g2d_free(void *virt_addr, void *phy_addr, unsigned int size)
 {
 #if defined(CONFIG_ION_SUNXI)
 	u32 actual_bytes;
+
 	actual_bytes = PAGE_ALIGN(size);
 	if (phy_addr && virt_addr)
-		dma_free_coherent(para.dev, actual_bytes, virt_addr, (dma_addr_t)phy_addr);
+		dma_free_coherent(para.dev, actual_bytes, virt_addr,
+				  (dma_addr_t) phy_addr);
 #else
 	unsigned map_size = PAGE_ALIGN(size);
 	unsigned page_size = map_size;
 
-	if (NULL == virt_addr)
-		return ;
+	if (virt_addr == NULL)
+		return;
 
-	free_pages((unsigned long)virt_addr,get_order(page_size));
+	free_pages((unsigned long)virt_addr, get_order(page_size));
 #endif
-	return ;
 }
 
 __s32 g2d_get_free_mem_index(void)
 {
 	__u32 i = 0;
 
-	for(i=0; i<MAX_G2D_MEM_INDEX; i++)
-	{
-		if(g2d_mem[i].b_used == 0)
-		{
+	for (i = 0; i < MAX_G2D_MEM_INDEX; i++) {
+		if (g2d_mem[i].b_used == 0)
 			return i;
-		}
 	}
 	return -1;
 }
@@ -130,26 +143,23 @@ int g2d_mem_request(__u32 size)
 	__u32 phy_addr;
 
 	sel = g2d_get_free_mem_index();
-	if(sel < 0)
-	{
+	if (sel < 0) {
 		ERR("g2d_get_free_mem_index fail!\n");
 		return -EINVAL;
 	}
 
-	ret = (__u32)g2d_malloc(size,&phy_addr);
-	if(ret != 0)
-	{
-		g2d_mem[sel].virt_addr = (void*)ret;
-		memset(g2d_mem[sel].virt_addr,0,size);
+	ret = (__u32) g2d_malloc(size, &phy_addr);
+	if (ret != 0) {
+		g2d_mem[sel].virt_addr = (void *)ret;
+		memset(g2d_mem[sel].virt_addr, 0, size);
 		g2d_mem[sel].phy_addr = phy_addr;
 		g2d_mem[sel].mem_len = size;
 		g2d_mem[sel].b_used = 1;
 
-		INFO("map_g2d_memory[%d]: pa=%08lx va=%p size:%x\n",sel,g2d_mem[sel].phy_addr, g2d_mem[sel].virt_addr, size);
+		INFO("map_g2d_memory[%d]: pa=%08lx va=%p size:%x\n", sel,
+		     g2d_mem[sel].phy_addr, g2d_mem[sel].virt_addr, size);
 		return sel;
-	}
-	else
-	{
+	} else {
 		ERR("fail to alloc reserved memory!\n");
 		return -ENOMEM;
 	}
@@ -157,26 +167,28 @@ int g2d_mem_request(__u32 size)
 
 int g2d_mem_release(__u32 sel)
 {
-	if(g2d_mem[sel].b_used == 0)
-	{
-		ERR("mem not used in g2d_mem_release,%d\n",sel);
+	if (g2d_mem[sel].b_used == 0) {
+		ERR("mem not used in g2d_mem_release,%d\n", sel);
 		return -EINVAL;
 	}
 
-	g2d_free((void *)g2d_mem[sel].virt_addr,(void *)g2d_mem[sel].phy_addr,g2d_mem[sel].mem_len);
-	memset(&g2d_mem[sel],0,sizeof(struct info_mem));
+	g2d_free((void *)g2d_mem[sel].virt_addr, (void *)g2d_mem[sel].phy_addr,
+		 g2d_mem[sel].mem_len);
+	memset(&g2d_mem[sel], 0, sizeof(struct info_mem));
 
 	return 0;
 }
 
-int g2d_mmap(struct file *file, struct vm_area_struct * vma)
+int g2d_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	unsigned long mypfn = vma->vm_pgoff;
-	unsigned long vmsize = vma->vm_end-vma->vm_start;
+	unsigned long vmsize = vma->vm_end - vma->vm_start;
+
 	vma->vm_pgoff = 0;
 
 	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-	if (remap_pfn_range(vma,vma->vm_start,mypfn,vmsize,vma->vm_page_prot))
+	if (remap_pfn_range(vma, vma->vm_start, mypfn,
+			    vmsize, vma->vm_page_prot))
 		return -EAGAIN;
 
 	return 0;
@@ -212,23 +224,31 @@ static int g2d_release(struct inode *inode, struct file *file)
 
 irqreturn_t g2d_handle_irq(int irq, void *dev_id)
 {
-	__u32 mod_irq_flag,cmd_irq_flag;
+#ifdef G2D_V2X_SUPPORT
+	__u32 mixer_irq_flag, rot_irq_flag;
 
-	mod_irq_flag = mixer_get_irq();
-	cmd_irq_flag = mixer_get_irq0();
-	if(mod_irq_flag & G2D_FINISH_IRQ)
-	{
-		mixer_clear_init();
+	mixer_irq_flag = g2d_irq_query();
+	rot_irq_flag = rot_irq_query();
+	if (mixer_irq_flag == 0 || rot_irq_flag == 0) {
+		g2d_bsp_close();
 		g2d_ext_hd.finish_flag = 1;
 		wake_up(&g2d_ext_hd.queue);
 	}
-	else if(cmd_irq_flag & G2D_FINISH_IRQ)
-	{
+#else
+	__u32 mod_irq_flag, cmd_irq_flag;
+
+	mod_irq_flag = mixer_get_irq();
+	cmd_irq_flag = mixer_get_irq0();
+	if (mod_irq_flag & G2D_FINISH_IRQ) {
+		mixer_clear_init();
+		g2d_ext_hd.finish_flag = 1;
+		wake_up(&g2d_ext_hd.queue);
+	} else if (cmd_irq_flag & G2D_FINISH_IRQ) {
 		mixer_clear_init0();
 		g2d_ext_hd.finish_flag = 1;
 		wake_up(&g2d_ext_hd.queue);
 	}
-
+#endif
 	return IRQ_HANDLED;
 }
 
@@ -248,13 +268,18 @@ int g2d_exit(void)
 
 int g2d_wait_cmd_finish(void)
 {
-	long timeout = 100; /* 100ms */
+	long timeout = 100;	/* 100ms */
 
-	timeout = wait_event_timeout(g2d_ext_hd.queue, g2d_ext_hd.finish_flag == 1, msecs_to_jiffies(timeout));
-	if(timeout == 0)
-	{
+	timeout = wait_event_timeout(g2d_ext_hd.queue,
+				     g2d_ext_hd.finish_flag == 1,
+				     msecs_to_jiffies(timeout));
+	if (timeout == 0) {
+#ifdef G2D_V2X_SUPPORT
+		g2d_bsp_close();
+#else
 		mixer_clear_init();
 		mixer_clear_init0();
+#endif
 		pr_warn("wait g2d irq pending flag timeout\n");
 		g2d_ext_hd.finish_flag = 1;
 		wake_up(&g2d_ext_hd.queue);
@@ -263,65 +288,67 @@ int g2d_wait_cmd_finish(void)
 	return 0;
 }
 
-int g2d_blit(g2d_blt * para)
+int g2d_blit(g2d_blt *para)
 {
 	__s32 err = 0;
-	__u32 tmp_w,tmp_h;
+	__u32 tmp_w, tmp_h;
 
-	if ((para->flag & G2D_BLT_ROTATE90) || (para->flag & G2D_BLT_ROTATE270)){tmp_w = para->src_rect.h;tmp_h = para->src_rect.w;}
-	else {tmp_w = para->src_rect.w;tmp_h = para->src_rect.h;}
+	if ((para->flag & G2D_BLT_ROTATE90) ||
+			(para->flag & G2D_BLT_ROTATE270)) {
+		tmp_w = para->src_rect.h;
+		tmp_h = para->src_rect.w;
+	} else {
+		tmp_w = para->src_rect.w;
+		tmp_h = para->src_rect.h;
+	}
 	/* check the parameter valid */
-	if(((para->src_rect.x < 0)&&((-para->src_rect.x) > para->src_rect.w)) ||
-	   ((para->src_rect.y < 0)&&((-para->src_rect.y) > para->src_rect.h)) ||
-	   ((para->dst_x < 0)&&((-para->dst_x) > tmp_w)) ||
-	   ((para->dst_y < 0)&&((-para->dst_y) > tmp_h)) ||
-	   ((para->src_rect.x > 0)&&(para->src_rect.x > para->src_image.w - 1)) ||
-	   ((para->src_rect.y > 0)&&(para->src_rect.y > para->src_image.h - 1)) ||
-	   ((para->dst_x > 0)&&(para->dst_x > para->dst_image.w - 1)) ||
-	   ((para->dst_y > 0)&&(para->dst_y > para->dst_image.h - 1)))
-	{
+	if (((para->src_rect.x < 0) &&
+	     ((-para->src_rect.x) > para->src_rect.w)) ||
+	    ((para->src_rect.y < 0) &&
+	     ((-para->src_rect.y) > para->src_rect.h)) ||
+	    ((para->dst_x < 0) &&
+	     ((-para->dst_x) > tmp_w)) ||
+	    ((para->dst_y < 0) &&
+	     ((-para->dst_y) > tmp_h)) ||
+	    ((para->src_rect.x > 0) &&
+	     (para->src_rect.x > para->src_image.w - 1)) ||
+	    ((para->src_rect.y > 0) &&
+	     (para->src_rect.y > para->src_image.h - 1)) ||
+	    ((para->dst_x > 0) &&
+	     (para->dst_x > para->dst_image.w - 1)) ||
+	    ((para->dst_y > 0) && (para->dst_y > para->dst_image.h - 1))) {
 		printk("invalid blit parameter setting");
 		return -EINVAL;
-	}
-	else
-	{
-		if(((para->src_rect.x < 0)&&((-para->src_rect.x) < para->src_rect.w)))
-		{
+	} else {
+		if (((para->src_rect.x < 0) &&
+		     ((-para->src_rect.x) < para->src_rect.w))) {
 			para->src_rect.w = para->src_rect.w + para->src_rect.x;
 			para->src_rect.x = 0;
-		}
-		else if((para->src_rect.x + para->src_rect.w) > para->src_image.w)
-		{
+		} else if ((para->src_rect.x + para->src_rect.w)
+			   > para->src_image.w) {
 			para->src_rect.w = para->src_image.w - para->src_rect.x;
 		}
-		if(((para->src_rect.y < 0)&&((-para->src_rect.y) < para->src_rect.h)))
-		{
+		if (((para->src_rect.y < 0) &&
+		     ((-para->src_rect.y) < para->src_rect.h))) {
 			para->src_rect.h = para->src_rect.h + para->src_rect.y;
 			para->src_rect.y = 0;
-		}
-		else if((para->src_rect.y + para->src_rect.h) > para->src_image.h)
-		{
+		} else if ((para->src_rect.y + para->src_rect.h)
+			   > para->src_image.h) {
 			para->src_rect.h = para->src_image.h - para->src_rect.y;
 		}
 
-		if(((para->dst_x < 0)&&((-para->dst_x) < tmp_w)))
-		{
+		if (((para->dst_x < 0) && ((-para->dst_x) < tmp_w))) {
 			para->src_rect.w = tmp_w + para->dst_x;
 			para->src_rect.x = (-para->dst_x);
 			para->dst_x = 0;
-		}
-		else if((para->dst_x + tmp_w) > para->dst_image.w)
-		{
+		} else if ((para->dst_x + tmp_w) > para->dst_image.w) {
 			para->src_rect.w = para->dst_image.w - para->dst_x;
 		}
-		if(((para->dst_y < 0)&&((-para->dst_y) < tmp_h)))
-		{
+		if (((para->dst_y < 0) && ((-para->dst_y) < tmp_h))) {
 			para->src_rect.h = tmp_h + para->dst_y;
 			para->src_rect.y = (-para->dst_y);
 			para->dst_y = 0;
-		}
-		else if((para->dst_y + tmp_h) > para->dst_image.h)
-		{
+		} else if ((para->dst_y + tmp_h) > para->dst_image.h) {
 			para->src_rect.h = para->dst_image.h - para->dst_y;
 		}
 	}
@@ -343,37 +370,36 @@ int g2d_blit(g2d_blt * para)
 	return err;
 }
 
-int g2d_fill(g2d_fillrect * para)
+int g2d_fill(g2d_fillrect *para)
 {
 	__s32 err = 0;
 
 	/* check the parameter valid */
-	if(((para->dst_rect.x < 0)&&((-para->dst_rect.x)>para->dst_rect.w)) ||
-	   ((para->dst_rect.y < 0)&&((-para->dst_rect.y)>para->dst_rect.h)) ||
-	   ((para->dst_rect.x > 0)&&(para->dst_rect.x > para->dst_image.w - 1)) ||
-	   ((para->dst_rect.y > 0)&&(para->dst_rect.y > para->dst_image.h - 1)))
-	{
+	if (((para->dst_rect.x < 0) &&
+	     ((-para->dst_rect.x) > para->dst_rect.w)) ||
+	    ((para->dst_rect.y < 0) &&
+	     ((-para->dst_rect.y) > para->dst_rect.h)) ||
+	    ((para->dst_rect.x > 0) &&
+	     (para->dst_rect.x > para->dst_image.w - 1)) ||
+	    ((para->dst_rect.y > 0) &&
+	     (para->dst_rect.y > para->dst_image.h - 1))) {
 		printk("invalid fillrect parameter setting");
 		return -EINVAL;
-	}
-	else
-	{
-		if(((para->dst_rect.x < 0)&&((-para->dst_rect.x) < para->dst_rect.w)))
-		{
+	} else {
+		if (((para->dst_rect.x < 0) &&
+		     ((-para->dst_rect.x) < para->dst_rect.w))) {
 			para->dst_rect.w = para->dst_rect.w + para->dst_rect.x;
 			para->dst_rect.x = 0;
-		}
-		else if((para->dst_rect.x + para->dst_rect.w) > para->dst_image.w)
-		{
+		} else if ((para->dst_rect.x + para->dst_rect.w)
+			   > para->dst_image.w) {
 			para->dst_rect.w = para->dst_image.w - para->dst_rect.x;
 		}
-		if(((para->dst_rect.y < 0)&&((-para->dst_rect.y) < para->dst_rect.h)))
-		{
+		if (((para->dst_rect.y < 0) &&
+		     ((-para->dst_rect.y) < para->dst_rect.h))) {
 			para->dst_rect.h = para->dst_rect.h + para->dst_rect.y;
 			para->dst_rect.y = 0;
-		}
-		else if((para->dst_rect.y + para->dst_rect.h) > para->dst_image.h)
-		{
+		} else if ((para->dst_rect.y + para->dst_rect.h)
+			   > para->dst_image.h) {
 			para->dst_rect.h = para->dst_image.h - para->dst_rect.y;
 		}
 	}
@@ -384,60 +410,61 @@ int g2d_fill(g2d_fillrect * para)
 	return err;
 }
 
-int g2d_stretchblit(g2d_stretchblt * para)
+int g2d_stretchblit(g2d_stretchblt *para)
 {
 	__s32 err = 0;
 
 	/* check the parameter valid */
-	if(((para->src_rect.x < 0)&&((-para->src_rect.x) > para->src_rect.w)) ||
-	   ((para->src_rect.y < 0)&&((-para->src_rect.y) > para->src_rect.h)) ||
-	   ((para->dst_rect.x < 0)&&((-para->dst_rect.x) > para->dst_rect.w)) ||
-	   ((para->dst_rect.y < 0)&&((-para->dst_rect.y) > para->dst_rect.h)) ||
-	   ((para->src_rect.x > 0)&&(para->src_rect.x > para->src_image.w - 1)) ||
-	   ((para->src_rect.y > 0)&&(para->src_rect.y > para->src_image.h - 1)) ||
-	   ((para->dst_rect.x > 0)&&(para->dst_rect.x > para->dst_image.w - 1)) ||
-	   ((para->dst_rect.y > 0)&&(para->dst_rect.y > para->dst_image.h - 1)))
-	{
+	if (((para->src_rect.x < 0) &&
+	     ((-para->src_rect.x) > para->src_rect.w)) ||
+	    ((para->src_rect.y < 0) &&
+	     ((-para->src_rect.y) > para->src_rect.h)) ||
+	    ((para->dst_rect.x < 0) &&
+	     ((-para->dst_rect.x) > para->dst_rect.w)) ||
+	    ((para->dst_rect.y < 0) &&
+	     ((-para->dst_rect.y) > para->dst_rect.h)) ||
+	    ((para->src_rect.x > 0) &&
+	     (para->src_rect.x > para->src_image.w - 1)) ||
+	    ((para->src_rect.y > 0) &&
+	     (para->src_rect.y > para->src_image.h - 1)) ||
+	    ((para->dst_rect.x > 0) &&
+	     (para->dst_rect.x > para->dst_image.w - 1)) ||
+	    ((para->dst_rect.y > 0) &&
+	     (para->dst_rect.y > para->dst_image.h - 1))) {
 		printk("invalid stretchblit parameter setting");
 		return -EINVAL;
-	}
-	else
-	{
-		if(((para->src_rect.x < 0)&&((-para->src_rect.x) < para->src_rect.w)))
-		{
+	} else {
+		if (((para->src_rect.x < 0) &&
+		     ((-para->src_rect.x) < para->src_rect.w))) {
 			para->src_rect.w = para->src_rect.w + para->src_rect.x;
 			para->src_rect.x = 0;
-		}
-		else if((para->src_rect.x + para->src_rect.w) > para->src_image.w)
-		{
+		} else if ((para->src_rect.x + para->src_rect.w)
+			   > para->src_image.w) {
 			para->src_rect.w = para->src_image.w - para->src_rect.x;
 		}
-		if(((para->src_rect.y < 0)&&((-para->src_rect.y) < para->src_rect.h)))
-		{
+		if (((para->src_rect.y < 0) &&
+		     ((-para->src_rect.y) < para->src_rect.h))) {
 			para->src_rect.h = para->src_rect.h + para->src_rect.y;
 			para->src_rect.y = 0;
-		}
-		else if((para->src_rect.y + para->src_rect.h) > para->src_image.h)
-		{
+		} else if ((para->src_rect.y + para->src_rect.h)
+			   > para->src_image.h) {
 			para->src_rect.h = para->src_image.h - para->src_rect.y;
 		}
 
-		if(((para->dst_rect.x < 0)&&((-para->dst_rect.x) < para->dst_rect.w)))
-		{
+		if (((para->dst_rect.x < 0) &&
+		     ((-para->dst_rect.x) < para->dst_rect.w))) {
 			para->dst_rect.w = para->dst_rect.w + para->dst_rect.x;
 			para->dst_rect.x = 0;
-		}
-		else if((para->dst_rect.x + para->dst_rect.w) > para->dst_image.w)
-		{
+		} else if ((para->dst_rect.x + para->dst_rect.w)
+			   > para->dst_image.w) {
 			para->dst_rect.w = para->dst_image.w - para->dst_rect.x;
 		}
-		if(((para->dst_rect.y < 0)&&((-para->dst_rect.y) < para->dst_rect.h)))
-		{
+		if (((para->dst_rect.y < 0) &&
+		     ((-para->dst_rect.y) < para->dst_rect.h))) {
 			para->dst_rect.h = para->dst_rect.h + para->dst_rect.y;
 			para->dst_rect.y = 0;
-		}
-		else if((para->dst_rect.y + para->dst_rect.h) > para->dst_image.h)
-		{
+		} else if ((para->dst_rect.y + para->dst_rect.h)
+			   > para->dst_image.h) {
 			para->dst_rect.h = para->dst_image.h - para->dst_rect.y;
 		}
 	}
@@ -460,11 +487,462 @@ int g2d_stretchblit(g2d_stretchblt * para)
 	return err;
 }
 
-int g2d_set_palette_table(g2d_palette *para)
+#ifdef G2D_V2X_SUPPORT
+int g2d_fill_h(g2d_fillrect_h *para)
+{
+	__s32 err = 0;
+
+	g2d_image_enh dst_tmp;
+	g2d_image_enh *dst = &dst_tmp;
+
+	/* check the parameter valid */
+	if (((para->dst_image_h.clip_rect.x < 0) &&
+	     ((-para->dst_image_h.clip_rect.x) >
+	      para->dst_image_h.clip_rect.w)) ||
+	    ((para->dst_image_h.clip_rect.y < 0) &&
+	     ((-para->dst_image_h.clip_rect.y) >
+	      para->dst_image_h.clip_rect.h)) ||
+	    ((para->dst_image_h.clip_rect.x > 0) &&
+	     (para->dst_image_h.clip_rect.x > para->dst_image_h.width - 1))
+	    || ((para->dst_image_h.clip_rect.y > 0) &&
+		(para->dst_image_h.clip_rect.y >
+		 para->dst_image_h.height - 1))) {
+		pr_err("invalid fillrect parameter setting\n");
+		return -EINVAL;
+	} else {
+		if (((para->dst_image_h.clip_rect.x < 0) &&
+		     ((-para->dst_image_h.clip_rect.x) <
+		      para->dst_image_h.clip_rect.w))) {
+			para->dst_image_h.clip_rect.w =
+			    para->dst_image_h.clip_rect.w +
+			    para->dst_image_h.clip_rect.x;
+			para->dst_image_h.clip_rect.x = 0;
+		} else if ((para->dst_image_h.clip_rect.x +
+			    para->dst_image_h.clip_rect.w)
+			   > para->dst_image_h.width) {
+			para->dst_image_h.clip_rect.w =
+			    para->dst_image_h.width -
+			    para->dst_image_h.clip_rect.x;
+		}
+		if (((para->dst_image_h.clip_rect.y < 0) &&
+		     ((-para->dst_image_h.clip_rect.y) <
+		      para->dst_image_h.clip_rect.h))) {
+			para->dst_image_h.clip_rect.h =
+			    para->dst_image_h.clip_rect.h +
+			    para->dst_image_h.clip_rect.y;
+			para->dst_image_h.clip_rect.y = 0;
+		} else if ((para->dst_image_h.clip_rect.y +
+			    para->dst_image_h.clip_rect.h)
+			   > para->dst_image_h.height) {
+			para->dst_image_h.clip_rect.h =
+			    para->dst_image_h.height -
+			    para->dst_image_h.clip_rect.y;
+		}
+	}
+
+	dst->bbuff = 1;
+	dst->gamut = G2D_BT709;
+	dst->mode = 0;
+	dst->alpha = para->dst_image_h.alpha;
+	dst->color = para->dst_image_h.color;
+	dst->format = para->dst_image_h.format;
+	dst->laddr[0] = para->dst_image_h.laddr[0];
+	dst->laddr[1] = para->dst_image_h.laddr[1];
+	dst->laddr[2] = para->dst_image_h.laddr[2];
+	dst->width = para->dst_image_h.width;
+	dst->height = para->dst_image_h.height;
+	dst->clip_rect.x = para->dst_image_h.clip_rect.x;
+	dst->clip_rect.y = para->dst_image_h.clip_rect.y;
+	dst->clip_rect.w = para->dst_image_h.clip_rect.w;
+	dst->clip_rect.h = para->dst_image_h.clip_rect.h;
+
+	g2d_ext_hd.finish_flag = 0;
+	err = g2d_fillrectangle(dst, dst->color);
+
+	return err;
+}
+
+int g2d_blit_h(g2d_blt_h *para)
+{
+	__s32 err = 0;
+
+	g2d_image_enh src_tmp, dst_tmp;
+	g2d_image_enh *src = &src_tmp;
+	g2d_image_enh *dst = &dst_tmp;
+
+	memset(src, 0, sizeof(g2d_image_enh));
+	memset(dst, 0, sizeof(g2d_image_enh));
+
+	/* check the parameter valid */
+	if (((para->src_image_h.clip_rect.x < 0) &&
+	     ((-para->src_image_h.clip_rect.x) >
+	      para->src_image_h.clip_rect.w)) ||
+	    ((para->src_image_h.clip_rect.y < 0) &&
+	     ((-para->src_image_h.clip_rect.y) >
+	      para->src_image_h.clip_rect.h)) ||
+	    ((para->src_image_h.clip_rect.x > 0) &&
+	     (para->src_image_h.clip_rect.x >
+	      para->src_image_h.width - 1)) ||
+	    ((para->src_image_h.clip_rect.y > 0) &&
+	     (para->src_image_h.clip_rect.y >
+	      para->src_image_h.height - 1)) ||
+	    ((para->dst_image_h.clip_rect.x > 0) &&
+	     (para->dst_image_h.clip_rect.x >
+	      para->dst_image_h.width - 1)) ||
+	    ((para->dst_image_h.clip_rect.y > 0) &&
+	     (para->dst_image_h.clip_rect.y > para->dst_image_h.height - 1))) {
+		pr_err("invalid bitblit parameter setting\n");
+		return -EINVAL;
+	} else {
+		if (((para->src_image_h.clip_rect.x < 0) &&
+		     ((-para->src_image_h.clip_rect.x) <
+		      para->src_image_h.clip_rect.w))) {
+			para->src_image_h.clip_rect.w =
+			    para->src_image_h.clip_rect.w +
+			    para->src_image_h.clip_rect.x;
+			para->src_image_h.clip_rect.x = 0;
+		} else if ((para->src_image_h.clip_rect.x +
+			    para->src_image_h.clip_rect.w)
+			   > para->src_image_h.width) {
+			para->src_image_h.clip_rect.w =
+			    para->src_image_h.width -
+			    para->src_image_h.clip_rect.x;
+		}
+		if (((para->src_image_h.clip_rect.y < 0) &&
+		     ((-para->src_image_h.clip_rect.y) <
+		      para->src_image_h.clip_rect.h))) {
+			para->src_image_h.clip_rect.h =
+			    para->src_image_h.clip_rect.h +
+			    para->src_image_h.clip_rect.y;
+			para->src_image_h.clip_rect.y = 0;
+		} else if ((para->src_image_h.clip_rect.y +
+			    para->src_image_h.clip_rect.h)
+			   > para->src_image_h.height) {
+			para->src_image_h.clip_rect.h =
+			    para->src_image_h.height -
+			    para->src_image_h.clip_rect.y;
+		}
+
+		if (((para->dst_image_h.clip_rect.x < 0) &&
+		     ((-para->dst_image_h.clip_rect.x) <
+		      para->dst_image_h.clip_rect.w))) {
+			para->dst_image_h.clip_rect.w =
+			    para->dst_image_h.clip_rect.w +
+			    para->dst_image_h.clip_rect.x;
+			para->dst_image_h.clip_rect.x = 0;
+		} else if ((para->dst_image_h.clip_rect.x +
+			    para->dst_image_h.clip_rect.w)
+			   > para->dst_image_h.width) {
+			para->dst_image_h.clip_rect.w =
+			    para->dst_image_h.width -
+			    para->dst_image_h.clip_rect.x;
+		}
+		if (((para->dst_image_h.clip_rect.y < 0) &&
+		     ((-para->dst_image_h.clip_rect.y) <
+		      para->dst_image_h.clip_rect.h))) {
+			para->dst_image_h.clip_rect.h =
+			    para->dst_image_h.clip_rect.h +
+			    para->dst_image_h.clip_rect.y;
+			para->dst_image_h.clip_rect.y = 0;
+		} else if ((para->dst_image_h.clip_rect.y +
+			    para->dst_image_h.clip_rect.h)
+			   > para->dst_image_h.height) {
+			para->dst_image_h.clip_rect.h =
+			    para->dst_image_h.height -
+			    para->dst_image_h.clip_rect.y;
+		}
+
+	}
+
+	g2d_ext_hd.finish_flag = 0;
+
+	/* Add support inverted order copy, however,
+	 * hardware have a bug when reciving y coordinate,
+	 * it use (y + height) rather than (y) on inverted
+	 * order mode, so here adjust it before pass it to hardware.
+	 */
+
+	src->bpremul = 0;
+	src->bbuff = 1;
+	src->color = para->color;
+	src->alpha = para->src_image_h.alpha;
+	src->format = para->src_image_h.format;
+	src->mode = para->src_image_h.mode;
+	src->laddr[0] = para->src_image_h.laddr[0];
+	src->laddr[1] = para->src_image_h.laddr[1];
+	src->laddr[2] = para->src_image_h.laddr[2];
+	src->width = para->src_image_h.width;
+	src->height = para->src_image_h.height;
+	src->clip_rect.x = para->src_image_h.clip_rect.x;
+	src->clip_rect.y = para->src_image_h.clip_rect.y;
+	src->clip_rect.w = para->src_image_h.clip_rect.w;
+	src->clip_rect.h = para->src_image_h.clip_rect.h;
+	src->gamut = G2D_BT709;
+
+	dst->bbuff = 1;
+	dst->alpha = para->dst_image_h.alpha;
+	dst->format = para->dst_image_h.format;
+	dst->color = para->color;
+	dst->mode = para->dst_image_h.mode;
+	dst->laddr[0] = para->dst_image_h.laddr[0];
+	dst->laddr[1] = para->dst_image_h.laddr[1];
+	dst->laddr[2] = para->dst_image_h.laddr[2];
+	dst->width = para->dst_image_h.width;
+	dst->height = para->dst_image_h.height;
+	dst->clip_rect.x = para->dst_image_h.clip_rect.x;
+	dst->clip_rect.y = para->dst_image_h.clip_rect.y;
+	dst->clip_rect.w = para->dst_image_h.clip_rect.w;
+	dst->clip_rect.h = para->dst_image_h.clip_rect.h;
+	dst->gamut = G2D_BT709;
+
+	err = g2d_bsp_bitblt(src, dst, para->flag_h);
+
+	return err;
+}
+
+int g2d_bld_h(g2d_bld *para)
+{
+	__s32 err = 0;
+	g2d_image_enh src_tmp, dst_tmp;
+	g2d_image_enh *src = &src_tmp;
+	g2d_image_enh *dst = &dst_tmp;
+	g2d_ck ck_para_tmp;
+	g2d_ck *ck_para = &ck_para_tmp;
+
+	memset(src, 0, sizeof(g2d_image_enh));
+	memset(dst, 0, sizeof(g2d_image_enh));
+	memset(ck_para, 0, sizeof(g2d_ck));
+
+	/* check the parameter valid */
+	if (((para->src_image_h.clip_rect.x < 0) &&
+	     ((-para->src_image_h.clip_rect.x) >
+	      para->src_image_h.clip_rect.w)) ||
+	    ((para->src_image_h.clip_rect.y < 0) &&
+	     ((-para->src_image_h.clip_rect.y) >
+	      para->src_image_h.clip_rect.h)) ||
+	    ((para->src_image_h.clip_rect.x > 0) &&
+	     (para->src_image_h.clip_rect.x >
+	      para->src_image_h.width - 1)) ||
+	    ((para->src_image_h.clip_rect.y > 0) &&
+	     (para->src_image_h.clip_rect.y >
+	      para->src_image_h.height - 1)) ||
+	    ((para->dst_image_h.clip_rect.x > 0) &&
+	     (para->dst_image_h.clip_rect.x > para->dst_image_h.width - 1))
+	    || ((para->dst_image_h.clip_rect.y > 0) &&
+		(para->dst_image_h.clip_rect.y >
+		 para->dst_image_h.height - 1))) {
+		pr_err("invalid blit parameter setting\n");
+		return -EINVAL;
+	} else {
+		if (((para->src_image_h.clip_rect.x < 0) &&
+		     ((-para->src_image_h.clip_rect.x) <
+		      para->src_image_h.clip_rect.w))) {
+			para->src_image_h.clip_rect.w =
+			    para->src_image_h.clip_rect.w +
+			    para->src_image_h.clip_rect.x;
+			para->src_image_h.clip_rect.x = 0;
+		} else if ((para->src_image_h.clip_rect.x +
+			    para->src_image_h.clip_rect.w)
+			   > para->src_image_h.width) {
+			para->src_image_h.clip_rect.w =
+			    para->src_image_h.width -
+			    para->src_image_h.clip_rect.x;
+		}
+		if (((para->src_image_h.clip_rect.y < 0) &&
+		     ((-para->src_image_h.clip_rect.y) <
+		      para->src_image_h.clip_rect.h))) {
+			para->src_image_h.clip_rect.h =
+			    para->src_image_h.clip_rect.h +
+			    para->src_image_h.clip_rect.y;
+			para->src_image_h.clip_rect.y = 0;
+		} else if ((para->src_image_h.clip_rect.y +
+			    para->src_image_h.clip_rect.h)
+			   > para->src_image_h.height) {
+			para->src_image_h.clip_rect.h =
+			    para->src_image_h.height -
+			    para->src_image_h.clip_rect.y;
+		}
+
+	}
+	src->bbuff = 1;
+	src->gamut = G2D_BT709;
+	src->alpha = para->src_image_h.alpha;
+	src->mode = para->src_image_h.mode;
+	src->color = para->src_image_h.color;
+	src->format = para->src_image_h.format;
+	src->laddr[0] = para->src_image_h.laddr[0];
+	src->laddr[1] = para->src_image_h.laddr[1];
+	src->laddr[2] = para->src_image_h.laddr[2];
+	src->width = para->src_image_h.width;
+	src->height = para->src_image_h.height;
+	src->clip_rect.x = para->src_image_h.clip_rect.x;
+	src->clip_rect.y = para->src_image_h.clip_rect.y;
+	src->clip_rect.w = para->src_image_h.clip_rect.w;
+	src->clip_rect.h = para->src_image_h.clip_rect.h;
+
+	dst->bbuff = 1;
+	dst->gamut = G2D_BT709;
+	dst->alpha = para->dst_image_h.alpha;
+	dst->mode = para->dst_image_h.mode;
+	dst->format = para->dst_image_h.format;
+	dst->laddr[0] = para->dst_image_h.laddr[0];
+	dst->laddr[1] = para->dst_image_h.laddr[1];
+	dst->laddr[2] = para->dst_image_h.laddr[2];
+	dst->width = para->dst_image_h.width;
+	dst->height = para->dst_image_h.height;
+	dst->clip_rect.x = para->dst_image_h.clip_rect.x;
+	dst->clip_rect.y = para->dst_image_h.clip_rect.y;
+	dst->clip_rect.w = para->dst_image_h.clip_rect.w;
+	dst->clip_rect.h = para->dst_image_h.clip_rect.h;
+
+	ck_para->match_rule = para->ck_para.match_rule;
+	ck_para->max_color = para->ck_para.max_color;
+	ck_para->min_color = para->ck_para.min_color;
+
+	g2d_ext_hd.finish_flag = 0;
+
+	err = g2d_bsp_bld(src, dst, para->bld_cmd, ck_para);
+
+	return err;
+}
+
+int g2d_maskblt_h(g2d_maskblt *para)
+{
+	__s32 err = 0;
+	g2d_image_enh src_tmp, dst_tmp, ptn_tmp, mask_tmp;
+	g2d_image_enh *src = &src_tmp;
+	g2d_image_enh *dst = &dst_tmp;
+	g2d_image_enh *ptn = &ptn_tmp;
+	g2d_image_enh *mask = &mask_tmp;
+
+	memset(src, 0, sizeof(g2d_image_enh));
+	memset(dst, 0, sizeof(g2d_image_enh));
+	memset(ptn, 0, sizeof(g2d_image_enh));
+	memset(mask, 0, sizeof(g2d_image_enh));
+
+	/* check the parameter valid */
+	if (((para->dst_image_h.clip_rect.x < 0) &&
+	     ((-para->dst_image_h.clip_rect.x) >
+	      para->dst_image_h.clip_rect.w)) ||
+	    ((para->dst_image_h.clip_rect.y < 0) &&
+	     ((-para->dst_image_h.clip_rect.y) >
+	      para->dst_image_h.clip_rect.h)) ||
+	    ((para->dst_image_h.clip_rect.x > 0) &&
+	     (para->dst_image_h.clip_rect.x >
+	      para->dst_image_h.width - 1)) ||
+	    ((para->dst_image_h.clip_rect.y > 0) &&
+	     (para->dst_image_h.clip_rect.y > para->dst_image_h.height - 1))) {
+		pr_err("invalid maskblt parameter setting\n");
+		return -EINVAL;
+	} else {
+		if (((para->dst_image_h.clip_rect.x < 0) &&
+		     ((-para->dst_image_h.clip_rect.x) <
+		      para->dst_image_h.clip_rect.w))) {
+			para->dst_image_h.clip_rect.w =
+			    para->dst_image_h.clip_rect.w +
+			    para->dst_image_h.clip_rect.x;
+			para->dst_image_h.clip_rect.x = 0;
+		} else if ((para->dst_image_h.clip_rect.x +
+			    para->dst_image_h.clip_rect.w)
+			   > para->dst_image_h.width) {
+			para->dst_image_h.clip_rect.w =
+			    para->dst_image_h.width -
+			    para->dst_image_h.clip_rect.x;
+		}
+		if (((para->dst_image_h.clip_rect.y < 0) &&
+		     ((-para->dst_image_h.clip_rect.y) <
+		      para->dst_image_h.clip_rect.h))) {
+			para->dst_image_h.clip_rect.h =
+			    para->dst_image_h.clip_rect.h +
+			    para->dst_image_h.clip_rect.y;
+			para->dst_image_h.clip_rect.y = 0;
+		} else if ((para->dst_image_h.clip_rect.y +
+			    para->dst_image_h.clip_rect.h)
+			   > para->dst_image_h.height) {
+			para->dst_image_h.clip_rect.h =
+			    para->dst_image_h.height -
+			    para->dst_image_h.clip_rect.y;
+		}
+	}
+
+	src->bbuff = 1;
+	src->gamut = G2D_BT709;
+	src->alpha = para->src_image_h.alpha;
+	src->color = para->src_image_h.color;
+	src->format = para->src_image_h.format;
+	src->mode = para->src_image_h.mode;
+	src->laddr[0] = para->src_image_h.laddr[0];
+	src->laddr[1] = para->src_image_h.laddr[1];
+	src->laddr[2] = para->src_image_h.laddr[2];
+	src->width = para->src_image_h.width;
+	src->height = para->src_image_h.height;
+	src->clip_rect.x = para->src_image_h.clip_rect.x;
+	src->clip_rect.y = para->src_image_h.clip_rect.y;
+	src->clip_rect.w = para->dst_image_h.clip_rect.w;
+	src->clip_rect.h = para->dst_image_h.clip_rect.h;
+
+	ptn->bbuff = 1;
+	ptn->gamut = G2D_BT709;
+	ptn->alpha = para->ptn_image_h.alpha;
+	ptn->color = para->ptn_image_h.color;
+	ptn->format = para->ptn_image_h.format;
+	ptn->mode = para->ptn_image_h.mode;
+	ptn->laddr[0] = para->ptn_image_h.laddr[0];
+	ptn->laddr[1] = para->ptn_image_h.laddr[1];
+	ptn->laddr[2] = para->ptn_image_h.laddr[2];
+	ptn->width = para->ptn_image_h.width;
+	ptn->height = para->ptn_image_h.height;
+	ptn->clip_rect.x = para->ptn_image_h.clip_rect.x;
+	ptn->clip_rect.y = para->ptn_image_h.clip_rect.y;
+	ptn->clip_rect.w = para->dst_image_h.clip_rect.w;
+	ptn->clip_rect.h = para->dst_image_h.clip_rect.h;
+
+	mask->bbuff = 1;
+	mask->gamut = G2D_BT709;
+	mask->alpha = para->mask_image_h.alpha;
+	mask->color = para->mask_image_h.color;
+	mask->format = para->mask_image_h.format;
+	mask->laddr[0] = para->mask_image_h.laddr[0];
+	mask->laddr[1] = para->mask_image_h.laddr[1];
+	mask->laddr[2] = para->mask_image_h.laddr[2];
+	mask->width = para->mask_image_h.width;
+	mask->height = para->mask_image_h.height;
+	mask->clip_rect.x = para->mask_image_h.clip_rect.x;
+	mask->clip_rect.y = para->mask_image_h.clip_rect.y;
+	mask->clip_rect.w = para->dst_image_h.clip_rect.w;
+	mask->clip_rect.h = para->dst_image_h.clip_rect.h;
+
+	dst->bbuff = 1;
+	dst->gamut = G2D_BT709;
+	dst->alpha = para->dst_image_h.alpha;
+	dst->color = para->dst_image_h.color;
+	dst->format = para->dst_image_h.format;
+	dst->mode = para->dst_image_h.mode;
+	dst->laddr[0] = para->dst_image_h.laddr[0];
+	dst->laddr[1] = para->dst_image_h.laddr[1];
+	dst->laddr[2] = para->dst_image_h.laddr[2];
+	dst->width = para->dst_image_h.width;
+	dst->height = para->dst_image_h.height;
+	dst->clip_rect.x = para->dst_image_h.clip_rect.x;
+	dst->clip_rect.y = para->dst_image_h.clip_rect.y;
+	dst->clip_rect.w = para->dst_image_h.clip_rect.w;
+	dst->clip_rect.h = para->dst_image_h.clip_rect.h;
+
+	g2d_ext_hd.finish_flag = 0;
+
+	err =
+	    g2d_bsp_maskblt(src, ptn, mask, dst, para->back_flag,
+			    para->fore_flag);
+
+	return err;
+}
+#endif
+
+/*int g2d_set_palette_table(g2d_palette *para)
 {
 
-	if((para->pbuffer == NULL) || (para->size < 0) || (para->size>1024))
-	{
+	if ((para->pbuffer == NULL) || (para->size < 0) ||
+			(para->size > 1024)) {
 		printk("para invalid in mixer_set_palette\n");
 		return -1;
 	}
@@ -473,8 +951,9 @@ int g2d_set_palette_table(g2d_palette *para)
 
 	return 0;
 }
+*/
 
-int g2d_cmdq(unsigned int para)
+/*int g2d_cmdq(unsigned int para)
 {
 	__s32 err = 0;
 
@@ -483,54 +962,58 @@ int g2d_cmdq(unsigned int para)
 
 	return err;
 }
+*/
 
 long g2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	__s32	ret = 0;
+	__s32 ret = 0;
 
-	if(!mutex_trylock(&para.mutex)) {
-			mutex_lock(&para.mutex);
-	}
+	if (!mutex_trylock(&para.mutex))
+		mutex_lock(&para.mutex);
 	switch (cmd) {
 
-	/* Proceed to the operation */
+		/* Proceed to the operation */
 	case G2D_CMD_BITBLT:{
-		g2d_blt blit_para;
-		if(copy_from_user(&blit_para, (g2d_blt *)arg, sizeof(g2d_blt)))
-		{
-			kfree(&blit_para);
-			ret = -EFAULT;
-			goto err_noput;
+			g2d_blt blit_para;
+
+			if (copy_from_user(&blit_para, (g2d_blt *) arg,
+					   sizeof(g2d_blt))) {
+				kfree(&blit_para);
+				ret = -EFAULT;
+				goto err_noput;
+			}
+			ret = g2d_blit(&blit_para);
+			break;
 		}
-		ret = g2d_blit(&blit_para);
-		break;
-	}
 	case G2D_CMD_FILLRECT:{
-		g2d_fillrect fill_para;
-		if(copy_from_user(&fill_para, (g2d_fillrect *)arg, sizeof(g2d_fillrect)))
-		{
-			kfree(&fill_para);
-			ret = -EFAULT;
-			goto err_noput;
+			g2d_fillrect fill_para;
+
+			if (copy_from_user(&fill_para, (g2d_fillrect *) arg,
+					   sizeof(g2d_fillrect))) {
+				kfree(&fill_para);
+				ret = -EFAULT;
+				goto err_noput;
+			}
+			ret = g2d_fill(&fill_para);
+			break;
 		}
-		ret = g2d_fill(&fill_para);
-		break;
-	}
 	case G2D_CMD_STRETCHBLT:{
-		g2d_stretchblt stre_para;
-		if(copy_from_user(&stre_para, (g2d_stretchblt *)arg, sizeof(g2d_stretchblt)))
-		{
-			kfree(&stre_para);
-			ret = -EFAULT;
-			goto err_noput;
+			g2d_stretchblt stre_para;
+
+			if (copy_from_user(&stre_para, (g2d_stretchblt *) arg,
+					   sizeof(g2d_stretchblt))) {
+				kfree(&stre_para);
+				ret = -EFAULT;
+				goto err_noput;
+			}
+			ret = g2d_stretchblit(&stre_para);
+			break;
 		}
-		ret = g2d_stretchblit(&stre_para);
-		break;
-	}
-	case G2D_CMD_PALETTE_TBL:{
+/*	case G2D_CMD_PALETTE_TBL:{
 		g2d_palette pale_para;
-		if(copy_from_user(&pale_para, (g2d_palette *)arg, sizeof(g2d_palette)))
-		{
+
+		if (copy_from_user(&pale_para, (g2d_palette *)arg,
+					sizeof(g2d_palette))) {
 			kfree(&pale_para);
 			ret = -EFAULT;
 			goto err_noput;
@@ -540,8 +1023,9 @@ long g2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 	case G2D_CMD_QUEUE:{
 		unsigned int cmdq_addr;
-		if(copy_from_user(&cmdq_addr, (unsigned int *)arg, sizeof(unsigned int)))
-		{
+
+		if (copy_from_user(&cmdq_addr,
+				(unsigned int *)arg, sizeof(unsigned int))) {
 			kfree(&cmdq_addr);
 			ret = -EFAULT;
 			goto err_noput;
@@ -549,14 +1033,64 @@ long g2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		ret = g2d_cmdq(cmdq_addr);
 		break;
 	}
+*/
+#ifdef G2D_V2X_SUPPORT
+	case G2D_CMD_BITBLT_H:{
+			g2d_blt_h blit_para;
 
-	/* just management memory for test */
+			if (copy_from_user(&blit_para, (g2d_blt_h *) arg,
+					   sizeof(g2d_blt_h))) {
+				kfree(&blit_para);
+				ret = -EFAULT;
+				goto err_noput;
+			}
+			ret = g2d_blit_h(&blit_para);
+			break;
+		}
+	case G2D_CMD_FILLRECT_H:{
+			g2d_fillrect_h fill_para;
+
+			if (copy_from_user(&fill_para, (g2d_fillrect_h *) arg,
+					   sizeof(g2d_fillrect_h))) {
+				kfree(&fill_para);
+				ret = -EFAULT;
+				goto err_noput;
+			}
+			ret = g2d_fill_h(&fill_para);
+			break;
+		}
+	case G2D_CMD_BLD_H:{
+			g2d_bld bld_para;
+
+			if (copy_from_user(&bld_para, (g2d_bld *) arg,
+					   sizeof(g2d_bld))) {
+				kfree(&bld_para);
+				ret = -EFAULT;
+				goto err_noput;
+			}
+			ret = g2d_bld_h(&bld_para);
+			break;
+		}
+	case G2D_CMD_MASK_H:{
+			g2d_maskblt mask_para;
+
+			if (copy_from_user(&mask_para, (g2d_maskblt *) arg,
+					   sizeof(g2d_maskblt))) {
+				kfree(&mask_para);
+				ret = -EFAULT;
+				goto err_noput;
+			}
+			ret = g2d_maskblt_h(&mask_para);
+			break;
+		}
+#endif
+		/* just management memory for test */
 	case G2D_CMD_MEM_REQUEST:
-		ret =  g2d_mem_request(arg);
+		ret = g2d_mem_request(arg);
 		break;
 
 	case G2D_CMD_MEM_RELEASE:
-		ret =  g2d_mem_release(arg);
+		ret = g2d_mem_release(arg);
 		break;
 
 	case G2D_CMD_MEM_SELIDX:
@@ -564,32 +1098,29 @@ long g2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 
 	case G2D_CMD_MEM_GETADR:
-		if(g2d_mem[arg].b_used)
-		{
+		if (g2d_mem[arg].b_used) {
 			ret = g2d_mem[arg].phy_addr;
-		}
-		else
-		{
+		} else {
 			ERR("mem not used in G2D_CMD_MEM_GETADR\n");
 			ret = -1;
 		}
 		break;
 
 	case G2D_CMD_INVERTED_ORDER:
-	{
-		if (arg > G2D_SM_DTRL) {
-			ERR("scan mode is err.\n");
-			ret = -EINVAL;
-			goto err_noput;
+		{
+			if (arg > G2D_SM_DTRL) {
+				ERR("scan mode is err.\n");
+				ret = -EINVAL;
+				goto err_noput;
+			}
+
+			mutex_lock(&global_lock);
+			scan_order = arg;
+			mutex_unlock(&global_lock);
+			break;
 		}
 
-		mutex_lock(&global_lock);
-		scan_order = arg;
-		mutex_unlock(&global_lock);
-		break;
-	}
-
-	/* Invalid IOCTL call */
+		/* Invalid IOCTL call */
 	default:
 		return -EINVAL;
 	}
@@ -601,60 +1132,56 @@ err_noput:
 }
 
 static struct file_operations g2d_fops = {
-	.owner				= THIS_MODULE,
-	.open				= g2d_open,
-	.release			= g2d_release,
-	.unlocked_ioctl		= g2d_ioctl,
-	.mmap				= g2d_mmap,
+	.owner = THIS_MODULE,
+	.open = g2d_open,
+	.release = g2d_release,
+	.unlocked_ioctl = g2d_ioctl,
+	.mmap = g2d_mmap,
 };
 
 static int g2d_probe(struct platform_device *pdev)
 {
 #if !defined(CONFIG_OF)
 	int size;
-	struct resource	*res;
+	struct resource *res;
 #endif
-	int	ret = 0;
-	__g2d_info_t	*info = NULL;
+	int ret = 0;
+	__g2d_info_t *info = NULL;
 
 	info = &para;
 	info->dev = &pdev->dev;
-	platform_set_drvdata(pdev,info);
+	platform_set_drvdata(pdev, info);
 
 #if !defined(CONFIG_OF)
 	/* get the memory region */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if(res == NULL)
-	{
+	if (res == NULL) {
 		ERR("failed to get memory register\n");
 		ret = -ENXIO;
-		goto  dealloc_fb;
+		goto dealloc_fb;
 	}
 
 	size = (res->end - res->start) + 1;
 	/* map the memory */
 	info->io = ioremap(res->start, size);
-	if(info->io == NULL)
-	{
-		ERR("iormap() of register failed\n");
+	if (info->io == NULL) {
+		ERR("iorGmap() of register failed\n");
 		ret = -ENXIO;
-		goto  dealloc_fb;
+		goto dealloc_fb;
 	}
 #else
 	info->io = of_iomap(pdev->dev.of_node, 0);
-	if(info->io == NULL)
-	{
+	if (info->io == NULL) {
 		ERR("iormap() of register failed\n");
 		ret = -ENXIO;
-		goto  dealloc_fb;
+		goto dealloc_fb;
 	}
 #endif
 
 #if !defined(CONFIG_OF)
 	/* get the irq */
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-	if(res == NULL)
-	{
+	if (res == NULL) {
 		ERR("failed to get irq resource\n");
 		ret = -ENXIO;
 		goto release_regs;
@@ -670,18 +1197,17 @@ static int g2d_probe(struct platform_device *pdev)
 #endif
 
 	/* request the irq */
-	ret = request_irq(info->irq,g2d_handle_irq,0,dev_name(&pdev->dev),NULL);
-	if(ret)
-	{
+	ret = request_irq(info->irq, g2d_handle_irq, 0,
+			  dev_name(&pdev->dev), NULL);
+	if (ret) {
 		ERR("failed to install irq resource\n");
 		goto release_regs;
 	}
 #if defined(CONFIG_OF)
 	/* clk init */
 	info->clk = of_clk_get(pdev->dev.of_node, 0);
-	if (IS_ERR(info->clk)) {
+	if (IS_ERR(info->clk))
 		ERR("fail to get clk\n");
-	}
 #endif
 
 	drv_g2d_init();
@@ -691,10 +1217,10 @@ static int g2d_probe(struct platform_device *pdev)
 
 release_regs:
 #if !defined(CONFIG_OF)
-		iounmap(info->io);
+	iounmap(info->io);
 #endif
 dealloc_fb:
-		platform_set_drvdata(pdev, NULL);
+	platform_set_drvdata(pdev, NULL);
 
 	return ret;
 }
@@ -715,7 +1241,7 @@ static int g2d_remove(struct platform_device *pdev)
 
 static int g2d_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	INFO("%s. \n", __func__);
+	INFO("%s.\n", __func__);
 	mutex_lock(&para.mutex);
 	if (para.opened) {
 		if (para.clk)
@@ -729,7 +1255,7 @@ static int g2d_suspend(struct platform_device *pdev, pm_message_t state)
 
 static int g2d_resume(struct platform_device *pdev)
 {
-	INFO("%s. \n", __func__);
+	INFO("%s.\n", __func__);
 	mutex_lock(&para.mutex);
 	if (para.opened) {
 		if (para.clk)
@@ -742,36 +1268,36 @@ static int g2d_resume(struct platform_device *pdev)
 }
 
 #if !defined(CONFIG_OF)
-struct platform_device g2d_device =
-{
-	.name		= "g2d",
-	.id		= -1,
-	.num_resources	= ARRAY_SIZE(g2d_resource),
-	.resource	= g2d_resource,
-	.dev		=
-	{
-	},
+struct platform_device g2d_device = {
+
+	.name = "g2d",
+	.id = -1,
+	.num_resources = ARRAY_SIZE(g2d_resource),
+	.resource = g2d_resource,
+	.dev = {
+
+		},
 };
 #else
 static const struct of_device_id sunxi_g2d_match[] = {
-	{ .compatible = "allwinner,sunxi-g2d", },
+	{.compatible = "allwinner,sunxi-g2d",},
 	{},
 };
 #endif
 
 static struct platform_driver g2d_driver = {
-	.probe		= g2d_probe,
-	.remove		= g2d_remove,
-	.suspend	= g2d_suspend,
-	.resume		= g2d_resume,
-	.suspend	= NULL,
-	.resume		= NULL,
-	.driver			=
-	{
-		.owner		= THIS_MODULE,
-		.name		= "g2d",
-		.of_match_table	= sunxi_g2d_match,
-	},
+	.probe = g2d_probe,
+	.remove = g2d_remove,
+	.suspend = g2d_suspend,
+	.resume = g2d_resume,
+	.suspend = NULL,
+	.resume = NULL,
+	.driver = {
+
+		   .owner = THIS_MODULE,
+		   .name = "g2d",
+		   .of_match_table = sunxi_g2d_match,
+		   },
 };
 
 int __init g2d_module_init(void)
@@ -783,15 +1309,13 @@ int __init g2d_module_init(void)
 	cdev_init(g2d_cdev, &g2d_fops);
 	g2d_cdev->owner = THIS_MODULE;
 	err = cdev_add(g2d_cdev, devid, 1);
-	if (err)
-	{
+	if (err) {
 		ERR("I was assigned major number %d.\n", MAJOR(devid));
 		return -1;
 	}
 
 	g2d_class = class_create(THIS_MODULE, "g2d_class");
-	if (IS_ERR(g2d_class))
-	{
+	if (IS_ERR(g2d_class)) {
 		ERR("create class error\n");
 		return -1;
 	}
@@ -801,9 +1325,7 @@ int __init g2d_module_init(void)
 	ret = platform_device_register(&g2d_device);
 #endif
 	if (ret == 0)
-	{
 		ret = platform_driver_register(&g2d_driver);
-	}
 
 	INFO("Module initialized.major:%d\n", MAJOR(devid));
 	return ret;
@@ -818,7 +1340,7 @@ static void __exit g2d_module_exit(void)
 #if !defined(CONFIG_OF)
 	platform_device_unregister(&g2d_device);
 #endif
-	device_destroy(g2d_class,  devid);
+	device_destroy(g2d_class, devid);
 	class_destroy(g2d_class);
 
 	cdev_del(g2d_cdev);
@@ -832,4 +1354,3 @@ MODULE_AUTHOR("tyle <tyle@allwinnertech.com>");
 MODULE_DESCRIPTION("g2d driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:g2d");
-

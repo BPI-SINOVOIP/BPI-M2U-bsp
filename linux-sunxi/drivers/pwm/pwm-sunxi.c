@@ -31,6 +31,7 @@
 #include <linux/of_platform.h>
 
 #include <linux/io.h>
+#include <linux/clk.h>
 
 #define PWM_DEBUG 0
 #define PWM_NUM_MAX 4
@@ -49,6 +50,13 @@
 #define pwm_debug(msg...) pr_info
 #else
 #define pwm_debug(msg...)
+#endif
+
+#if ((defined CONFIG_ARCH_SUN50IW6P1IW12P1) ||\
+			(defined CONFIG_ARCH_SUN8IW17P1) ||\
+			(defined CONFIG_ARCH_SUN50IW6P1) ||\
+			(defined CONFIG_ARCH_SUN50IW3P1))
+#define CLK_GATE_SUPPORT
 #endif
 
 struct sunxi_pwm_config {
@@ -82,6 +90,9 @@ struct sunxi_pwm_chip {
 	struct pwm_chip chip;
 	void __iomem *base;
 	struct sunxi_pwm_config *config;
+#if defined(CLK_GATE_SUPPORT)
+	struct clk	*pwm_clk;
+#endif
 };
 
 static inline struct sunxi_pwm_chip *to_sunxi_pwm_chip(struct pwm_chip *chip)
@@ -120,7 +131,6 @@ static int sunxi_pwm_pin_set_state(struct device *dev, char *name)
 		ret = PTR_ERR(pctl);
 		goto exit;
 	}
-
 	state = pinctrl_lookup_state(pctl, name);
 	if (IS_ERR(state)) {
 		dev_err(dev, "pinctrl_lookup_state(%s) failed!\n", name);
@@ -396,7 +406,6 @@ static int sunxi_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	reg_width = pc->config[pwm->pwm - chip->base].reg_period_width;
 	temp = sunxi_pwm_readl(chip, reg_offset);
 	temp = SET_BITS(reg_shift, reg_width, temp, (entire_cycles - 1));
-
 	sunxi_pwm_writel(chip, reg_offset, temp);
 
 	return 0;
@@ -421,6 +430,7 @@ static int sunxi_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 			pr_err("%s: can't parse pwm device\n", __func__);
 			return -ENODEV;
 	}
+
 	sunxi_pwm_pin_set_state(&pwm_pdevice->dev, PWM_PIN_STATE_ACTIVE);
 
 	/* enable clk for pwm controller */
@@ -554,7 +564,15 @@ static int sunxi_pwm_probe(struct platform_device *pdev)
 		}
 	}
 
-  return 0;
+#if defined(CLK_GATE_SUPPORT)
+	pwm->pwm_clk = of_clk_get(pdev->dev.of_node, 0);
+	if (IS_ERR_OR_NULL(pwm->pwm_clk)) {
+		pr_err("%s: can't get pwm clk\n", __func__);
+		return -EINVAL;
+	}
+	clk_prepare_enable(pwm->pwm_clk);
+#endif
+	return 0;
 
 err_get_config:
 err_alloc:
@@ -568,7 +586,9 @@ err_iomap:
 static int sunxi_pwm_remove(struct platform_device *pdev)
 {
 	struct sunxi_pwm_chip *pwm = platform_get_drvdata(pdev);
-
+#if defined CLK_GATE_SUPPORT
+	clk_disable(pwm->pwm_clk);
+#endif
 	return pwmchip_remove(&pwm->chip);
 }
 

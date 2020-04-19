@@ -10,8 +10,12 @@
 #define _PM_H
 #if defined(CONFIG_ARCH_SUN8IW10P1) || \
 	defined(CONFIG_ARCH_SUN8IW11P1) || \
+	defined(CONFIG_ARCH_SUN8IW17P1) || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1) || \
+	defined(CONFIG_ARCH_SUN3IW1P1)
 #include "pm_types.h"
 #include "pm_config.h"
 #include "pm_errcode.h"
@@ -29,14 +33,17 @@
 #include "mem_usb.h"
 #include "mem_printk.h"
 #include "mem_divlibc.h"
-#include "mem_int.h"
+#ifdef CONFIG_ARCH_SUN3IW1P1
+#include "mem_intc.h"
+#else
+#include "mem_gic.h"
+#endif
 #include "mem_gpio.h"
 #include "mem_tmr.h"
 #include "mem_tmstmp.h"
 #include "mem_clk.h"
 #include "mem_timing.h"
 #include "mem_mapping.h"
-#include "mem_hwspinlock.h"
 #ifdef CONFIG_ARCH_SUN9IW1P1
 #include "mem_cci400.h"
 #include "mem_gtbus.h"

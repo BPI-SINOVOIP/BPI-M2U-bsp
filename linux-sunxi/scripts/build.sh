@@ -8,7 +8,11 @@ if [ -n "`echo ${LICHEE_CHIP} | grep "sun5[0-9]i"`" ] && \
     export ARCH=arm64
 fi
 
-export CROSS_COMPILE=${ARCH}-linux-gnueabi-
+if [ "${LICHEE_CHIP}" = "sun3iw1p1" ]; then
+	export CROSS_COMPILE=${ARCH}-none-linux-gnueabi-
+else
+	export CROSS_COMPILE=${ARCH}-linux-gnueabi-
+fi
 if [ -n "${LICHEE_TOOLCHAIN_PATH}" \
 	-a -d "${LICHEE_TOOLCHAIN_PATH}" ]; then
     GCC=$(find ${LICHEE_TOOLCHAIN_PATH} -perm /a+x -a -regex '.*-gcc');
@@ -16,7 +20,6 @@ if [ -n "${LICHEE_TOOLCHAIN_PATH}" \
 elif [ -n "${LICHEE_CROSS_COMPILER}" ]; then
     export CROSS_COMPILE="${LICHEE_CROSS_COMPILER}-"
 fi
-
 export AS=${CROSS_COMPILE}as
 export LD=${CROSS_COMPILE}ld
 export CC=${CROSS_COMPILE}gcc
@@ -32,6 +35,28 @@ KERNEL_VERSION=`make -s kernelversion -C ./`
 LICHEE_KDIR=`pwd`
 LICHEE_MOD_DIR=${LICHEE_KDIR}/output/lib/modules/${KERNEL_VERSION}
 export LICHEE_KDIR
+
+LINUX_CONFIG_INITRAMFS_SOURCE=`cat ${LICHEE_KDIR}/.config | grep "CONFIG_INITRAMFS_SOURCE" || echo ""`
+
+if [[ "$LINUX_CONFIG_INITRAMFS_SOURCE" =~ xz\"$ ]];then
+    echo "file end with xz"
+    export RAMFS_COMPRESS_METHOD="xz"
+elif [[ "$LINUX_CONFIG_INITRAMFS_SOURCE" =~ gz\"$  ]];then
+    echo "file end with gz"
+    export RAMFS_COMPRESS_METHOD="gz"
+elif [[ "$LINUX_CONFIG_INITRAMFS_SOURCE" =~ none\"$  ]];then
+    echo "file end with none"
+    export RAMFS_COMPRESS_METHOD="none"
+elif [[ "X$LINUX_CONFIG_INITRAMFS_SOURCE" =  "X"  ]];then
+    echo "no file name,use gz"
+    export RAMFS_COMPRESS_METHOD="gz"
+else
+    echo "error format,file shoule end with gz or xz or none"
+    export RAMFS_COMPRESS_METHOD="gz"
+    #exit 1
+fi
+
+RAMFS_TARGET=rootfs.cpio.$RAMFS_COMPRESS_METHOD
 
 update_kern_ver()
 {
@@ -60,6 +85,7 @@ NAND_ROOT=${LICHEE_KDIR}/modules/nand
 
 build_nand_lib()
 {
+
 	echo "build nand library ${NAND_ROOT}/${LICHEE_CHIP}/lib"
 	if [ -d ${NAND_ROOT}/${LICHEE_CHIP}/lib ]; then
 		echo "build nand library now"
@@ -144,16 +170,21 @@ build_kernel()
     fi
 
     # We need to copy rootfs files to compile kernel for linux image
-    echo "Copy rootfs.cpio.gz for ${ARCH}"
+    echo "Copy rootfs for ${ARCH}"
     if [ "${ARCH}" = "arm" ]; then
-        cp -f rootfs_32bit.cpio.gz output/rootfs.cpio.gz
+		if [ "${LICHEE_CHIP}" = "sun3iw1p1" ]; then
+			RAMFS_SOURCE=rootfs_32bit_arm9.cpio.$RAMFS_COMPRESS_METHOD
+		else
+			RAMFS_SOURCE=rootfs_32bit.cpio.$RAMFS_COMPRESS_METHOD
+		fi
+		cp -f $RAMFS_SOURCE output/$RAMFS_TARGET
     else
         cp -f rootfs.cpio.gz output/
     fi
 
     if [ ! -f .config ] ; then
-        printf "\n\033[0;31;1mUsing default config ${LICHEE_KERN_DEFCONF} ...\033[0m\n\n"
-        make ARCH=${ARCH} ${LICHEE_KERN_DEFCONF}
+       printf "\n\033[0;31;1mUsing default config ${LICHEE_KERN_DEFCONF} ...\033[0m\n\n"
+           make ARCH=${ARCH} ${LICHEE_KERN_DEFCONF}
     fi
 
     if [ "x$PACK_TINY_ANDROID" = "xtrue" ]; then
@@ -162,6 +193,9 @@ build_kernel()
 
     if [ "x$PACK_BSPTEST" = "xtrue" ]; then
         ARCH=${ARCH} scripts/kconfig/merge_config.sh .config linaro/configs/sunxi-sata.conf
+	if [ -f linaro/configs/sunxi-sata-${LICHEE_CHIP}.conf ];then
+	    ARCH=${ARCH} scripts/kconfig/merge_config.sh .config linaro/configs/sunxi-sata-${LICHEE_CHIP}.conf
+	fi
     fi
 
     if [ "x$SUNXI_CHECK" = "x1" ];then
@@ -217,13 +251,13 @@ build_modules()
 {
 
 	echo "Building modules"
-	
+
 	if [ ! -f include/generated/utsrelease.h ]; then
 		printf "Please build kernel first!\n"
 		exit 1
 	fi
-	
 	update_kern_ver
+
 	build_nand_lib
 	make -C modules/nand LICHEE_MOD_DIR=${LICHEE_MOD_DIR} \
 		LICHEE_KDIR=${LICHEE_KDIR} \
@@ -238,7 +272,7 @@ regen_rootfs_cpio()
 
 	cd ${LICHEE_KDIR}/output
 	if [ -x "../scripts/build_rootfs.sh" ]; then
-		../scripts/build_rootfs.sh e ./rootfs.cpio.gz > /dev/null
+		../scripts/build_rootfs.sh e ./$RAMFS_TARGET > /dev/null
 	else
 		echo "No such file: scripts/build_rootfs.sh"
 		exit 1
@@ -257,8 +291,19 @@ regen_rootfs_cpio()
 	if [ ! -z "$ko_file" ]; then
 	        ${STRIP} -d ./skel/lib/modules/$KERNEL_VERSION/*.ko
 	fi
-	rm -f rootfs.cpio.gz
-	../scripts/build_rootfs.sh c rootfs.cpio.gz > /dev/null
+	if [ "x$LICHEE_BOARD" = "xft" ];then
+		for shfile in `ls ../tools/ft/*`
+		do
+			if [ "x$shfile" != "xreadme" ];then
+				chmod 755 $shfile
+				cp $shfile ./skel/usr/bin -v
+			fi
+			sed -i '/exec < \/dev\/console > \/dev\/console 2>&1/a\ft.sh' ./skel/init
+		done
+	fi
+
+        rm -f $RAMFS_TARGET
+        ../scripts/build_rootfs.sh c $RAMFS_TARGET > /dev/null
 	rm -rf skel
 	cd - > /dev/null
 }
@@ -269,12 +314,12 @@ build_ramfs()
 	local CHIP="";
 
 	local BIMAGE="output/bImage";
-	local RAMDISK="output/rootfs.cpio.gz";
+	local RAMDISK="output/$RAMFS_TARGET";
 	local BASE="";
 	local RAMDISK_OFFSET="";
 	local KERNEL_OFFSET="";
 
-	# update rootfs.cpio.gz with new module files
+	# update rootfs with new module files
 	regen_rootfs_cpio
 
 	CHIP=`echo ${LICHEE_CHIP} | sed -e 's/.*\(sun[0-9x]*i\).*/\1/g'`;
@@ -312,7 +357,7 @@ build_ramfs()
 		--kernel_offset ${KERNEL_OFFSET} \
 		--ramdisk_offset ${RAMDISK_OFFSET} \
 		-o output/boot.img
-	
+
 	# If uboot use *bootm* to boot kernel, we should use uImage.
 	echo build_ramfs
 	echo "Copy boot.img to output directory ..."
@@ -326,14 +371,21 @@ build_ramfs()
 	if [ ! -f output/arisc ]; then
 		echo "arisc" > output/arisc
 	fi
-	cp output/arisc    ${LICHEE_PLAT_OUT}
+	cp output/arisc ${LICHEE_PLAT_OUT}
 
-	if [ ! -f arch/${ARCH}/boot/dts/${LICHEE_CHIP}-${LICHEE_BOARD}.dtb ]; then
-		echo "sunxi.dtb" > output/sunxi.dtb
-	else
+	if [ -f arch/${ARCH}/boot/dts/${LICHEE_CHIP}-${LICHEE_BOARD}.dtb ]; then
 		cp arch/${ARCH}/boot/dts/${LICHEE_CHIP}-${LICHEE_BOARD}.dtb output/sunxi.dtb
+	elif [ -f arch/${ARCH}/boot/dts/${LICHEE_CHIP}-soc.dtb ]; then
+		cp arch/${ARCH}/boot/dts/${LICHEE_CHIP}-soc.dtb output/sunxi.dtb
+	else
+		echo "sunxi.dtb" > output/sunxi.dtb
 	fi
-	cp output/sunxi.dtb    ${LICHEE_PLAT_OUT}
+
+	# It's used for dtb debug
+	./scripts/dtc/dtc -I dtb -O dts -o output/.sunxi.dts output/sunxi.dtb
+
+	cp output/.sunxi.dts ${LICHEE_PLAT_OUT}
+	cp output/sunxi.dtb ${LICHEE_PLAT_OUT}
 }
 
 gen_output()

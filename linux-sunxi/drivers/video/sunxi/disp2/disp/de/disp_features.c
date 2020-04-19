@@ -46,7 +46,13 @@ int bsp_disp_feat_is_support_capture(unsigned int disp)
 	return de_feat_is_support_wb(disp);
 }
 
-int disp_init_feat(void)
+int disp_init_feat(struct disp_feat_init *feat_init)
 {
+#ifdef SUPPORT_FEAT_INIT_CONFIG
+	struct de_feat_init de_feat;
+	de_feat.chn_cfg_mode = feat_init->chn_cfg_mode;
+	return de_feat_init_config(&de_feat);
+#else
 	return de_feat_init();
+#endif
 }

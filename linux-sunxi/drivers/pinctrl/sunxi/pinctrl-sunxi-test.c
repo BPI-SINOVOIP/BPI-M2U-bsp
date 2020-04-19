@@ -958,6 +958,7 @@ static int pctrltest_request_eint(void)
 	int virq;
 	int gpio_index;
 	char pin_name[SUNXI_PIN_NAME_MAX_LEN];
+	int trigger;
 
 	gpio_index = sunxi_ptest_data->gpio_index;
 	sunxi_gpio_to_name(gpio_index, pin_name);
@@ -974,13 +975,10 @@ static int pctrltest_request_eint(void)
 		return -EINVAL;
 	}
 
-	pr_warn("step2: set gpio[%s]direction output and data value 0.\n", pin_name);
-	ret = gpio_direction_output(gpio_index, 0);
-	if (IS_ERR_VALUE(ret)) {
-		pr_warn("set gpio direction output failed for check gpio get value %d\n",
-			ret);
-		return -EINVAL;
-	}
+	gpio_direction_input(gpio_index);
+	trigger = gpio_get_value_cansleep(gpio_index);
+	pr_warn("step2: get gpio[%s] trigger level:0x%x\n", pin_name, trigger);
+	trigger = trigger ? IRQF_TRIGGER_HIGH : IRQF_TRIGGER_LOW;
 	gpio_free(gpio_index);
 
 	pr_warn("step3: generate virtual irq number.\n");
@@ -990,9 +988,10 @@ static int pctrltest_request_eint(void)
 		return -EINVAL;
 	}
 
-	pr_warn("step4: request irq(low level trigger).\n");
+	pr_warn("step4: request irq(%s level).\n",
+			trigger == IRQF_TRIGGER_HIGH ? "high" : "low");
 	ret = request_irq(virq, sunxi_pinctrl_irq_handler_demo1,
-					IRQF_TRIGGER_LOW, "PIN_EINT", NULL);
+					trigger, "PIN_EINT", NULL);
 	if (IS_ERR_VALUE(ret)) {
 		pr_warn("request irq failed !\n");
 		return -EINVAL;
@@ -1021,6 +1020,7 @@ static int pctrltest_re_request_eint(void)
 	int virq;
 	int gpio_index;
 	char pin_name[SUNXI_PIN_NAME_MAX_LEN];
+	int trigger;
 
 	gpio_index = sunxi_ptest_data->gpio_index;
 	sunxi_gpio_to_name(gpio_index, pin_name);
@@ -1036,13 +1036,10 @@ static int pctrltest_re_request_eint(void)
 		return -EINVAL;
 	}
 
-	pr_warn("step2: set gpio[%s]direction output and data value 0.\n", pin_name);
-	ret = gpio_direction_output(gpio_index, 0);
-	if (IS_ERR_VALUE(ret)) {
-		pr_warn("set gpio direction output failed for check gpio get value %d\n",
-			ret);
-		return -EINVAL;
-	}
+	gpio_direction_input(gpio_index);
+	trigger = gpio_get_value_cansleep(gpio_index);
+	pr_warn("step2: get gpio[%s] trigger level:0x%x\n", pin_name, trigger);
+	trigger = trigger ? IRQF_TRIGGER_HIGH : IRQF_TRIGGER_LOW;
 	gpio_free(gpio_index);
 
 	pr_warn("step3: generate virtual irq number.\n");
@@ -1052,18 +1049,21 @@ static int pctrltest_re_request_eint(void)
 		return -EINVAL;
 	}
 
-	pr_warn("step4: first time request irq(low level trigger).\n");
+	pr_warn("step4: first time request irq(%s level trigger).\n",
+			trigger == IRQF_TRIGGER_HIGH ? "high" : "low");
+
 	ret = request_irq(virq, sunxi_pinctrl_irq_handler_demo1,
-				    IRQF_TRIGGER_LOW, "PIN_EINT", NULL);
+				    trigger, "PIN_EINT", NULL);
 	if (IS_ERR_VALUE(ret)) {
 		free_irq(virq, NULL);
 		pr_warn("test pin request irq failed !\n");
 		return -EINVAL;
 	}
 
-	pr_warn("step5: repeat request irq(low level trigger).\n");
+	pr_warn("step5: repeat request irq(%s level trigger).\n",
+			trigger == IRQF_TRIGGER_HIGH ? "high" : "low");
 	ret = request_irq(virq, sunxi_pinctrl_irq_handler_demo2,
-					IRQF_TRIGGER_LOW, "PIN_EINT", NULL);
+					trigger, "PIN_EINT", NULL);
 	free_irq(virq, NULL);
 	if (!IS_ERR_VALUE(ret)) {
 		pr_warn("      repeat request irq success!\n\n");
@@ -1648,6 +1648,7 @@ static int sunxi_pctrltest_remove(struct platform_device *pdev)
 static struct of_device_id sunxi_pctrltest_match[] = {
 	{ .compatible = "allwinner,sun8i-vdevice"},
 	{ .compatible = "allwinner,sun50i-vdevice"},
+	{ .compatible = "allwinner,sun3i-vdevice"},
 	{}
 };
 

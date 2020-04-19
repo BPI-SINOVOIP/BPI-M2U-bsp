@@ -1,10 +1,11 @@
 
 #ifndef __CSIC__PARSER__REG__H__
 #define __CSIC__PARSER__REG__H__
+#include <media/sunxi_camera_v2.h>
 
 #include <linux/types.h>
 
-#define MAX_CSIC_PRS_NUM 2
+#define MAX_CSIC_PRS_NUM 4
 
 /*register value*/
 
@@ -13,22 +14,22 @@ enum prs_mode {
 	PRS_MCSI,
 };
 
-enum csi_if {
+enum prs_if {
 	/* YUV(seperate syncs) */
-	CSI_IF_INTLV = 0x00,	/* YUYV422 Interleaved or RAW
+	PRS_IF_INTLV = 0x00,	/* YUYV422 Interleaved or RAW
 				 * (All data in one data bus) */
-	CSI_IF_INTLV_16BIT = 0x01, /* 16 bit YUYV422 Interleaved */
+	PRS_IF_INTLV_16BIT = 0x01, /* 16 bit YUYV422 Interleaved */
 
 	/* CCIR656(embedded syncs) */
-	CSI_IF_BT656_1CH = 0x04,	/* BT656 1 channel */
-	CSI_IF_BT1120_1CH = 0x05,	/* 16bit BT656(BT1120 like) 1 channel */
-	CSI_IF_BT656_2CH = 0x0c,	/* BT656 2 channels (All data
+	PRS_IF_BT656_1CH = 0x04,	/* BT656 1 channel */
+	PRS_IF_BT1120_1CH = 0x05,	/* 16bit BT656(BT1120 like) 1 channel */
+	PRS_IF_BT656_2CH = 0x0c,	/* BT656 2 channels (All data
 					 * interleaved in one data bus) */
-	CSI_IF_BT1120_2CH = 0x0d,	/* 16bit BT656(BT1120 like) 2 channels
+	PRS_IF_BT1120_2CH = 0x0d,	/* 16bit BT656(BT1120 like) 2 channels
 					 * (All data interleaved in one data bus) */
-	CSI_IF_BT656_4CH = 0x0e, 	/* BT656 4 channels (All data
+	PRS_IF_BT656_4CH = 0x0e, 	/* BT656 4 channels (All data
 					 * interleaved in one data bus) */
-	CSI_IF_BT1120_4CH = 0x0f,	/* 16bit BT656(BT1120 like) 4 channels
+	PRS_IF_BT1120_4CH = 0x0f,	/* 16bit BT656(BT1120 like) 4 channels
 					 * (All data interleaved in one data bus) */
 };
 
@@ -80,7 +81,7 @@ enum clk_pol {
 /*
  * input reference polarity
  */
-enum ref_pol {
+enum refer_pol {
 	REF_NEGATIVE,		/* active low */
 	REF_POSITIVE,		/* active high */
 };
@@ -126,8 +127,8 @@ struct prs_ncsi_if_cfg {
 	unsigned int pclk_shift;
 	enum src_type type;
 	enum field_pol field;
-	enum ref_pol vref;
-	enum ref_pol href;
+	enum refer_pol vref;
+	enum refer_pol href;
 	enum clk_pol clk;
 	enum field_dt_mode field_dt;
 	unsigned int ddr_sample;
@@ -135,12 +136,12 @@ struct prs_ncsi_if_cfg {
 	enum if_data_width dw;
 	enum input_seq seq;
 	enum output_mode mode;
-	enum csi_if intf;
+	enum prs_if intf;
 };
 
 struct prs_mcsi_if_cfg {
-	enum input_seq input_seq;
-	enum output_mode output_mode;
+	enum input_seq seq;
+	enum output_mode mode;
 };
 
 struct prs_cap_mode {
@@ -188,15 +189,14 @@ void csic_prs_enable(unsigned int sel);
 void csic_prs_disable(unsigned int sel);
 void csic_prs_mode(unsigned int sel, enum prs_mode mode);
 void csic_prs_pclk_en(unsigned int sel, unsigned int en);
-void csic_prs_pclk_en(unsigned int sel, unsigned int en);
 void csic_prs_ncsi_en(unsigned int sel, unsigned int en);
 void csic_prs_mcsi_en(unsigned int sel, unsigned int en);
 
 void csic_prs_ncsi_if_cfg(unsigned int sel, struct prs_ncsi_if_cfg *if_cfg);
 void csic_prs_mcsi_if_cfg(unsigned int sel, struct prs_mcsi_if_cfg *if_cfg);
-
-void csic_prs_capture(unsigned int sel, unsigned int ch,
+void csic_prs_capture_start(unsigned int sel, unsigned int ch_total_num,
 				struct prs_cap_mode *mode);
+void csic_prs_capture_stop(unsigned int sel);
 void csic_prs_signal_status(unsigned int sel,
 				struct prs_signal_status *status);
 void csic_prs_ncsi_bt656_header_cfg(unsigned int sel,
@@ -205,7 +205,15 @@ void csic_prs_input_fmt_cfg(unsigned int sel, unsigned int ch,
 				enum prs_input_fmt fmt);
 void csic_prs_output_size_cfg(unsigned int sel, unsigned int ch,
 				struct prs_output_size *size);
+/*for csic sync*/
+void csic_prs_sync_en_cfg(unsigned int sel, struct csi_sync_ctrl *sync);
+void csic_prs_sync_en(unsigned int sel, struct csi_sync_ctrl *sync);
+void csic_prs_sync_cfg(unsigned int sel, struct csi_sync_ctrl *sync);
+void csic_prs_sync_wait_N(unsigned int sel, struct csi_sync_ctrl *sync);
+void csic_prs_sync_wait_M(unsigned int sel, struct csi_sync_ctrl *sync);
 
+void csic_prs_xs_en(unsigned int sel, struct csi_sync_ctrl *sync);
+void csic_prs_xs_period_len_register(unsigned int sel, struct csi_sync_ctrl *sync);
 /* for debug */
 void csic_prs_input_para_get(unsigned int sel, unsigned int ch,
 				struct prs_input_para *para);

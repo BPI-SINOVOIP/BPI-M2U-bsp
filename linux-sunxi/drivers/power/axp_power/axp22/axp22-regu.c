@@ -109,7 +109,7 @@ static struct axp_regulator_info axp22_regulator_info[] = {
 			0x00,     0,    0,   0,      0, 0, 0, 0, 0),
 	AXP22_LDO(IO1,  700, 3300, 100, LDOIO1, 0, 5, LDOIO1EN, 0x07, 0x03,
 			0x00,     0,    0,   0,      0, 0, 0, 0, 0),
-	AXP22_SW(1,    3300, 3300, 100,  DC1SW, 0, 0,  DC1SWEN, 0x80, 0x80,
+	AXP22_SW(1,    1600, 3400, 100,  DC1SW, 0, 5,  DC1SWEN, 0x80, 0x80,
 			0x00,     0,    0,   0,      0, 0, 0, 0, 0),
 	AXP22_LDO(12,   700, 1400, 100,  LDO12, 0, 3,  LDO12EN, 0x01, 0x01,
 			0x00,     0,    0,   0,      0, 0, 0, 0, 0),
@@ -132,6 +132,9 @@ static struct regulator_init_data axp_regl_init_data[] = {
 			.max_uV = 1540000,
 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE
 				| REGULATOR_CHANGE_STATUS,
+#ifdef CONFIG_ARCH_SUN8IW5
+			.always_on = 1,
+#endif
 		},
 	},
 	[VCC_DCDC3] = {
@@ -679,6 +682,7 @@ static int axp22_regulator_remove(struct platform_device *pdev)
 static const struct of_device_id axp22_regu_dt_ids[] = {
 	{ .compatible = "axp221s-regulator", },
 	{ .compatible = "axp227-regulator", },
+	{ .compatible = "axp223-regulator", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, axp22_regu_dt_ids);

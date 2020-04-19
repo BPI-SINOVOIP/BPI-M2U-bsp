@@ -49,12 +49,17 @@
 #define  SUNXI_AXP_809                   809
 #define  SUNXI_AXP_806                   806
 #define  SUNXI_AXP_81X                   81
+#define  SUNXI_AXP_259                   259
+#define  SUNXI_AXP_858					858
+#define  SUNXI_AXP_2585                  2585
+
+
 
 #define  RSB_SADDR_AXP22X	         	(0x3A3)
 #define  RSB_SADDR_AXP809		        (0x3A3)
 #define  RSB_SADDR_AXP806		        (0x745)
 #define  RSB_SADDR_AXP81X		        (0x3A3)
-
+#define  RSB_SADDR_AXP858               (0x745)
 
 #define AXP_SLAVE  ("slave")
 #define AXP_MAIN   ("main")
@@ -174,6 +179,23 @@ sunxi_axp_module_ext(SUNXI_AXP_NULL);
 	sunxi_axp_module_ext(SUNXI_AXP_806);
 #endif
 
+#if defined(CONFIG_SUNXI_AXP809)
+	sunxi_axp_module_ext(SUNXI_AXP_809);
+#endif
+
+#if defined(CONFIG_SUNXI_AXP259)
+	sunxi_axp_module_ext(SUNXI_AXP_259);
+#endif
+
+#if defined(SUNXI_AXP_858)
+	sunxi_axp_module_ext(SUNXI_AXP_858);
+#endif
+
+#if defined(SUNXI_AXP_2585)
+	sunxi_axp_module_ext(SUNXI_AXP_2585);
+#endif
+
+
 
 static inline int axp_i2c_read(unsigned char chip, unsigned char addr, unsigned char *buffer)
 {
@@ -227,6 +249,11 @@ static inline int axp_i2c_config(unsigned int chip, unsigned char slave_id)
     {
         sunxi_rsb_config(slave_id, RSB_SADDR_AXP81X);
     }
+#endif
+#if defined(CONFIG_SUNXI_AXP858)
+	if (chip == SUNXI_AXP_858) {
+		sunxi_rsb_config(slave_id, RSB_SADDR_AXP858);
+	}
 #endif
 #endif
 

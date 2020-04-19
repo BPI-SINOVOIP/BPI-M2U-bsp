@@ -306,6 +306,10 @@ enum pixel_fmt pix_fmt_v4l2_to_common(unsigned int pix_fmt)
 			return PIX_FMT_SGRBG_12;
 		case V4L2_PIX_FMT_SRGGB12:
 			return PIX_FMT_SRGGB_12;
+#ifdef CONFIG_ARCH_SUN3IW1P1
+		case V4L2_PIX_FMT_HM12:
+			return PIX_FMT_YUV420MB_8;
+#endif
 		default:
 			return PIX_FMT_SBGGR_8;
 	}

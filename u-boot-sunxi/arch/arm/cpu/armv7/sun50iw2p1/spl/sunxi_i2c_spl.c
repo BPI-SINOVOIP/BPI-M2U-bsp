@@ -410,12 +410,12 @@ int i2c_write(uchar chip, uint addr, int alen, uchar *buffer, int len)
 	return ret0;
 }
 
-static inline int axp_i2c_write(unsigned char chip, unsigned char addr, unsigned char data)
+int axp_i2c_write(unsigned char chip, unsigned char addr, unsigned char data)
 {
 	return i2c_write(chip, addr, 1, &data, 1);
 }
 
-static inline int axp_i2c_read(unsigned char chip, unsigned char addr, unsigned char *buffer)
+int axp_i2c_read(unsigned char chip, unsigned char addr, unsigned char *buffer)
 {
 	return i2c_read(chip, addr, 1, buffer, 1);
 }
@@ -481,15 +481,19 @@ void i2c_set_clock(int speed, int slaveaddr)
 	}
 	if((i2c->lcr & 0x30) != 0x30 )
 	{
-	    /* toggle I2CSCL until bus idle */
+	    /* toggle I2C SCL and SDA until bus idle */
 	    i2c->lcr = 0x05;
 	    __usdelay(500);
 	    i = 10;
 		    while ((i > 0) && ((i2c->lcr & 0x02) != 2))
 		    {
+			    /*control scl and sda output high level*/
 			    i2c->lcr |= 0x08;
+			    i2c->lcr |= 0x02;
 			    __usdelay(1000);
+			    /*control scl and sda output low level*/
 			    i2c->lcr &= ~0x08;
+			    i2c->lcr &= ~0x02;
 			    __usdelay(1000);
 			    i--;
 		    }
@@ -522,7 +526,7 @@ void i2c_init_cpus(int speed, int slaveaddr)
 	return ;
 }
 
-
+#ifndef  CONFIG_SUNXI_MULITCORE_BOOT
 static int axp_probe(void)
 {
 	u8	  pmu_type;
@@ -561,6 +565,7 @@ static int set_dcdcd_voltage(int vol)
 	return ret;
 }
 
+
 int set_ddr_voltage(int vol)
 {
 
@@ -576,4 +581,5 @@ int set_ddr_voltage(int vol)
 		return 0;
 	}
 }
+#endif
 

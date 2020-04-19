@@ -7,10 +7,22 @@
 #include "./lowlevel_sun8iw10/de_feat.h"
 #elif defined(CONFIG_ARCH_SUN8IW11P1)
 #include "./lowlevel_v2x/de_feat.h"
+#elif defined(CONFIG_ARCH_SUN8IW12P1)
+#include "./lowlevel_v2x/de_feat.h"
+#elif defined(CONFIG_ARCH_SUN8IW17P1)
+#include "./lowlevel_v2x/de_feat.h"
 #elif defined(CONFIG_ARCH_SUN50IW1P1)
 #include "./lowlevel_sun50iw1/de_feat.h"
 #elif defined(CONFIG_ARCH_SUN50IW2P1)
 #include "./lowlevel_v2x/de_feat.h"
+#elif defined(CONFIG_ARCH_SUN8IW7P1)
+#include "./lowlevel_v2x/de_feat.h"
+#elif defined(CONFIG_ARCH_SUN50IW3P1)
+#include "./lowlevel_v3x/de_feat.h"
+#elif defined(CONFIG_ARCH_SUN50IW6P1)
+#include "./lowlevel_v3x/de_feat.h"
+#else
+#error "undefined platform!!!"
 #endif
 
 #define DISP_DEVICE_NUM DEVICE_NUM

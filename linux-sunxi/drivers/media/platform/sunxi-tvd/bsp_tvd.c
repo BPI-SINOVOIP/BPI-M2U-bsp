@@ -36,18 +36,20 @@ void tvd_3d_mode(u32 _3d_sel, u32 _3d_en, u32 _3d_addr)
 	tvd_device[_3d_sel]->tvd_yc_sep1.bits._3d_comb_filter_dis =
 								_3d_en ? 0 : 1;
 }
-s32 tvd_init(u32 sel,u32 interface)
-{
 
-	if(sel==0 && interface!=0)
-	{
-		tvd_adc_config(0);
-		tvd_adc_config(1);
-		tvd_adc_config(2);
-	}
-	else if(interface==0)
-	{
-		tvd_adc_config(sel);
+void tvd_enable_chanel(u32 sel, u32 en)
+{
+	tvd_device[sel]->tvd_en.bits.tvd_en_ch = en;
+}
+
+s32 tvd_init(u32 sel, u32 interface)
+{
+	if (sel == 0 && interface != CVBS_INTERFACE) {
+		tvd_adc_config(0, 1);
+		tvd_adc_config(1, 1);
+		tvd_adc_config(2, 1);
+	} else if (interface == CVBS_INTERFACE) {
+		tvd_adc_config(sel, 1);
 	}
 
 	if (tvd_top_dev->tvd_top_map.bits.tvd_adc_map != 2) {
@@ -63,7 +65,7 @@ s32 tvd_init(u32 sel,u32 interface)
 		tvd_top_dev->tvd_top_map.bits.tvd_adc_map = interface ? 2 : 1;
 	}
 */
-	tvd_device[sel]->tvd_en.bits.tvd_en_ch = 1;
+	tvd_enable_chanel(sel, 1);
 	return 0;
 }
 
@@ -86,17 +88,17 @@ s32 tvd_get_status(u32 sel,u32* locked,u32* system)
 
 s32 tvd_config(u32 sel,u32 interface,u32 system)
 {
-	tvd_device[sel]->tvd_wb1.bits.wb_en = 0;
-	tvd_device[sel]->tvd_en.bits.tvd_en_ch = 0;
+	tvd_device[sel]->tvd_wb1.bits.wb_en = 0;    /*wb dma disable*/
+	tvd_device[sel]->tvd_en.bits.tvd_en_ch = 0; /*tvd module disable*/
 
 	tvd_device[sel]->tvd_en.bits.en_lock_disable_write_back1only_start_wb_when_locked = 0;
 	tvd_device[sel]->tvd_en.bits.en_lock_disable_write_back2when_unlocked = 0;
 	tvd_device[sel]->tvd_en.bits.clr_rsmp_fifo = 0;
-	tvd_device[sel]->tvd_mode.bits.blue_display_mode = 2;
-	tvd_device[sel]->tvd_mode.bits.blue_color = 1;
+	tvd_device[sel]->tvd_mode.bits.blue_display_mode = 2; /*auto*/
+	tvd_device[sel]->tvd_mode.bits.blue_color = 1;	/*black*/
 	tvd_device[sel]->tvd_clamp_agc1.bits.agc_en = 1;
 	tvd_device[sel]->tvd_clamp_agc1.bits.agc_frequence = 1;
-	tvd_device[sel]->tvd_clamp_agc1.bits.cagc_en = interface?0:1;
+	tvd_device[sel]->tvd_clamp_agc1.bits.cagc_en = interface ? 0 : 1;
 	tvd_device[sel]->tvd_clamp_agc2.bits.agc_gate_width = system ? 70 : 64;
 	tvd_device[sel]->tvd_clamp_agc2.bits.agc_backporch_delay =
 							system ? 110 : 100;
@@ -106,18 +108,24 @@ s32 tvd_config(u32 sel,u32 interface,u32 system)
 							0x1d1745d1 : 0x20000000;
 	tvd_device[sel]->tvd_hlock2.bits.hsync_filter_gate_start_time = 214;
 	tvd_device[sel]->tvd_hlock2.bits.hsync_filter_gate_end_time = 78;
-	tvd_device[sel]->tvd_hlock3.bits.hsync_rising_detect_window_start_time = 45;
-	tvd_device[sel]->tvd_hlock3.bits.hsync_rising_detect_window_end_time = 80;
-	tvd_device[sel]->tvd_hlock3.bits.hsync_tip_detect_window_start_time = 233;
+	tvd_device[sel]->tvd_hlock3.bits.hsync_rising_detect_window_start_time =
+	    45;
+	tvd_device[sel]->tvd_hlock3.bits.hsync_rising_detect_window_end_time =
+	    80;
+	tvd_device[sel]->tvd_hlock3.bits.hsync_tip_detect_window_start_time =
+	    233;
 	tvd_device[sel]->tvd_hlock3.bits.hsync_tip_detect_window_end_time = 15;
-	tvd_device[sel]->tvd_hlock4.bits.hsync_detect_window_start_time_for_coarse_detection = 0;
+	tvd_device[sel]
+	    ->tvd_hlock4.bits
+	    .hsync_detect_window_start_time_for_coarse_detection = 0;
 	tvd_device[sel]->tvd_hlock4.bits.hsync_detect_window_end_time_for_corase_detect = 128;
 	tvd_device[sel]->tvd_hlock4.bits.hsync_rising_time_for_fine_detect = 62;
 	tvd_device[sel]->tvd_hlock4.bits.hsync_fine_to_coarse_offset = 62;
 
-	tvd_device[sel]->tvd_mode.bits.ypbpr_mode = interface?1:0;
+	tvd_device[sel]->tvd_mode.bits.ypbpr_mode = interface ? 1 : 0;
 	tvd_device[sel]->tvd_mode.bits.svideo_mode = 0;
-	tvd_device[sel]->tvd_mode.bits.progressive_mode = (interface==2)?1:0;
+	tvd_device[sel]->tvd_mode.bits.progressive_mode =
+	    (interface == 2) ? 1 : 0;
 
 	tvd_device[sel]->tvd_clamp_agc1.bits.agc_target =  interface ? 0 :
 						(system == 0) ? 225 : 220;
@@ -301,6 +309,13 @@ s32 tvd_set_wb_height(u32 sel,u32 height)
 	return 0;
 }
 
+/**
+ * @name       tvd_set_wb_addr
+ * @brief      set dma y and c(uv) channel addre
+ * @param[IN]
+ * @param[OUT]
+ * @return
+ */
 s32 tvd_set_wb_addr(u32 sel,u32 addr_y,u32 addr_c)
 {
 	//make sure 1 frame change 1 buffer,no need to detect this bit
@@ -413,13 +428,20 @@ u32 tvd_get_contrast(u32 sel)
 	return tvd_device[sel]->tvd_enhance1.bits.contrast_gain;
 }
 
-s32 tvd_adc_config(u32 adc)
+/**
+ * @name       tvd_adc_config
+ * @brief      config tvd adc and enable it
+ * @param[IN]  adc: the index of tvd module
+ * @param[IN]  en: 1: enable; 0: disable
+ * @return    0 if success
+ */
+s32 tvd_adc_config(u32 adc, u32 en)
 {
 	volatile tvd_adc_cfg_reg_t *adc_cfg_p;
 	volatile tvd_adc_ctl_reg_t *adc_ctl_p;
 	volatile tvd_adc_dig_reg_t *adc_dig_p;
 
-	if (adc > 3)
+	if (adc > 3 || en > 1)
 		return -1;
 
 	adc_cfg_p = (adc == 0) ? &tvd_top_dev->tvd_adc0_cfg :
@@ -447,9 +469,9 @@ s32 tvd_adc_config(u32 adc)
 	adc_cfg_p->bits.clp_step = 7;
 	adc_cfg_p->bits.data_dly = 1;
 	adc_dig_p->bits.lpf_dig_sel = 0;
-	adc_dig_p->bits.lpf_dig_en = 1;
-	adc_ctl_p->bits.afe_en = 1;
-	adc_ctl_p->bits.adc_en = 1;
+	adc_dig_p->bits.lpf_dig_en = en;
+	adc_ctl_p->bits.afe_en = en;
+	adc_ctl_p->bits.adc_en = en;
 	return 0;
 }
 
@@ -649,4 +671,3 @@ void tvd_cagc_config(u32 sel, u32 enable)
 {
 	tvd_device[sel]->tvd_clamp_agc1.bits.cagc_en = enable;
 }
-

@@ -27,9 +27,8 @@
 #include <common.h>
 #include <asm/io.h>
 #include <asm/arch/timer.h>
+#include "asm/arch/rtc_region.h"
 
-#define  RTC_DATA_HOLD_REG_BASE        (SUNXI_RTC_BASE + 0x100)
-#define  RTC_DATA_HOLD_REG_FEL         (RTC_DATA_HOLD_REG_BASE + 0x8)
 /*
 ************************************************************************************************************
 *

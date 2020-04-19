@@ -2,9 +2,9 @@
 #include "de_dsi_type.h"
 #include "de_dsi.h"
 
-#if defined(SUPPORT_DSI) && defined(DSI_VERSION_40)
+#if defined(SUPPORT_DSI)
 
-static volatile struct __de_dsi_dev_t *dsi_dev[2];
+static volatile struct __de_dsi_dev_t *dsi_dev[DEVICE_DSI_NUM];
 static volatile struct __de_dsi_dphy_dev_t *dphy_dev[1];
 
 u32 dsi_pixel_bits[4] = { 24, 24, 18, 16 };
@@ -40,19 +40,7 @@ u32 dsi_get_reg_base(u32 sel)
 
 u32 dsi_get_start_delay(u32 sel)
 {
-	u32 dsi_start_delay =
-	    dsi_dev[sel]->dsi_basic_ctl1.bits.video_start_delay;
-	u32 vt = dsi_dev[sel]->dsi_basic_size1.bits.vt;
-	u32 vsa = dsi_dev[sel]->dsi_basic_size0.bits.vsa;
-	u32 vbp = dsi_dev[sel]->dsi_basic_size0.bits.vbp;
-	u32 y = dsi_dev[sel]->dsi_basic_size1.bits.vact;
-	u32 vfp = vt - vsa - vbp - y;
-	u32 start_delay = dsi_start_delay + vfp;
-
-	if (start_delay > dsi_dev[sel]->dsi_basic_size1.bits.vt)
-		start_delay -= dsi_dev[sel]->dsi_basic_size1.bits.vt;
-
-	return vt - y - 8;
+	return dsi_dev[sel]->dsi_basic_ctl1.bits.video_start_delay;
 }
 
 u32 dsi_get_cur_line(u32 sel)
@@ -184,6 +172,18 @@ s32 dsi_close(u32 sel)
 	dphy_dev[sel]->dphy_ana1.bits.reg_vttmode =	1;
 	*/
 
+	return 0;
+}
+
+/**
+ * @name       dsi_mode_switch
+ * @brief      switch dsi mode between cmd and video mode
+ * @param[IN]  sel: dsi module index; en:1-->video mode
+ *             0--> cmd mode
+ * @return     alway return 0
+ */
+__s32 dsi_mode_switch(__u32 sel, __u32 en)
+{
 	return 0;
 }
 

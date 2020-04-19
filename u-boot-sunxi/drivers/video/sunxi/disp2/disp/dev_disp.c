@@ -21,6 +21,9 @@ static u32 suspend_status = 0;//0:normal; suspend_status&1 != 0:in early_suspend
 //static u32 suspend_prestep = 3; //0:after early suspend; 1:after suspend; 2:after resume; 3 :after late resume
 static u32 power_status_init = 0;
 
+struct disp_layer_config lyr_cfg[16];
+struct disp_layer_config2 lyr_cfg2[16];
+
 //uboot plat
 static u32    lcd_flow_cnt[2] = {0};
 static s8   lcd_op_finished[2] = {0};
@@ -275,6 +278,7 @@ static s32 drv_disp_check_spec(void)
 }
 
 extern __s32 hdmi_init(void);
+extern __s32 tv_init(void);
 extern int tv_ac200_init(void);
 extern void disp_fdt_init(void);
 
@@ -329,13 +333,16 @@ s32 drv_disp_init(void)
 	}
 
 #if defined(SUPPORT_DSI)
-	para->reg_base[DISP_MOD_DSI0] = disp_getprop_regbase(FDT_DISP_PATH, "reg", counter);
-	if (!para->reg_base[DISP_MOD_DSI0]) {
-		__wrn("unable to map dsi registers\n");
-		ret = -EINVAL;
-		goto exit;
+	for (i = 0; i < DEVICE_DSI_NUM; ++i) {
+		para->reg_base[DISP_MOD_DSI0 + i] =
+		    disp_getprop_regbase(FDT_DISP_PATH, "reg", counter);
+		if (!para->reg_base[DISP_MOD_DSI0 + i]) {
+			__wrn("unable to map dsi%d registers\n", i);
+			ret = -EINVAL;
+			goto exit;
+		}
+		++counter;
 	}
-	counter ++;
 #endif
 
 	/* parse and map irq */
@@ -350,11 +357,13 @@ s32 drv_disp_init(void)
 	}
 
 #if defined(SUPPORT_DSI)
-	para->irq_no[DISP_MOD_DSI0] = disp_getprop_irq(FDT_DISP_PATH, "interrupts", counter);
-	if (!para->irq_no[DISP_MOD_DSI0]) {
-		__wrn("irq_of_parse_and_map irq %d fail for dsi\n", counter);
+	for (i = 0; i < DEVICE_DSI_NUM; ++i) {
+		para->irq_no[DISP_MOD_DSI0 + i] =
+		    disp_getprop_irq(FDT_DISP_PATH, "interrupts", counter);
+		if (!para->irq_no[DISP_MOD_DSI0 + i])
+			__wrn("irq_of_parse_and_map irq %d fail for dsi\n", i);
+		counter++;
 	}
-	counter ++;
 #endif
 
 	node_offset = disp_fdt_nodeoffset("disp");
@@ -394,11 +403,13 @@ s32 drv_disp_init(void)
 #endif
 
 #if defined(SUPPORT_DSI)
-	para->mclk[DISP_MOD_DSI0] = of_clk_get(node_offset, counter);
-	if (IS_ERR(para->mclk[DISP_MOD_DSI0])) {
-		__wrn("fail to get clk for dsi\n");
+	for (i = 0; i < CLK_DSI_NUM; ++i) {
+		para->mclk[DISP_MOD_DSI0 + i] =
+		    of_clk_get(node_offset, counter);
+		if (IS_ERR(para->mclk[DISP_MOD_DSI0 + i]))
+			__wrn("fail to get clk %d for dsi\n", i);
+		counter++;
 	}
-	counter ++;
 #endif
 
 #if defined(SUPPORT_EINK)
@@ -458,10 +469,10 @@ s32 drv_disp_init(void)
 		g_disp_drv.mgr[disp] = disp_get_layer_manager(disp);
 	}
 	lcd_init();
-#if defined(SUPPORT_HDMI)
+#if defined(SUPPORT_HDMI) && defined(CONFIG_SUNXI_MODULE_HDMI)
 	hdmi_init();
 #endif
-#if defined(SUPPORT_TV)
+#if defined(SUPPORT_TV) && defined(CONFIG_SUNXI_MODULE_TV)
 	tv_init();
 #endif
 
@@ -492,6 +503,8 @@ s32 drv_disp_exit(void)
 
 int sunxi_disp_get_source_ops(struct sunxi_disp_source_ops *src_ops)
 {
+	memset((void *)src_ops, 0, sizeof(struct sunxi_disp_source_ops));
+
 	src_ops->sunxi_lcd_set_panel_funs = bsp_disp_lcd_set_panel_funs;
 	src_ops->sunxi_lcd_delay_ms = disp_delay_ms;
 	src_ops->sunxi_lcd_delay_us = disp_delay_us;
@@ -507,10 +520,17 @@ int sunxi_disp_get_source_ops(struct sunxi_disp_source_ops *src_ops)
 	src_ops->sunxi_lcd_gpio_set_value = bsp_disp_lcd_gpio_set_value;
 	src_ops->sunxi_lcd_gpio_set_direction = bsp_disp_lcd_gpio_set_direction;
 #ifdef SUPPORT_DSI
-	src_ops->sunxi_lcd_dsi_dcs_write = dsi_dcs_wr;
-	src_ops->sunxi_lcd_dsi_gen_write = dsi_gen_wr;
-	src_ops->sunxi_lcd_dsi_clk_enable = dsi_clk_enable;
+	src_ops->sunxi_lcd_dsi_dcs_write = bsp_disp_lcd_dsi_dcs_wr;
+	src_ops->sunxi_lcd_dsi_gen_write = bsp_disp_lcd_dsi_gen_wr;
+	src_ops->sunxi_lcd_dsi_clk_enable = bsp_disp_lcd_dsi_clk_enable;
+	src_ops->sunxi_lcd_dsi_open = bsp_disp_lcd_dsi_open;
+	src_ops->sunxi_lcd_dsi_close = bsp_disp_lcd_dsi_close;
 #endif
+	src_ops->sunxi_lcd_cpu_write = tcon0_cpu_wr_16b;
+	src_ops->sunxi_lcd_cpu_write_data = tcon0_cpu_wr_16b_data;
+	src_ops->sunxi_lcd_cpu_write_index = tcon0_cpu_wr_16b_index;
+	src_ops->sunxi_lcd_cpu_set_auto_mode = tcon0_cpu_set_auto_mode;
+
 	return 0;
 }
 
@@ -687,6 +707,39 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	}
 
+	case DISP_DEVICE_SET_CONFIG:
+	{
+		struct disp_device_config config;
+
+		if (copy_from_user(&config, (void __user *)ubuffer[1],
+			sizeof(struct disp_device_config))) {
+			__wrn("copy_from_user fail\n");
+			return  -EFAULT;
+		}
+
+		ret = bsp_disp_device_set_config(ubuffer[0], &config);
+		break;
+	}
+
+	case DISP_DEVICE_GET_CONFIG:
+	{
+		struct disp_device_config config;
+
+		if (mgr && dispdev)
+			dispdev->get_static_config(dispdev, &config);
+		else
+			ret = -EFAULT;
+
+		if (ret == 0) {
+			if (copy_to_user((void __user *)ubuffer[1], &config,
+				sizeof(struct disp_device_config))) {
+				__wrn("copy_to_user fail\n");
+				return  -EFAULT;
+			}
+		}
+		break;
+	}
+
 	case DISP_GET_OUTPUT:
 	{
 		struct disp_output para;
@@ -727,29 +780,68 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	//----layer----
 	case DISP_LAYER_SET_CONFIG:
 	{
-		struct disp_layer_config para;
-
-		if (copy_from_user(&para, (void __user *)ubuffer[1],sizeof(struct disp_layer_config)*ubuffer[2]))	{
+		if (copy_from_user(lyr_cfg,
+			(void __user *)ubuffer[1],
+			sizeof(struct disp_layer_config) * ubuffer[2]))	{
 			__wrn("copy_from_user fail\n");
 			return  -EFAULT;
 		}
 		if (mgr && mgr->set_layer_config)
-			ret = mgr->set_layer_config(mgr, &para, ubuffer[2]);
+			ret = mgr->set_layer_config(mgr, lyr_cfg, ubuffer[2]);
 		break;
 	}
 
 	case DISP_LAYER_GET_CONFIG:
 	{
-		struct disp_layer_config para;
-
-		if (copy_from_user(&para, (void __user *)ubuffer[1],sizeof(struct disp_layer_config)*ubuffer[2]))	{
+		if (copy_from_user(lyr_cfg,
+			(void __user *)ubuffer[1],
+			sizeof(struct disp_layer_config) * ubuffer[2]))	{
 			__wrn("copy_from_user fail\n");
+
 			return  -EFAULT;
 		}
 		if (mgr && mgr->get_layer_config)
-			ret = mgr->get_layer_config(mgr, &para, ubuffer[2]);
-		if (copy_to_user((void __user *)ubuffer[1], &para, sizeof(struct disp_layer_config)*ubuffer[2]))	{
+			ret = mgr->get_layer_config(mgr, lyr_cfg, ubuffer[2]);
+		if (copy_to_user((void __user *)ubuffer[1],
+			lyr_cfg,
+			sizeof(struct disp_layer_config) * ubuffer[2]))	{
 			__wrn("copy_to_user fail\n");
+
+			return  -EFAULT;
+		}
+		break;
+	}
+
+	case DISP_LAYER_SET_CONFIG2:
+	{
+		if (copy_from_user(lyr_cfg2,
+		    (void __user *)ubuffer[1],
+		    sizeof(struct disp_layer_config2) * ubuffer[2])) {
+			__wrn("copy_from_user fail\n");
+
+			return  -EFAULT;
+		}
+		if (mgr && mgr->set_layer_config2)
+			ret = mgr->set_layer_config2(mgr, lyr_cfg2, ubuffer[2]);
+		break;
+	}
+
+	case DISP_LAYER_GET_CONFIG2:
+	{
+		if (copy_from_user(lyr_cfg2,
+		    (void __user *)ubuffer[1],
+		    sizeof(struct disp_layer_config2) * ubuffer[2])) {
+			__wrn("copy_from_user fail\n");
+
+			return  -EFAULT;
+		}
+		if (mgr && mgr->get_layer_config2)
+			ret = mgr->get_layer_config2(mgr, lyr_cfg2, ubuffer[2]);
+		if (copy_to_user((void __user *)ubuffer[1],
+			lyr_cfg2,
+			sizeof(struct disp_layer_config2) * ubuffer[2])) {
+			__wrn("copy_to_user fail\n");
+
 			return  -EFAULT;
 		}
 		break;
@@ -768,6 +860,50 @@ long disp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	{
 		if (dispdev && (DISP_OUTPUT_TYPE_LCD == dispdev->type)) {
 			ret = dispdev->get_bright(dispdev);
+		}
+		break;
+	}
+
+	case DISP_LCD_GAMMA_CORRECTION_ENABLE:
+	{
+		if (dispdev && (DISP_OUTPUT_TYPE_LCD == dispdev->type))
+			ret = dispdev->enable_gamma(dispdev);
+		break;
+	}
+
+	case DISP_LCD_GAMMA_CORRECTION_DISABLE:
+	{
+		if (dispdev && (DISP_OUTPUT_TYPE_LCD == dispdev->type))
+			ret = dispdev->disable_gamma(dispdev);
+
+		break;
+	}
+
+	case DISP_LCD_SET_GAMMA_TABLE:
+	{
+		if (dispdev && (DISP_OUTPUT_TYPE_LCD == dispdev->type)) {
+			u32 *gamma_tbl = kmalloc(LCD_GAMMA_TABLE_SIZE,
+						 GFP_KERNEL | __GFP_ZERO);
+			u32 size = ubuffer[2];
+
+			if (gamma_tbl == NULL) {
+				__wrn("kmalloc fail\n");
+				ret = -EFAULT;
+				break;
+			}
+
+			size = (size > LCD_GAMMA_TABLE_SIZE) ?
+			    LCD_GAMMA_TABLE_SIZE : size;
+			if (copy_from_user(gamma_tbl, (void __user *)ubuffer[1],
+					  size)) {
+				__wrn("copy_from_user fail\n");
+				kfree(gamma_tbl);
+				ret = -EFAULT;
+
+				break;
+			}
+			ret = dispdev->set_gamma_tbl(dispdev, gamma_tbl, size);
+			kfree(gamma_tbl);
 		}
 		break;
 	}

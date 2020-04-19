@@ -139,7 +139,10 @@ void save_processor_state(void);
 void restore_processor_state(void);
 void restore_processor_ttbr0(void);
 void set_ttbr0(void);
+
+#ifndef CONFIG_ARCH_SUN3IW1P1
 extern int get_cur_cluster_id(void);
+#endif
 
 /* Used in mem_cpu_asm.S */
 #define SYS_CONTEXT_SIZE (2)

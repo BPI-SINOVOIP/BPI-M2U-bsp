@@ -7,7 +7,6 @@
 #include <linux/workqueue.h>
 #include <linux/types.h>
 #include <linux/slab.h>
-#include <linux/interrupt.h>
 #include <linux/power_supply.h>
 #include "../axp-core.h"
 #include "../axp-charger.h"
@@ -308,7 +307,7 @@ static struct axp_supply_info axp20_spy_info = {
 static int axp20_charger_init(struct axp_dev *axp_dev)
 {
 	u8 ocv_cap[32];
-	u8 val;
+	u8 val = 0;
 	int rdc;
 	struct axp_regmap *map = axp_dev->regmap;
 
@@ -413,46 +412,14 @@ static int axp20_charger_init(struct axp_dev *axp_dev)
 		axp_regmap_write(map, AXP20_RDC0, rdc & 0x00FF);
 	}
 
-
-
 	return 0;
 }
 
-static irqreturn_t axp_ac_usb_in_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	axp_usbac_in(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_ac_usb_out_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	axp_usbac_out(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_capchange_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_capchange(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_change_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	return IRQ_HANDLED;
-}
-
 static struct axp_interrupts axp_charger_irq[] = {
-	{"usb in",        axp_ac_usb_in_isr},
-	{"usb out",       axp_ac_usb_out_isr},
-	{"ac in",         axp_ac_usb_in_isr},
-	{"ac out",        axp_ac_usb_out_isr},
+	{"usb in",        axp_usb_in_isr},
+	{"usb out",       axp_usb_out_isr},
+	{"ac in",         axp_ac_in_isr},
+	{"ac out",        axp_ac_out_isr},
 	{"bat in",        axp_capchange_isr},
 	{"bat out",       axp_capchange_isr},
 	{"bat temp low",  axp_change_isr},

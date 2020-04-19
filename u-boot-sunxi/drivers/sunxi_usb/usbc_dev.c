@@ -475,6 +475,7 @@ static void __USBC_Dev_Rx_ClearStall(ulong usbc_base_addr)
 	USBC_REG_clear_bit_w(USBC_BP_RXCSR_D_SENT_STALL, USBC_REG_RXCSR(usbc_base_addr));
 }
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 static void __USBC_Dev_ClearDma_Trans(ulong usbc_base_addr)
 {
 	__u32 reg_val;
@@ -492,6 +493,7 @@ static void __USBC_Dev_ConfigDma_Trans(ulong usbc_base_addr)
 	reg_val |= (1 << 24);
 	writel(reg_val, usbc_base_addr + USBC_REG_o_PCTL);
 }
+#endif
 /*
 ***********************************************************************************
 *                     USBC_Dev_SetAddress_default
@@ -832,12 +834,16 @@ __s32 USBC_Dev_ConfigEpDma(__hdle hUSB, __u32 ep_type)
 
 		case USBC_EP_TYPE_TX:
 			__USBC_Dev_Tx_ConfigEpDma(usbc_otg->base_addr);
+			#ifndef CONFIG_ARCH_SUN3IW1P1
 			__USBC_Dev_ConfigDma_Trans(usbc_otg->base_addr);
+			#endif
 		break;
 
 		case USBC_EP_TYPE_RX:
 			__USBC_Dev_Rx_ConfigEpDma(usbc_otg->base_addr);
+			#ifndef CONFIG_ARCH_SUN3IW1P1
 			__USBC_Dev_ConfigDma_Trans(usbc_otg->base_addr);
+			#endif
 		break;
 
 		default:
@@ -883,12 +889,16 @@ __s32 USBC_Dev_ClearEpDma(__hdle hUSB, __u32 ep_type)
 
 		case USBC_EP_TYPE_TX:
 			__USBC_Dev_Tx_ClearEpDma(usbc_otg->base_addr);
+			#ifndef CONFIG_ARCH_SUN3IW1P1
 			__USBC_Dev_ClearDma_Trans(usbc_otg->base_addr);
+			#endif
 		break;
 
 		case USBC_EP_TYPE_RX:
 			__USBC_Dev_Rx_ClearEpDma(usbc_otg->base_addr);
+			#ifndef CONFIG_ARCH_SUN3IW1P1
 			__USBC_Dev_ClearDma_Trans(usbc_otg->base_addr);
+			#endif
 		break;
 
 		default:

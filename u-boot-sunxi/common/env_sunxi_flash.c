@@ -34,6 +34,7 @@
 #ifdef CONFIG_ALLWINNER
 #include <boot_type.h>
 #include <sys_partition.h>
+#include <sunxi_board.h>
 #endif
 
 char * env_name_spec = "SUNXI";
@@ -102,7 +103,7 @@ int saveenv(void)
 	int     ret;
 	u32     start;
 
-	printf("saveenv storage_type = %d\n", uboot_spare_head.boot_data.storage_type);
+	printf("saveenv storage_type = %d\n", get_boot_storage_type());
 	start = sunxi_partition_get_offset_byname(CONFIG_SUNXI_ENV_PARTITION);
 	if(!start){
 		printf("fail to find part named %s\n", CONFIG_SUNXI_ENV_PARTITION);
@@ -113,7 +114,8 @@ int saveenv(void)
 	if(ret)
 		goto fini;
 
-	return sunxi_flash_write(start, CONFIG_ENV_SIZE/512, env_new);
+	ret = sunxi_flash_write(start, CONFIG_ENV_SIZE/512, env_new);
+	sunxi_flash_flush();
 fini:
 	return ret;
 }
@@ -151,7 +153,7 @@ static void flash_env_relocate_spec(int workmode)
 
 void env_relocate_spec(void)
 {
-	debug("env_relocate_spec storage_type = %d\n", uboot_spare_head.boot_data.storage_type);
+	debug("env_relocate_spec storage_type = %d\n", get_boot_storage_type());
 	flash_env_relocate_spec(uboot_spare_head.boot_data.work_mode);
 }
 

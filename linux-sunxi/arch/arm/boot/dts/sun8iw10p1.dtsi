@@ -264,7 +264,7 @@
 		};
 
 		mbus0:mbus-controller@01c62000 {
-			compatible = "allwinner,sun8i-b100-mbus";
+			compatible = "allwinner,sun8i-mbus";
 			reg = <0x0 0x01c62000 0x0 0x110>;
 			#mbus-cells = <1>;
 		};
@@ -279,7 +279,7 @@
 			compatible = "allwinner,sunxi-timer";
 			device_type = "timer";
 			reg = <0x0 0x01c20c00 0x0 0x90>;
-			interrupts = <GIC_SPI 18 IRQ_TYPE_EDGE_RISING>;
+			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
 			clock-frequency = <24000000>;
 			timer-prescale = <16>;
 		};
@@ -410,7 +410,6 @@
 					#size-cells = <0>;
 					#gpio-cells = <6>;
 					status = "okay";
-					device_type = "axp_pio";
 				};
 
 				charger0: charger@0{
@@ -429,6 +428,13 @@
 				};
 
 				charger1: charger@1{
+					status = "okay";
+				};
+
+				axp_gpio1: axp_gpio@1{
+					gpio-controller;
+					#size-cells = <0>;
+					#gpio-cells = <6>;
 					status = "okay";
 				};
 			};
@@ -669,11 +675,15 @@
 		snddaudio0:sound@1{
 			compatible = "allwinner,sunxi-daudio0-machine";
 			sunxi,daudio0-controller = <&daudio0>;
+                        sunxi,snddaudio-codec = "cx2081x.1-003b";
+                        sunxi,snddaudio-codec-dai = "cx2081x-pcm1";
 			status = "okay";
 		};
 		snddaudio1:sound@2{
 			compatible = "allwinner,sunxi-daudio1-machine";
 			sunxi,daudio1-controller = <&daudio1>;
+                        sunxi,snddaudio-codec = "sta32x.1-001c";
+                        sunxi,snddaudio-codec-dai = "STA32X";
 			status = "okay";
 		};
 
@@ -1237,15 +1247,19 @@
 			interrupts = <GIC_SPI 31 IRQ_TYPE_NONE>;
 			clocks = <&clk_hosc>,<&clk_ths>;
 			sensor_num = <2>;
+			combine_num = <1>;
 			shut_temp= <120>;
 			status = "okay";
 
-			combine0:combine0{
+			ths_combine0:ths_combine0{
+				compatible = "allwinner,ths_combine0";
 				#thermal-sensor-cells = <1>;
-				combine_cnt = <2>;
-				combine_type = "max";
-				combine_chn = <0 1>;
+				combine_sensor_num = <2>;
+				combine_sensor_type = "cpu";
+				combine_sensor_temp_type = "max";
+				combine_sensor_id = <0 1>;
 			};
+
 		};
 
 		cpu_budget_cooling:cpu_budget_cool{
@@ -1263,7 +1277,7 @@
 
 				polling-delay-passive = <1000>;
 				polling-delay = <10000>;
-				thermal-sensors = <&combine0 0>;
+				thermal-sensors = <&ths_combine0 0>;
 
 				trips{
 					cpu_trip0:t0{
@@ -1303,15 +1317,15 @@
 			clocks = <&clk_keyadc>;
 			status = "okay";
 			key_cnt = <9>;
-			key1 = <240 115>;
-			key2 = <500 114>;
-			key3 = <700 0x1ac>;
-			key4 = <890 28>;
-			key5 = <1100 102>;
-			key6 = <1300 0x192>;
-			key7 = <1500 0x193>;
-			key8 = <1700 9>;
-			key9 = <2000 10>;
+			key0 = <190 115>;
+			key1 = <390 114>;
+			key2 = <600 0x1ac>;
+			key3 = <800 28>;
+			key4 = <980 102>;
+			key5 = <1180 0x192>;
+			key6 = <1400 0x193>;
+			key7 = <1600 9>;
+			key8 = <1800 10>;
 		};
 
 		wlan:wlan {

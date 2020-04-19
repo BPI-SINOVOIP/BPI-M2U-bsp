@@ -9,3 +9,19 @@ config SUNXI_ARISC
 	  Previously known as "ar100" or "cpus".
 	  Set y here to support the sunxi arisc driver.
 	  If unsure, set N.
+
+config MCPM_WITH_ARISC_DVFS_SUPPORT
+	tristate "mcpm with arisc dvfs support"
+	depends on MCPM && CPU_FREQ
+	depends on EVB_PLATFORM && SUNXI_ARISC
+	help
+	  Arisc driver support dvfs when mcpm init.
+	  Set y here to support mcpm with arisc dvfs.
+	  If unsure, set N.
+
+config SUNXI_ARISC_COM_DIRECTLY
+       bool "sunxi arsic communate directly"
+       depends on SUNXI_ARISC && !ARCH_SUN50I
+       help
+         Arisc driver communate with cpus directly, because
+	 there is not atf.

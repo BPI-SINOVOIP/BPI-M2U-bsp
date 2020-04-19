@@ -15,6 +15,9 @@
 #ifdef VFE_PMU
 static int iovdd_on_off_cnt = 0;
 #endif  
+
+#define CLK_OUT_CTRL_REG	((void __iomem *)0xf1c000f0)
+
 //enable/disable pmic channel 
 int vfe_set_pmu_channel(struct v4l2_subdev *sd, enum pmic_channel pmic_ch, enum on_off on_off)
 {
@@ -115,6 +118,10 @@ int vfe_set_mclk(struct v4l2_subdev *sd, enum on_off on_off)
 				vfe_err("csi%d master clock enable error\n",csi->id);
 				return -1;
 			}
+#ifdef CONFIG_ARCH_SUN3IW1P1
+			/*CLK_OUT enable, CLK_OUT_SRC=OSC24M, DIV=0*/
+			writel(0x82000000, CLK_OUT_CTRL_REG);
+#endif
 		} else {
 			vfe_err("csi%d master clock is null\n",csi->id);
 			return -1;
@@ -123,6 +130,10 @@ int vfe_set_mclk(struct v4l2_subdev *sd, enum on_off on_off)
 	case OFF:
 		vfe_print("mclk off\n");
 		if(csi->clock[CSI_MASTER_CLK]) {
+#ifdef CONFIG_ARCH_SUN3IW1P1
+			/*CLK_OUT disable, CLK_OUT_SRC=LOSC, DIV=0*/
+			writel(0x00000000, CLK_OUT_CTRL_REG);
+#endif
 			clk_disable_unprepare(csi->clock[CSI_MASTER_CLK]);
 		} else {
 			vfe_err("csi%d master clock is null\n",csi->id);
@@ -166,7 +177,8 @@ int vfe_set_mclk_freq(struct v4l2_subdev *sd, unsigned long freq)
   
 	if(csi->clock[CSI_MASTER_CLK]) {
 		if(clk_set_parent(csi->clock[CSI_MASTER_CLK], master_clk_src)) {
-			vfe_err("mclk src Name = %s, set vfe master clock source failed!!! \n",master_clk_src->name);
+			vfe_err("mclk src Name = %s, set vfe master clock source failed!!!\n",
+				 master_clk_src->name);
 			return -1;
 		}
 	} else {
@@ -176,7 +188,7 @@ int vfe_set_mclk_freq(struct v4l2_subdev *sd, unsigned long freq)
   
 	if(csi->clock[CSI_MASTER_CLK]) {
 		if(clk_set_rate(csi->clock[CSI_MASTER_CLK], freq)) {
-			vfe_err("set csi%d master clock error\n",csi->id);
+			vfe_err("set csi%d master clock error\n", csi->id);
 			return -1;
 		}
 	} else {
@@ -195,8 +207,10 @@ int vfe_gpio_write(struct v4l2_subdev *sd, enum gpio_type gpio_type, unsigned in
 	int force_value_flag = 1;
 	struct vfe_dev *dev=(struct vfe_dev *)dev_get_drvdata(sd->v4l2_dev->dev);
 	u32 gpio = dev->gpio[gpio_type].gpio;
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	if ((gpio_type == PWDN)||(gpio_type == RESET))
 		force_value_flag = 0;
+#endif
 	return os_gpio_write(gpio, status, NULL, force_value_flag);
 #else
 	return 0;

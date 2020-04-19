@@ -88,8 +88,8 @@ SUNXI_CLK_FACTORS(pll_cpu, 8, 5, 4, 2, 0, 2, 16, 2,
 			0, PLL_CPUPAT, 0xd1303333);
 
 SUNXI_CLK_FACTORS(pll_audio, 8, 7, 0, 0, 0, 5, 16, 4,
-			0, 0, 0, 0, 0, 0, 0, 31, 24, 0,
-			PLL_AUDIOPAT, 0xd1303333);
+			0, 0, 0, 0, 0, 0, 0, 31, 24, 1,
+			PLL_AUDIOPAT, 0xc0010d84);
 
 SUNXI_CLK_FACTORS(pll_video0, 8, 7, 0, 0, 0, 4, 0, 0,
 			0, 0, 0, 0, 1, 25, 24, 31, 20, 0,
@@ -146,13 +146,15 @@ static int get_factors_pll_audio(u32 rate, u32 parent_rate,
 				struct clk_factors_value *factor)
 {
 	if(rate == 22579200) {
-		factor->factorn = 78;
-		factor->factorm = 20;
-		factor->factorp = 3;
+		factor->factorn = 6;
+		factor->factorm = 0;
+		factor->factorp = 7;
+		sunxi_clk_factor_pll_audio.sdmval = 0xc0010d84;
 	} else if(rate == 24576000) {
-		factor->factorn = 85;
-		factor->factorm = 20;
-		factor->factorp = 3;
+		factor->factorn = 13;
+		factor->factorm = 0;
+		factor->factorp = 13;
+		sunxi_clk_factor_pll_audio.sdmval = 0xc000ac02;
 	} else
 		return -1;
 
@@ -377,13 +379,13 @@ static unsigned long calc_rate_pll_audio(u32 parent_rate, struct clk_factors_val
 {
 	u64 tmp_rate = (parent_rate?parent_rate:24000000);
 
-	if ((factor->factorn == 78)
-		&& (factor->factorm == 20)
-		&& (factor->factorp == 3))
+	if ((factor->factorn == 6)
+		&& (factor->factorm == 0)
+		&& (factor->factorp == 7))
 		return 22579200;
-	else if ((factor->factorn == 85)
-			&& (factor->factorm == 20)
-			&& (factor->factorp == 3))
+	else if ((factor->factorn == 13)
+			&& (factor->factorm == 0)
+			&& (factor->factorp == 13))
 		return 24576000;
 	else {
 		tmp_rate = tmp_rate * (factor->factorn+1);

@@ -20,6 +20,7 @@
 
 /*
 timing mode
+0: output and input are both based on [0,1,...,7] pll delay.
 1: output and input are both based on phase.
 2: output is based on phase, input is based on delay chain except hs400.
 	input of hs400 is based on delay chain.
@@ -27,11 +28,13 @@ timing mode
 4: output is based on phase, input is based on delay chain.
     it also support to use delay chain on data strobe signal.
 */
+#define SUNXI_MMC_TIMING_MODE_0 0U
 #define SUNXI_MMC_TIMING_MODE_1 1U
 #define SUNXI_MMC_TIMING_MODE_2 2U
 #define SUNXI_MMC_TIMING_MODE_3 3U
 #define SUNXI_MMC_TIMING_MODE_4 4U
 
+#define MMC_CLK_SAMPLE_POINIT_MODE_0 8U
 #define MMC_CLK_SAMPLE_POINIT_MODE_1 3U
 #define MMC_CLK_SAMPLE_POINIT_MODE_2 2U
 #define MMC_CLK_SAMPLE_POINIT_MODE_2_HS400 64U
@@ -52,6 +55,18 @@ timing mode
 
 /* error number defination */
 #define ERR_NO_BEST_DLY (2)
+
+struct sunxi_mmc_timing_mode0 {
+	u32 cur_spd_md;
+	u32 cur_freq;
+	u8 odly[MAX_SPD_MD_NUM*MAX_CLK_FREQ_NUM];
+	u8 sdly[MAX_SPD_MD_NUM*MAX_CLK_FREQ_NUM];
+	u8 def_odly[MAX_SPD_MD_NUM*MAX_CLK_FREQ_NUM];
+	u8 def_sdly[MAX_SPD_MD_NUM*MAX_CLK_FREQ_NUM];
+	u32 sample_point_cnt;
+	u8 cur_odly;
+	u8 cur_sdly;
+};
 
 /* for smhc v4.1x*/
 struct sunxi_mmc_timing_mode1 {
@@ -137,6 +152,7 @@ struct sunxi_mmc_host {
 
 	/*sample delay and output deley setting*/
 	u32 timing_mode;
+	struct sunxi_mmc_timing_mode0 tm0;
 	struct sunxi_mmc_timing_mode1 tm1;
 	struct sunxi_mmc_timing_mode2 tm2;
 	struct sunxi_mmc_timing_mode3 tm3;
@@ -200,5 +216,7 @@ struct sunxi_mmc_host {
 
 extern void dumphex32(char* name, char* base, int len);
 int mmc_clk_io_onoff(int sdc_no, int onoff, int reset_clk);
+
+//#define SUPPORT_SUNXI_MMC_FFU
 
 #endif /* SUNXI_MMC_H */

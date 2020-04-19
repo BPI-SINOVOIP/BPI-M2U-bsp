@@ -602,8 +602,10 @@ void USBC_SelectBus(__hdle hUSB, __u32 io_type, __u32 ep_type, __u32 ep_index)
 			reg_val |= 0x1<<USBC_BP_VEND0_BUS_SEL;
 		}
 	} else {
+#if !defined(CONFIG_ARCH_SUN8IW6) && !defined(CONFIG_ARCH_SUN8IW5)
 		//reg_val &= ~(0x1 << USBC_BP_VEND0_DRQ_SEL);  //clear drq_sel, select pio
 		reg_val &= 0x00;  // clear drq_sel, select pio
+#endif
 	}
 
 	/*
@@ -612,7 +614,9 @@ void USBC_SelectBus(__hdle hUSB, __u32 io_type, __u32 ep_type, __u32 ep_index)
 	 * cpu/inner_dma/outer_dma transfer.
 	 */
 
+	#ifndef CONFIG_ARCH_SUN3IW1
 	reg_val |= 0x1<<USBC_BP_VEND0_BUS_SEL;
+	#endif
 
 	USBC_Writeb(reg_val, USBC_REG_VEND0(usbc_otg->base_addr));
 }

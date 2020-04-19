@@ -535,15 +535,10 @@ int arch_interrupt_init (void)
 	int i;
 
 	for (i=0; i<GIC_IRQ_NUM; i++)
-	{
 		sunxi_int_handlers[i].m_data = default_isr;
-	}
-	if(sunxi_probe_secure_monitor())
-	{
+	if (sunxi_probe_secure_monitor() || sunxi_probe_secure_os())
 		printf("gic: sec monitor mode\n");
-	}
-	else
-	{
+	else {
 		printf("gic: normal mode\n");
 		gic_distributor_init();
 		gic_cpuif_init();
@@ -568,8 +563,7 @@ int arch_interrupt_init (void)
 */
 int arch_interrupt_exit(void)
 {
-	if(!sunxi_probe_secure_monitor())
-	{
+	if (!(sunxi_probe_secure_monitor() || sunxi_probe_secure_os())) {
 		gic_distributor_init();
 		gic_cpuif_init();
 	}

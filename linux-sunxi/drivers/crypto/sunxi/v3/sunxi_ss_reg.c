@@ -57,7 +57,7 @@ void ss_keysize_set(int size, ce_task_desc_t *task)
 //		type = CE_AES_KEY_SIZE_128;
 		break;
 	}
-	
+
 	task->sym_ctl |= (type << CE_SYM_CTL_KEY_SIZE_SHIFT);
 }
 
@@ -73,6 +73,10 @@ void ss_key_set(char *key, int size, ce_task_desc_t *task)
 		{CE_KEY_SELECT_SSK,		   CE_KS_SSK},
 		{CE_KEY_SELECT_HUK,		   CE_KS_HUK},
 		{CE_KEY_SELECT_RSSK,	   CE_KS_RSSK},
+#ifdef SS_SUPPORT_CE_V3_2
+		{CE_KEY_SELECT_SCK0,	   CE_KS_SCK0},
+		{CE_KEY_SELECT_SCK1,	   CE_KS_SCK1},
+#endif
 		{CE_KEY_SELECT_INTERNAL_0, CE_KS_INTERNAL_0},
 		{CE_KEY_SELECT_INTERNAL_1, CE_KS_INTERNAL_1},
 		{CE_KEY_SELECT_INTERNAL_2, CE_KS_INTERNAL_2},
@@ -149,7 +153,7 @@ void ss_cntsize_set(int size, ce_task_desc_t *task)
 void ss_cnt_set(char *cnt, int size, ce_task_desc_t *task)
 {
 	task->ctr_addr = virt_to_phys(cnt);
-	
+
 	ss_cntsize_set(CE_CTR_SIZE_128, task);
 }
 
@@ -157,6 +161,20 @@ void ss_cts_last(ce_task_desc_t *task)
 {
 	task->sym_ctl |= CE_SYM_CTL_AES_CTS_LAST;
 }
+
+#ifndef SS_SUPPORT_CE_V3_1
+
+void ss_xts_first(ce_task_desc_t *task)
+{
+	task->sym_ctl |= CE_SYM_CTL_AES_XTS_FIRST;
+}
+
+void ss_xts_last(ce_task_desc_t *task)
+{
+	task->sym_ctl |= CE_SYM_CTL_AES_XTS_LAST;
+}
+
+#endif
 
 void ss_hmac_sha1_last(ce_task_desc_t *task)
 {
@@ -209,6 +227,7 @@ void ss_check_sha_end(void)
 
 void ss_rsa_width_set(int size, ce_task_desc_t *task)
 {
+#ifdef SS_SUPPORT_CE_V3_1
 	int width_type = CE_RSA_PUB_MODULUS_WIDTH_512;
 
 	switch (size*8) {
@@ -232,6 +251,9 @@ void ss_rsa_width_set(int size, ce_task_desc_t *task)
 	}
 
 	task->asym_ctl |= width_type<<CE_ASYM_CTL_RSA_PM_WIDTH_SHIFT;
+#else
+	task->asym_ctl |= DIV_ROUND_UP(size, 4);
+#endif
 }
 
 void ss_rsa_op_mode_set(int mode, ce_task_desc_t *task)
@@ -245,6 +267,7 @@ void ss_rsa_op_mode_set(int mode, ce_task_desc_t *task)
 
 void ss_ecc_width_set(int size, ce_task_desc_t *task)
 {
+#ifdef SS_SUPPORT_CE_V3_1
 	int width_type = CE_ECC_PARA_WIDTH_160;
 
 	switch (size*8) {
@@ -262,12 +285,29 @@ void ss_ecc_width_set(int size, ce_task_desc_t *task)
 	}
 
 	task->asym_ctl |= width_type<<CE_ASYM_CTL_ECC_PARA_WIDTH_SHIFT;
+#else
+	task->asym_ctl |= DIV_ROUND_UP(size, 4);
+#endif
 }
 
 void ss_ecc_op_mode_set(int mode, ce_task_desc_t *task)
 {
+#ifdef SS_SUPPORT_CE_V3_1
 	task->asym_ctl |= mode<<CE_ASYM_CTL_ECC_OP_SHIFT;
+#else
+	task->asym_ctl |= mode<<CE_ASYM_CTL_RSA_OP_SHIFT;
+#endif
 }
+#ifdef CONFIG_CRYPTO_SUNXI_SS_KL
+void ss_kl_level_set(int lev, ce_task_desc_t *task)
+{
+	task->sym_ctl |= lev<<CE_SYM_CTL_KL_LEVEL_SHIFT;
+}
+void ss_kl_no_modk_set(int no_modk, ce_task_desc_t *task)
+{
+	task->sym_ctl |= no_modk<<CE_SYM_CTL_KL_NO_MODK;
+}
+#endif
 
 void ss_ctrl_start(ce_task_desc_t *task)
 {
@@ -279,7 +319,7 @@ void ss_ctrl_start(ce_task_desc_t *task)
 #ifdef SS_SUPPORT_CE_V3_1
 	ss_writel(CE_REG_TLR, 0x1);
 #else
-	ss_writel(CE_REG_TLR, 0x1&(method<<CE_REG_TLR_METHOD_TYPE_SHIFT));
+	ss_writel(CE_REG_TLR, 0x1|(method<<CE_REG_TLR_METHOD_TYPE_SHIFT));
 #endif
 }
 
@@ -295,10 +335,17 @@ int ss_flow_err(int flow)
 
 void ss_wait_idle(void)
 {
+#ifdef SS_SUPPORT_CE_V3_1
 	while ((ss_readl(CE_REG_TSR) & CE_REG_TSR_BUSY_MASK) == CE_REG_TSR_BUSY) {
-//		SS_DBG("Need wait for the hardware.\n");
-		msleep(10);
+		SS_DBG("Need wait for the hardware.\n");
+		msleep(20);
 	}
+#else
+	while ((ss_readl(CE_REG_TSR) & 0xff) != 0x0) {
+		SS_DBG("Need wait for the hardware.\n");
+		msleep(20);
+	}
+#endif
 }
 
 void ss_data_len_set(int len, ce_task_desc_t *task)
@@ -311,15 +358,20 @@ int ss_reg_print(char *buf, int len)
 	return snprintf(buf, len,
 		"The SS control register:\n"
 		"[TSK] 0x%02x = 0x%08x\n"
+#ifdef SS_SUPPORT_CE_V3_1
 		"[CTL] 0x%02x = 0x%08x\n"
+#endif
 		"[ICR] 0x%02x = 0x%08x, [ISR] 0x%02x = 0x%08x\n"
 		"[TLR] 0x%02x = 0x%08x\n"
 		"[TSR] 0x%02x = 0x%08x\n"
 		"[ERR] 0x%02x = 0x%08x\n"
+#ifdef SS_SUPPORT_CE_V3_1
 		"[CSS] 0x%02x = 0x%08x, [CDS] 0x%02x = 0x%08x\n"
+#endif
 		"[CSA] 0x%02x = 0x%08x, [CDA] 0x%02x = 0x%08x\n"
+#ifdef SS_SUPPORT_CE_V3_1
 		"[TPR] 0x%02x = 0x%08x\n"
-#ifdef SS_SUPPORT_CE_V3_2
+#else
 		"[HCSA] 0x%02x = 0x%08x\n"
 		"[HCDA] 0x%02x = 0x%08x\n"
 		"[ACSA] 0x%02x = 0x%08x\n"
@@ -330,18 +382,24 @@ int ss_reg_print(char *buf, int len)
 #endif
 		,
 		CE_REG_TSK, ss_readl(CE_REG_TSK),
+#ifdef SS_SUPPORT_CE_V3_1
 		CE_REG_CTL, ss_readl(CE_REG_CTL),
+#endif
 		CE_REG_ICR, ss_readl(CE_REG_ICR),
 		CE_REG_ISR, ss_readl(CE_REG_ISR),
 		CE_REG_TLR, ss_readl(CE_REG_TLR),
 		CE_REG_TSR, ss_readl(CE_REG_TSR),
 		CE_REG_ERR, ss_readl(CE_REG_ERR),
+#ifdef SS_SUPPORT_CE_V3_1
 		CE_REG_CSS, ss_readl(CE_REG_CSS),
 		CE_REG_CDS, ss_readl(CE_REG_CDS),
+#endif
 		CE_REG_CSA, ss_readl(CE_REG_CSA),
-		CE_REG_CDA, ss_readl(CE_REG_CDA),
+		CE_REG_CDA, ss_readl(CE_REG_CDA)
+#ifdef SS_SUPPORT_CE_V3_1
+		,
 		CE_REG_TPR, ss_readl(CE_REG_TPR)
-#ifdef SS_SUPPORT_CE_V3_2
+#else
 		,
 		CE_REG_HCSA, ss_readl(CE_REG_HCSA),
 		CE_REG_HCDA, ss_readl(CE_REG_HCDA),
@@ -353,11 +411,4 @@ int ss_reg_print(char *buf, int len)
 #endif
 		);
 }
-
-#define CE_REG_HCSA			0x34
-#define CE_REG_HCDA			0x38
-#define CE_REG_ACSA			0x44
-#define CE_REG_ACDA			0x48
-#define CE_REG_XCSA			0x54
-#define CE_REG_XCDA			0x58
 

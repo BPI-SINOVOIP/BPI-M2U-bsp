@@ -35,6 +35,7 @@ extern int sunxi_oem_op_lock(int lock_flag, char *info, int force);
 extern void sunxi_board_close_source(void);
 extern int sunxi_board_restart(int next_mode);
 extern int sunxi_board_shutdown(void);
+extern int sunxi_board_prepare_kernel(void);
 extern int sunxi_board_run_fel(void);
 extern int sunxi_board_run_fel_eraly(void);
 
@@ -65,6 +66,7 @@ extern int board_display_show_until_lcd_open(int display_source);
 extern int board_display_show(int display_source);
 extern int board_display_framebuffer_set(int width, int height, int bitcount, void *buffer);
 extern int board_display_framebuffer_change(void *buffer);
+extern void board_display_set_alpha_mode(int mode);
 extern int board_display_device_open(void);
 extern int borad_display_get_screen_width(void);
 extern int borad_display_get_screen_height(void);
@@ -121,17 +123,32 @@ extern int check_physical_key_early(void);
 extern void sunxi_set_fel_flag(void);
 extern void sunxi_clear_fel_flag(void);
 
+extern int sunxi_verify_embed_signature(void *buff, unsigned int len, const char *cert_name,\
+										void *cert, unsigned cert_len);
 extern int sunxi_verify_signature(void *buff, uint len, const char *cert_name);
 extern int sunxi_verify_rotpk_hash(void *input_hash_buf, int len);
 
 extern void sunxi_dump(void *addr, unsigned int size);
-extern char* board_hardware_info(void);
+extern char *board_hardware_info(void);
+
+#ifdef CONFIG_DETECT_RTC_BOOT_MODE
+extern char *set_bootcmd_from_rtc(int mode, char *bootcmd);
+extern int sunxi_get_bootmode_flag(void);
+extern int sunxi_set_bootmode_flag(u8 flag);
+#endif
+extern char *set_bootcmd_from_misc(int mode, char *bootcmd);
+
 extern int get_boot_work_mode(void);
+extern int get_boot_storage_type_ext(void);
 extern int get_boot_storage_type(void);
+extern void set_boot_storage_type(int);
+
 extern u32 get_boot_dram_para_addr(void);
 extern u32 get_boot_dram_para_size(void);
 extern u32 get_boot_dram_update_flag(void);
 extern void set_boot_dram_update_flag(u32 *dram_para);
+extern u32 get_pmu_byte_from_boot0(void);
+
 
 extern int mmc_request_update_boot0(int dev_num);
 extern int mmc_write_info(int dev_num,void *buffer,u32 buffer_size);
@@ -141,6 +158,8 @@ extern int get_debugmode_flag(void);
 extern int sunxi_probe_securemode(void);
 extern int sunxi_get_securemode(void);
 extern int sunxi_probe_secure_monitor(void);
+extern int sunxi_probe_secure_os(void);
+
 extern int smc_init(void);
 
 
@@ -155,7 +174,17 @@ extern int get_core_pos(void);
 extern void sunxi_store_gp_status(void);
 extern void sunxi_set_gp_status(void);
 extern void sunxi_restore_gp_status(void);
+extern int  sunxi_set_cpu_on(int cpu, uint entry);
+extern int  sunxi_set_cpu_off(void);
 
 extern int  cleanup_before_powerdown(void);
+void sunxi_dump(void *addr, unsigned int size);
+
+extern uint sunxi_generate_checksum(void *buffer, uint length, uint src_sum);
+extern int sunxi_verify_checksum(void *buffer, uint length, uint src_sum);
+
+#define BIT(x)				(1<<(x))
+#define sunxi_set_bit(addr, val) writel((readl(addr) | val), addr)
+#define sunxi_clear_bit(addr, val) writel((readl(addr) & ~val), addr)
 
 #endif /*_SUNXI_BOARD_H_ */

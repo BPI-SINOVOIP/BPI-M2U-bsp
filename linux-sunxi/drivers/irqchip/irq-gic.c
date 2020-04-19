@@ -597,7 +597,7 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
 #endif
 
 #ifdef CONFIG_SMP
-static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
 {
 	int cpu;
 	unsigned long flags, map = 0;
@@ -820,6 +820,13 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
 }
 
 #ifdef CONFIG_SMP
+void __cpuinit sunxi_gic_secondary_init(unsigned int gic_nr)
+{
+	BUG_ON(gic_nr >= MAX_GIC_NR);
+
+	gic_cpu_init(&gic_data[gic_nr]);
+}
+
 static int __cpuinit gic_secondary_init(struct notifier_block *nfb,
 					unsigned long action, void *hcpu)
 {

@@ -6,6 +6,7 @@
 #ifndef CONFIG_SPARSE_IRQ
 #include <mach/irqs.h>
 #else
+#undef  NR_IRQS
 #define NR_IRQS NR_IRQS_LEGACY
 #endif
 

@@ -50,7 +50,165 @@ __ccmu_reg_list_t *mem_get_ba(void)
 
 #if defined(CONFIG_ARCH_SUN8I) || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1) || \
+	defined(CONFIG_ARCH_SUN3IW1P1)
+
+#ifdef CONFIG_ARCH_SUN8IW17P1
+/*
+*********************************************************************************************************
+*                           mem_clk_save
+*
+*Description: save ccu for platform mem
+*
+*Arguments  : none
+*
+*Return     : result,
+*
+*Notes      :
+*
+*********************************************************************************************************
+*/
+__s32 mem_clk_save(struct clk_state *ccm_reg)
+{
+	return 0;
+}
+
+/*
+*********************************************************************************************************
+*                           mem_clk_exit
+*
+*Description: restore ccu for platform mem
+*
+*Arguments  : none
+*
+*Return     : result,
+*
+*Notes      :
+*
+*********************************************************************************************************
+*/
+__s32 mem_clk_restore(struct clk_state *ccm_reg)
+{
+	return 0;
+}
+
+/*
+*********************************************************************************************************
+*                                     mem_clk_setdiv
+*
+* Description: set div ratio
+*
+* Arguments  : none
+*
+* Returns    : 0;
+*********************************************************************************************************
+*/
+__s32 mem_clk_setdiv(struct clk_div_t *clk_div)
+{
+	return 0;
+}
+
+/*
+*********************************************************************************************************
+*                                     mem_clk_getdiv
+*
+* Description:
+*
+* Arguments  : none
+*
+* Returns    : 0;
+*********************************************************************************************************
+*/
+__s32 mem_clk_getdiv(struct clk_div_t *clk_div)
+{
+	return 0;
+}
+
+/*
+*********************************************************************************************************
+*                                     mem_clk_set_pll_factor
+*
+* Description: set pll factor, target cpu freq is ?M hz
+*
+* Arguments  : none
+*
+* Returns    : 0;
+*********************************************************************************************************
+*/
+
+__s32 mem_clk_set_pll_factor(struct pll_factor_t *pll_factor)
+{
+	return 0;
+}
+
+/*
+*********************************************************************************************************
+*                                     mem_clk_get_pll_factor
+*
+* Description: get pll factor
+*
+* Arguments  : none
+*
+* Returns    : 0;
+*********************************************************************************************************
+*/
+
+__s32 mem_clk_get_pll_factor(struct pll_factor_t *pll_factor)
+{
+	return 0;
+}
+
+/*
+*********************************************************************************************************
+*                                     mem_clk_set_misc
+*
+* Description: set clk_misc
+*
+* Arguments  : none
+*
+* Returns    : 0;
+*********************************************************************************************************
+*/
+__s32 mem_clk_set_misc(struct clk_misc_t *clk_misc)
+{
+	return 0;
+}
+
+/*
+*********************************************************************************************************
+*                                     mem_clk_get_misc
+*
+* Description: get clk_misc
+*
+* Arguments  : none
+*
+* Returns    : 0;
+*********************************************************************************************************
+*/
+
+__s32 mem_clk_get_misc(struct clk_misc_t *clk_misc)
+{
+	return 0;
+}
+
+/*
+*********************************************************************************************************
+*                                     mem_clk_get_cpu_freq
+*
+* Description: get current cpu freq
+*
+* Arguments  : none
+*
+* Returns    : cpu freq.
+*********************************************************************************************************
+*/
+__u32 mem_clk_get_cpu_freq(void)
+{
+	return 0;
+}
+#else
 static __ccmu_pll1_reg0000_t CmuReg_Pll1Ctl_tmp;
 static __ccmu_sysclk_ratio_reg0050_t CmuReg_SysClkDiv_tmp;
 
@@ -90,9 +248,12 @@ __s32 mem_clk_save(struct clk_state *pclk_state)
 
 	/*backup clk src and ldo */
 	pclk_state->ccu_reg_back[0] = *(volatile __u32 *)&CmuReg->SysClkDiv;
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	pclk_state->ccu_reg_back[1] = *(volatile __u32 *)&CmuReg->Ahb1Div;
+#else
 	pclk_state->ccu_reg_back[1] = *(volatile __u32 *)&CmuReg->Apb2Div;
 	pclk_state->ccu_reg_back[2] = *(volatile __u32 *)&CmuReg->Ahb1Div;
-
+#endif
 	return 0;
 }
 
@@ -122,9 +283,12 @@ __s32 mem_clk_restore(struct clk_state *pclk_state)
 
 	/*restore clk src */
 	*(volatile __u32 *)&CmuReg->SysClkDiv = pclk_state->ccu_reg_back[0];
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	*(volatile __u32 *)&CmuReg->Ahb1Div = pclk_state->ccu_reg_back[1];
+#else
 	*(volatile __u32 *)&CmuReg->Apb2Div = pclk_state->ccu_reg_back[1];
 	*(volatile __u32 *)&CmuReg->Ahb1Div = pclk_state->ccu_reg_back[2];
-
+#endif
 	return 0;
 }
 
@@ -147,16 +311,19 @@ __s32 mem_clk_setdiv(struct clk_div_t *clk_div)
 
 	CmuReg = (__ccmu_reg_list_t *) (AW_CCM_BASE);
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/*1st: set axi ratio */
 	CmuReg_SysClkDiv_tmp.dwval = CmuReg->SysClkDiv.dwval;
 	CmuReg_SysClkDiv_tmp.bits.AXIClkDiv = clk_div->axi_div;
 	CmuReg->SysClkDiv.dwval = CmuReg_SysClkDiv_tmp.dwval;
+#endif
 
 	/*set ahb1/apb1 clock divide ratio */
 	/*first, config ratio; */
 	*(volatile __u32 *)(&CmuReg->Ahb1Div) =
 	    (((clk_div->ahb_apb_div) & (~0x3000)) | (0x1000));
-#if defined(CONFIG_ARCH_SUN8IW10P1) || defined(CONFIG_ARCH_SUN8IW11P1)
+#if defined(CONFIG_ARCH_SUN8IW10P1) || defined(CONFIG_ARCH_SUN8IW11P1) || \
+	defined(CONFIG_ARCH_SUN3IW1P1)
 	change_runtime_env();
 	delay_us(5);
 #else
@@ -164,7 +331,8 @@ __s32 mem_clk_setdiv(struct clk_div_t *clk_div)
 #endif
 	/*sec, config src. */
 	*(volatile __u32 *)(&CmuReg->Ahb1Div) = (clk_div->ahb_apb_div);
-#if defined(CONFIG_ARCH_SUN8IW10P1) || defined(CONFIG_ARCH_SUN8IW11P1)
+#if defined(CONFIG_ARCH_SUN8IW10P1) || defined(CONFIG_ARCH_SUN8IW11P1) || \
+	defined(CONFIG_ARCH_SUN3IW1P1)
 	delay_us(5);
 #else
 	udelay(5);
@@ -193,7 +361,9 @@ __s32 mem_clk_getdiv(struct clk_div_t *clk_div)
 	}
 	CmuReg = (__ccmu_reg_list_t *) IO_ADDRESS(AW_CCM_BASE);
 	CmuReg_SysClkDiv_tmp.dwval = CmuReg->SysClkDiv.dwval;
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	clk_div->axi_div = CmuReg_SysClkDiv_tmp.bits.AXIClkDiv;
+#endif
 	clk_div->ahb_apb_div = *(volatile __u32 *)(&CmuReg->Ahb1Div);
 
 	return 0;
@@ -305,6 +475,7 @@ __s32 mem_clk_set_misc(struct clk_misc_t *clk_misc)
 	*(volatile __u32 *)(&CmuReg->Apb2Div) = clk_misc->Apb2Div;	/*0x58, apb2 divide ratio */
 #endif
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	/*config axi ratio to 1+1 = 2; */
 	/*axi can not exceed 300M; */
 	CmuReg_SysClkDiv_tmp.dwval = CmuReg->SysClkDiv.dwval;
@@ -313,6 +484,8 @@ __s32 mem_clk_set_misc(struct clk_misc_t *clk_misc)
 
 	CmuReg_SysClkDiv_tmp.bits.AXIClkDiv = 1;
 	CmuReg->SysClkDiv.dwval = CmuReg_SysClkDiv_tmp.dwval;
+#endif
+
 	return 0;
 }
 
@@ -442,6 +615,12 @@ __u32 mem_clk_get_cpu_freq(void)
 	return cpu_freq;
 }
 
+#elif defined(CONFIG_ARCH_SUN8IW17P1)
+__u32 mem_clk_get_cpu_freq(void)
+{
+	return 0;
+}
+
 #else
 
 __u32 mem_clk_get_cpu_freq(void)
@@ -469,7 +648,8 @@ __u32 mem_clk_get_cpu_freq(void)
 		FactorN = CmuReg_Pll1Ctl_tmp.bits.FactorN + 1;
 		FactorK = CmuReg_Pll1Ctl_tmp.bits.FactorK + 1;
 		FactorM = CmuReg_Pll1Ctl_tmp.bits.FactorM + 1;
-#if defined(CONFIG_ARCH_SUN8IW3P1) || defined(CONFIG_ARCH_SUN8IW5P1) || defined(CONFIG_ARCH_SUN8IW11P1)
+#if defined(CONFIG_ARCH_SUN8IW3P1) || defined(CONFIG_ARCH_SUN8IW5P1) || \
+	defined(CONFIG_ARCH_SUN8IW11P1) || defined(CONFIG_ARCH_SUN3IW1P1)
 		FactorP = 1 << (CmuReg_Pll1Ctl_tmp.bits.FactorP);
 #endif
 		cpu_freq =
@@ -481,7 +661,7 @@ __u32 mem_clk_get_cpu_freq(void)
 	return cpu_freq;
 }
 #endif
-
+#endif
 #endif
 
 #ifdef CONFIG_ARCH_SUN9IW1P1

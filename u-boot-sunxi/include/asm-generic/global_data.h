@@ -62,6 +62,7 @@ typedef struct global_data {
 	unsigned long irq_sp;		/* irq stack pointer */
 	unsigned long start_addr_sp;	/* start_addr_stackpointer */
 	unsigned long secondary_cpu_svc_sp[4];		/* secondary cpu svc stack pointer */
+	unsigned long secondary_cpu_irq_sp[4];		/* secondary cpu irq stack pointer */
 	unsigned long reloc_off;
 	struct global_data *new_gd;	/* relocated global data */
 
@@ -91,15 +92,9 @@ typedef struct global_data {
 	unsigned long timebase_l;
 #ifdef CONFIG_SUNXI
 	long           securemode;
-        long           boot_card_num;
-	void          *script_mod_buf;
-	
-	ulong          script_main_key_count;
+       long           boot_card_num;
 	ulong          lockflag;
 	ulong          chargemode;
-	
-	ulong          script_reloc_buf;
-	ulong          script_reloc_size;
 
 	ulong          malloc_noncache_start;
 

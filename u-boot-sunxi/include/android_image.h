@@ -16,6 +16,7 @@
 #define ANDR_BOOT_MAGIC_SIZE 8
 #define ANDR_BOOT_NAME_SIZE 16
 #define ANDR_BOOT_ARGS_SIZE 512
+#define BOOT_EXTRA_ARGS_SIZE 1024
 
 struct andr_img_hdr {
 	char magic[ANDR_BOOT_MAGIC_SIZE];
@@ -38,6 +39,33 @@ struct andr_img_hdr {
 	char cmdline[ANDR_BOOT_ARGS_SIZE];
 
 	u32 id[8]; /* timestamp / checksum / sha1 / etc */
+
+    /* Supplemental command line data; kept here to maintain
+     * binary compatibility with older versions of mkbootimg */
+  unsigned char extra_cmdline[BOOT_EXTRA_ARGS_SIZE];
+};
+
+
+/*
+ * Add allwinner certification to image file
+ */
+#define AW_CERT_MAGIC "AW_CERT!"
+#define AW_CERT_DESC_SIZE		64
+#define AW_PAGESIZE			2048
+#define AW_IMAGE_PADDING_LEN	(AW_PAGESIZE-sizeof(struct andr_img_hdr)-\
+									AW_CERT_DESC_SIZE)
+
+/*
+ * Pagesize (2048 bytes) offset
+ */
+struct boot_img_hdr_ex
+{
+	struct andr_img_hdr std_hdr;
+	unsigned char padding[AW_IMAGE_PADDING_LEN];
+
+	/*Reserved AW_CERT_DESC_SIZE for allwinner specific data*/
+	unsigned char cert_magic[ANDR_BOOT_MAGIC_SIZE];
+	unsigned cert_size;
 };
 
 /*
@@ -49,7 +77,9 @@ struct andr_img_hdr {
  * | ramdisk         | m pages
  * +-----------------+
  * | second stage    | o pages
- * +-----------------+
+ * +-----------------+*
+** | image certicate | 
+** +-----------------+
  *
  * n = (kernel_size + page_size - 1) / page_size
  * m = (ramdisk_size + page_size - 1) / page_size

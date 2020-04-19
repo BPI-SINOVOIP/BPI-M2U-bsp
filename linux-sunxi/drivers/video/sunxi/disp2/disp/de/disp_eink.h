@@ -45,7 +45,8 @@ struct eink_buffer_manager {
 	struct eink_8bpp_image *(*get_current_image)(
 					struct eink_buffer_manager *buffer_mgr);
 	s32 (*queue_image)(struct eink_buffer_manager *buffer_mgr,
-				void *src_image, unsigned int mode,
+				struct disp_layer_config *config,
+				unsigned int layer_num, unsigned int mode,
 				struct area_info update_area);
 	s32 (*dequeue_image)(struct eink_buffer_manager *buffer_mgr);
 	s32 (*clear_image)(struct eink_buffer_manager *buffer_mgr);
@@ -76,6 +77,7 @@ struct pipeline_manager {
 	struct mutex          mlock;
 
 	int (*check_overlap)(struct pipeline_manager *, struct area_info);
+	int (*op_skip)(struct pipeline_manager *, unsigned int);
 	int (*config_one_pipeline)(struct pipeline_manager *, struct area_info, enum eink_update_mode);
 	int (*config_and_enable_one_pipeline)(struct pipeline_manager *, struct area_info,
 											enum eink_update_mode, unsigned int, unsigned int* tframes);

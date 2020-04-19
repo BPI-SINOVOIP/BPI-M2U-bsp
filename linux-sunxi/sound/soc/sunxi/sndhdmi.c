@@ -110,7 +110,7 @@ int sndhdmi_hw_params(struct snd_pcm_substream *substream,
 		hdmi_para.sample_bit = 24; //??? TODO
 	}
 	if (hdmi_para.channel_num == 8) {
-		hdmi_para.ca = 0x12;
+		hdmi_para.ca = 0x13;
 	} else if (hdmi_para.channel_num == 6) {
 		hdmi_para.ca = 0x0b;
 	} else if ((hdmi_para.channel_num >= 3)) {

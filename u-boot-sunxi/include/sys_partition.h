@@ -25,6 +25,9 @@
 #ifndef __SYS_PARTITION_H
 #define __SYS_PARTITION_H
 
+#define PART_TYPE_GPT 1
+#define PART_TYPE_AW  0
+
 extern int sunxi_partition_get_total_num(void);
 
 extern int sunxi_partition_get_name(int index, char *buf);
@@ -47,5 +50,6 @@ extern int sunxi_partition_init(void);
 
 extern int sunxi_partition_get_partno_byname(const char *part_name);
 
+extern int sunxi_partition_get_type(void);
 
 #endif //__SYS_PARTITION_H

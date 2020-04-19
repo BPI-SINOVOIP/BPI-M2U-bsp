@@ -2,6 +2,11 @@
 #include"clk_factor.h"
 #include<clk/clk.h>
 
+
+#define PLL_ENABLE_INIT_FACTOR_N	80
+#define PLL_LOCK_TIMEOUT_CNT		5
+
+
 static int sunxi_clk_disable_plllock(struct sunxi_clk_factors *factor)
 {
 	volatile u32 reg;
@@ -105,6 +110,7 @@ static int sunxi_clk_is_lock(struct sunxi_clk_factors *factor)
 	}
 }
 
+#ifndef CONFIG_ARCH_SUN8IW12P1
 static int sunxi_clk_fators_enable(struct clk_hw *hw)
 {
 	struct sunxi_clk_factors *factor = to_clk_factor(hw);
@@ -138,6 +144,92 @@ static int sunxi_clk_fators_enable(struct clk_hw *hw)
 
     return 0;
 }
+#else
+static int sunxi_clk_fators_enable(struct clk_hw *hw)
+{
+	struct sunxi_clk_factors *factor = NULL;
+	struct sunxi_clk_factors_config *config = NULL;
+	unsigned long reg;
+	u16 factor_n;
+	u8 i;
+
+	if (hw != NULL) {
+		factor = to_clk_factor(hw);
+		if (factor != NULL) {
+			config = factor->config;
+			if (config == NULL)
+				return -1;
+		} else
+			return -1;
+	} else
+		return -1;
+
+	/* check if the pll enabled already */
+	reg = factor_readl(factor, factor->reg);
+	if (GET_BITS(config->enshift, 1, reg))
+		return 0;
+
+	sunxi_clk_disable_plllock(factor);
+
+	/* get factor register value */
+	reg = factor_readl(factor, factor->reg);
+	/* store the factor n */
+	factor_n = (reg >> config->nshift) & 0xFF;
+
+	if (config->nwidth)
+		reg = SET_BITS(config->nshift, config->nwidth, reg, 250);
+	factor_writel(factor, reg, factor->reg);
+	/* enable the register */
+	reg = SET_BITS(config->enshift, 1, reg, 1);
+	factor_writel(factor, reg, factor->reg);
+	udelay(10);
+
+	if (config->sdmwidth) {
+		factor_writel(factor, config->sdmval,
+			(void __iomem *)config->sdmpat);
+		reg = SET_BITS(config->sdmshift, config->sdmwidth, reg, 1);
+	}
+
+	/* config a larger value for factor_n */
+	if (config->nwidth)
+		reg = SET_BITS(config->nshift, config->nwidth, reg,
+					 PLL_ENABLE_INIT_FACTOR_N);
+
+	/* update for pll_ddr register */
+	if (config->updshift)
+		reg = SET_BITS(config->updshift, 1, reg, 1);
+
+	factor_writel(factor, reg, factor->reg);
+
+	for (i = 0; i < PLL_LOCK_TIMEOUT_CNT; i++) {
+		if (sunxi_clk_is_lock(factor) == 0)
+			break;
+		else {
+			reg = SET_BITS(config->enshift, 1, reg, 0);
+			factor_writel(factor, reg, factor->reg);
+			udelay(1);
+			reg = SET_BITS(config->enshift, 1, reg, 1);
+			factor_writel(factor, reg, factor->reg);
+		}
+	}
+	if (i == PLL_LOCK_TIMEOUT_CNT) {
+		printf("clk %s wait lock timeout\n", factor->hw.init->name);
+		return -1;
+	}
+
+	if (config->nwidth)
+		reg = SET_BITS(config->nshift, config->nwidth, reg, factor_n);
+
+	factor_writel(factor, reg, factor->reg);
+
+	if (sunxi_clk_is_lock(factor)) {
+		printf("clk %s wait lock timeout\n", factor->hw.init->name);
+		return -1;
+	}
+
+	return 0;
+}
+#endif
 
 static void sunxi_clk_fators_disable(struct clk_hw *hw)
 {
@@ -145,11 +237,13 @@ static void sunxi_clk_fators_disable(struct clk_hw *hw)
 	struct sunxi_clk_factors_config *config = factor->config;
 	unsigned long reg = factor_readl(factor,factor->reg);
 
-	if(factor->flags & CLK_IGNORE_DISABLE)
-		return;
-
 	if(!GET_BITS(config->enshift, 1, reg)) {
 		printf("clk %s is already disable.\n", factor->hw.clk->name);
+		return;
+	}
+	/* When the pll is not in use, just set it to the minimum frequency */
+	if (factor->flags & CLK_IGNORE_DISABLE) {
+		clk_set_rate(hw->clk, 0);
 		return;
 	}
 
@@ -279,7 +373,7 @@ static int sunxi_clk_factors_set_flat_facotrs(struct sunxi_clk_factors *pfactor 
 		reg = SET_BITS( config->nshift , config->nwidth , reg, values->factorn );
 
 	if( config->kwidth )
-		reg = SET_BITS( config->kshift , config->kwidth , reg, values->factork );		
+		reg = SET_BITS( config->kshift , config->kwidth , reg, values->factork );
 
 	factor_writel(factor,reg, factor->reg);
 	/* 4. do pair things for 2). decease factor m */
@@ -289,7 +383,7 @@ static int sunxi_clk_factors_set_flat_facotrs(struct sunxi_clk_factors *pfactor 
 		factor_writel(factor,reg, factor->reg);
 		if( factor->flags & CLK_RATE_FLAT_DELAY)
 			udelay(config->delay);
-	}	
+	}
 
 	/* 5. wait for PLL state stable */
 #ifdef CONFIG_EVB_PLATFORM

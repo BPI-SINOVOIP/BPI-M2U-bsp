@@ -49,6 +49,8 @@
 #define PLL_AUDIOPAT0       0x0178
 #define PLL_AUDIOPAT1       0x017C
 
+#define PLL_VE_BIAS_REG     0x0358
+
 #define CPU_CFG             0x0500
 #define PSI_CFG             0x0510
 #define AHB3_CFG            0x051C
@@ -103,9 +105,6 @@
 #define SPI1_CFG            0x0944
 #define SPI_GATE            0x096C
 #define GMAC_GATE           0x097C
-#define SATA_CFG            0x09A0
-#define SATA_24M_CFG        0x09A4
-#define SATA_GATE           0x09AC
 #define TS_CFG              0x09B0
 #define TS_GATE             0x09BC
 #define IRTX_CFG            0x09C0
@@ -120,14 +119,21 @@
 #define SPDIF_GATE          0x0A2C
 #define DMIC_CFG            0x0A40
 #define DMIC_GATE           0x0A4C
+#define AHUB_CFG	    0x0A60
+#define AHUB_GATE	    0x0A6C
 #define USB0_CFG            0x0A70
 #define USB1_CFG            0x0A74
 #define USB3_CFG            0x0A7C
 #define USB_GATE            0x0A8C
+#define PCIE_REF_CFG        0x0AB0
+#define PCIE_AXI_CFG        0x0AB4
+#define PCIE_AUX_CFG        0x0AB8
+#define PCIE_GATE           0x0ABC
 
 /* Display Interface */
 #define HDMI_CFG            0x0B00
 #define HDMI_SLOW_CFG       0x0B04
+#define HDMI_CEC_CFG        0x0B10
 #define HDMI_GATE           0x0B1C
 #define DISPLAY_TOP_GATE    0x0B5C
 #define TCON_LCD_CFG        0x0B60
@@ -161,6 +167,7 @@
 
 /* RTC Register List */
 #define LOSC_OUT_GATE       0x0060
+#define DCXO_OUT_CFG        0x0160
 
 #define F_N8X8_M0X2_P16x2(nv, mv, pv)      (FACTOR_ALL(nv, 8, 8, 0, 0, 0, mv, 0, 2, pv, 16, 2, 0, 0, 0, 0, 0, 0))
 #define F_N8X8_D1V1X1_D2V0X1(nv, d1v, d2v) (FACTOR_ALL(nv, 8, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, d1v, 1, 1, d2v, 0, 1))

@@ -375,6 +375,85 @@ mmc_bread(int dev_num, unsigned long start, unsigned blkcnt, void *dst)
 	return blkcnt;
 }
 
+/**
+ * mmc_read_bootp - read  boot partition data
+ * @dev_num: card number
+ * @start:start sector
+ * @blkcnt:count of sector data to transfer
+ * @part_nu: emmc boot partition number,should be 1 or 2
+ * @dst: data buffer address to be writen from emmc
+ *
+ * return number of sector has been read from emmc,if return 0, it mean failed;
+ */
+
+unsigned long
+mmc_bread_bootp(int dev_num,
+				unsigned long start,
+				unsigned blkcnt,
+				int part_nu,
+				void *dst)
+{
+	lbaint_t blocks_do_boot = 0;
+	ulong start_todo = start;
+	struct mmc *mmc = find_mmc_device(dev_num);
+
+	if (mmc->boot_support) {
+		if ((part_nu != MMC_SWITCH_PART_BOOT_PART_1)
+			&& part_nu != MMC_SWITCH_PART_BOOT_PART_2) {
+			mmcinfo("%s,%d:wrong mmc boot partition numuber %d:\n",
+			__FUNCTION__, __LINE__, part_nu);
+			return 0;
+		}
+
+		if ((start + blkcnt) > (mmc->capacity_boot/512)) {
+			mmcinfo("%s,%d: over emmc boot part size\n",
+			__FUNCTION__, __LINE__);
+			return 0;
+		}
+
+		if (mmc_switch_part(dev_num, part_nu)) {
+			mmcinfo("%s: switch to boot%d part failed\n",
+			__FUNCTION__, part_nu);
+			return 0;
+		}
+
+		blocks_do_boot = mmc_bread(dev_num, start_todo, blkcnt, dst);
+		if (blocks_do_boot != blkcnt) {
+			mmcinfo("%s: get boot0 from boot part err\n",
+			__FUNCTION__);
+			return 0;
+		} else {
+			mmcdbg("%s: get boot0 from boot part ok\n",
+			__FUNCTION__);
+		}
+
+		if (mmc_switch_part(dev_num, 0)) {
+			mmcinfo("%s: switch back to user part failed",
+			__FUNCTION__);
+			return 0;
+		}
+		return blocks_do_boot;
+	} else {
+		mmcinfo("%s,%d: don't support boot partition\n",
+		__FUNCTION__, __LINE__);
+		return 0;
+	}
+}
+
+
+/**
+ * mmc_get_boot_cap - get emmc boot partition capacity
+ * @dev_num: card number
+ *
+ * return number of sector of emmc boot partition capacity;
+ */
+u64 mmc_get_boot_cap(int dev_num)
+{
+	struct mmc *mmc = find_mmc_device(dev_num);
+	return mmc->capacity_boot/512;
+}
+
+
 int mmc_go_idle(struct mmc* mmc)
 {
 	struct mmc_cmd cmd;
@@ -904,6 +983,7 @@ int mmc_startup(struct mmc *mmc)
 	struct mmc_cmd cmd;
 	char ext_csd[512];
 	int timeout = 1000;
+	int i = 0;
 	char *spd_name[] = {"DS26/SDR12", "HSSDR52/SDR25", "HSDDR52/DDR50", "HS200/SDR104", "HS400"};
 
 	/* Put the Card in Identify Mode */
@@ -1107,6 +1187,33 @@ int mmc_startup(struct mmc *mmc)
 		/* store the partition info of emmc */
 		if (ext_csd[160] & PART_SUPPORT)
 			mmc->part_config = ext_csd[179];
+
+
+	/* store the partition info of emmc */
+	if ((ext_csd[EXT_CSD_PARTITIONING_SUPPORT] & PART_SUPPORT) ||
+		ext_csd[EXT_CSD_BOOT_MULT]) {
+		mmc->part_config = ext_csd[EXT_CSD_PART_CONF];
+		mmc->capacity_boot = ext_csd[EXT_CSD_BOOT_MULT] * 128 * 1024;
+		mmc->capacity_rpmb = ext_csd[EXT_CSD_RPMB_MULT] * 128 * 1024;
+
+		if (mmc->capacity_boot) {
+			mmc->boot_support = 1;
+			mmc->boot_bus_cond = ext_csd[EXT_CSD_BOOT_BUS_WIDTH];
+		} else {
+			mmcdbg("not PART_SUPPORT ext_csd[226] = %d\n",
+			ext_csd[226]);
+		}
+
+		for (i = 0; i < 4; i++) {
+			int idx = EXT_CSD_GP_SIZE_MULT + i * 3;
+		mmc->capacity_gp[i] = ((u64)ext_csd[idx + 2] << 16) +
+		((u64)ext_csd[idx + 1] << 8) + (u64)ext_csd[idx];
+		mmc->capacity_gp[i] *= (u64)ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE];
+		mmc->capacity_gp[i] *= (u64)ext_csd[EXT_CSD_HC_WP_GRP_SIZE];
+		mmc->capacity_gp[i] *= 512*1024;/*512k*/
+		}
+	}
+
 	}
 
 	if (IS_SD(mmc))

@@ -11,6 +11,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/sizes.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
 
@@ -42,6 +43,13 @@ static const unsigned int tacc_exp[] = {
 static const unsigned int tacc_mant[] = {
 	0,	10,	12,	13,	15,	20,	25,	30,
 	35,	40,	45,	50,	55,	60,	70,	80,
+};
+
+static const unsigned int sd_au_size[] = {
+	0,		SZ_16K / 512,		SZ_32K / 512,	SZ_64K / 512,
+	SZ_128K / 512,	SZ_256K / 512,		SZ_512K / 512,	SZ_1M / 512,
+	SZ_2M / 512, SZ_4M / 512, SZ_8M / 512, (SZ_8M + SZ_4M) / 512,
+	SZ_16M / 512,	(SZ_16M + SZ_8M) / 512,	SZ_32M / 512,	SZ_64M / 512,
 };
 
 #define UNSTUFF_BITS(resp,start,size)					\
@@ -217,6 +225,9 @@ static int mmc_read_ssr(struct mmc_card *card)
 	unsigned int au, es, et, eo;
 	int err, i;
 	u32 *ssr;
+	u32 speed_class[] = {0, 2, 4, 6, 10};
+	char *mmc_sunxi_event[] = { NULL, NULL };
+	char mmc_sunxi_spc_str[] = {"mmc_sunxi_event= mmc core:unknown speed class"};
 
 	if (!(card->csd.cmdclass & CCC_APP_SPEC)) {
 		pr_warning("%s: card lacks mandatory SD Status "
@@ -244,18 +255,32 @@ static int mmc_read_ssr(struct mmc_card *card)
 	 * bitfield positions accordingly.
 	 */
 	au = UNSTUFF_BITS(ssr, 428 - 384, 4);
-	if (au > 0 && au <= 9) {
-		card->ssr.au = 1 << (au + 4);
-		es = UNSTUFF_BITS(ssr, 408 - 384, 16);
-		et = UNSTUFF_BITS(ssr, 402 - 384, 6);
-		eo = UNSTUFF_BITS(ssr, 400 - 384, 2);
-		if (es && et) {
-			card->ssr.erase_timeout = (et * 1000) / es;
-			card->ssr.erase_offset = eo * 1000;
+	if (au) {
+		if (au <= 9 || card->scr.sda_spec3) {
+			card->ssr.au = sd_au_size[au];
+			es = UNSTUFF_BITS(ssr, 408 - 384, 16);
+			et = UNSTUFF_BITS(ssr, 402 - 384, 6);
+			if (es && et) {
+				eo = UNSTUFF_BITS(ssr, 400 - 384, 2);
+				card->ssr.erase_timeout = (et * 1000) / es;
+				card->ssr.erase_offset = eo * 1000;
+			}
+		} else {
+			pr_warn("%s: SD Status: Invalid Allocation Unit size\n",
+				mmc_hostname(card->host));
 		}
-	} else {
-		pr_warning("%s: SD Status: Invalid Allocation Unit "
-			"size.\n", mmc_hostname(card->host));
+	}
+	if (UNSTUFF_BITS(ssr, 440 - 384, 8) <= 4) {
+		card->ssr.speed_class = speed_class[UNSTUFF_BITS(ssr, 440 - 384, 8)];
+		snprintf(mmc_sunxi_spc_str, sizeof(mmc_sunxi_spc_str),
+				"mmc_sunxi_event = mmc core:speed class:%d", card->ssr.speed_class);
+		mmc_sunxi_event[0] = mmc_sunxi_spc_str;
+		kobject_uevent_env(&mmc_dev(card->host)->kobj, KOBJ_CHANGE, mmc_sunxi_event);
+	} else{
+		/*unkown speed class*/
+		card->ssr.speed_class = 0xffffffff;
+		mmc_sunxi_event[0] = mmc_sunxi_spc_str;
+		kobject_uevent_env(&mmc_dev(card->host)->kobj, KOBJ_CHANGE, mmc_sunxi_event);
 	}
 out:
 	kfree(ssr);
@@ -674,6 +699,8 @@ MMC_DEV_ATTR(manfid, "0x%06x\n", card->cid.manfid);
 MMC_DEV_ATTR(name, "%s\n", card->cid.prod_name);
 MMC_DEV_ATTR(oemid, "0x%04x\n", card->cid.oemid);
 MMC_DEV_ATTR(serial, "0x%08x\n", card->cid.serial);
+MMC_DEV_ATTR(speed_class, "class%d\n", card->ssr.speed_class);
+
 
 
 static struct attribute *sd_std_attrs[] = {
@@ -689,6 +716,7 @@ static struct attribute *sd_std_attrs[] = {
 	&dev_attr_name.attr,
 	&dev_attr_oemid.attr,
 	&dev_attr_serial.attr,
+	&dev_attr_speed_class.attr,
 	NULL,
 };
 

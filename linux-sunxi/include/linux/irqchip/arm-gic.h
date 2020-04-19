@@ -17,6 +17,9 @@
 #define GIC_CPU_EOI			0x10
 #define GIC_CPU_RUNNINGPRI		0x14
 #define GIC_CPU_HIGHPRI			0x18
+#define GIC_CPU_AINTACK			0x20
+#define GIC_CPU_AEOI			0x24
+#define GIC_CPU_AHIGHPRI		0x28
 #define GIC_CPU_ALIAS_BINPOINT		0x1c
 #define GIC_CPU_ACTIVEPRIO		0xd0
 #define GIC_CPU_IDENT			0xfc
@@ -82,6 +85,8 @@ extern struct irq_chip gic_arch_extn;
 void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
 		    u32 offset, struct device_node *);
 void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+void sunxi_gic_secondary_init(unsigned int gic_nr);
+void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
 void gic_cpu_if_down(void);
 
 void gic_cpu_if_down(void);

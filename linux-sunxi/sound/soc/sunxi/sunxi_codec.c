@@ -313,7 +313,7 @@ static int codec_init(struct sunxi_codec *sunxi_internal_codec)
 
 	if (sunxi_internal_codec->hwconfig.dachpf_cfg)
 		dachpf_config(sunxi_internal_codec->codec);
-	if (sunxi_internal_codec->aif_config.aif2config || sunxi_internal_codec->aif_config.aif3config) {
+	if (sunxi_internal_codec->aif_config.aif2config || sunxi_internal_codec->aif_config.aif3config || sunxi_internal_codec->dmic_used) {
 		if (!sunxi_internal_codec->pinctrl) {
 			sunxi_internal_codec->pinctrl = devm_pinctrl_get(sunxi_internal_codec->codec->dev);
 			if (IS_ERR_OR_NULL(sunxi_internal_codec->pinctrl)) {
@@ -322,17 +322,15 @@ static int codec_init(struct sunxi_codec *sunxi_internal_codec)
 			}
 		}
 	}
-
 	if (sunxi_internal_codec->aif_config.aif2config) {
-		if (!sunxi_internal_codec->aif2_pinstate){
+		if (!sunxi_internal_codec->aif2_pinstate) {
 			sunxi_internal_codec->aif2_pinstate = pinctrl_lookup_state(sunxi_internal_codec->pinctrl, "aif2-default");
 			if (IS_ERR_OR_NULL(sunxi_internal_codec->aif2_pinstate)) {
 				pr_warn("[audio-codec]lookup aif2-default state failed\n");
 				return -EINVAL;
 			}
 		}
-
-		if (!sunxi_internal_codec->aif2sleep_pinstate){
+		if (!sunxi_internal_codec->aif2sleep_pinstate) {
 			sunxi_internal_codec->aif2sleep_pinstate = pinctrl_lookup_state(sunxi_internal_codec->pinctrl, "aif2-sleep");
 			if (IS_ERR_OR_NULL(sunxi_internal_codec->aif2sleep_pinstate)) {
 				pr_warn("[audio-codec]lookup aif2-sleep state failed\n");
@@ -346,15 +344,14 @@ static int codec_init(struct sunxi_codec *sunxi_internal_codec)
 		}
 	}
 	if (sunxi_internal_codec->aif_config.aif3config) {
-		if (!sunxi_internal_codec->aif3_pinstate){
+		if (!sunxi_internal_codec->aif3_pinstate) {
 			sunxi_internal_codec->aif3_pinstate = pinctrl_lookup_state(sunxi_internal_codec->pinctrl, "aif3-default");
 			if (IS_ERR_OR_NULL(sunxi_internal_codec->aif3_pinstate)) {
 				pr_warn("[audio-codec]lookup aif3-default state failed\n");
 				return -EINVAL;
 			}
 		}
-
-		if (!sunxi_internal_codec->aif3sleep_pinstate){
+		if (!sunxi_internal_codec->aif3sleep_pinstate) {
 			sunxi_internal_codec->aif3sleep_pinstate = pinctrl_lookup_state(sunxi_internal_codec->pinctrl, "aif3-sleep");
 			if (IS_ERR_OR_NULL(sunxi_internal_codec->aif3sleep_pinstate)) {
 				pr_warn("[audio-codec]lookup aif3-sleep state failed\n");
@@ -365,6 +362,27 @@ static int codec_init(struct sunxi_codec *sunxi_internal_codec)
 		ret = pinctrl_select_state(sunxi_internal_codec->pinctrl, sunxi_internal_codec->aif3_pinstate);
 		if (ret) {
 			pr_warn("[audio-codec]select aif3-default state failed\n");
+			return ret;
+		}
+	}
+	if (sunxi_internal_codec->dmic_used) {
+		if (!sunxi_internal_codec->dmic_pinstate) {
+			sunxi_internal_codec->dmic_pinstate = pinctrl_lookup_state(sunxi_internal_codec->pinctrl, "dmic-default");
+			if (IS_ERR_OR_NULL(sunxi_internal_codec->dmic_pinstate)) {
+				pr_warn("[audio-codec]lookup dmic-default state failed\n");
+				return -EINVAL;
+			}
+		}
+		if (!sunxi_internal_codec->dmicsleep_pinstate) {
+			sunxi_internal_codec->dmicsleep_pinstate = pinctrl_lookup_state(sunxi_internal_codec->pinctrl, "dmic-sleep");
+			if (IS_ERR_OR_NULL(sunxi_internal_codec->dmicsleep_pinstate)) {
+				pr_warn("[audio-codec]lookup dmic-sleep state failed\n");
+				return -EINVAL;
+			}
+		}
+		ret = pinctrl_select_state(sunxi_internal_codec->pinctrl, sunxi_internal_codec->dmic_pinstate);
+		if (ret) {
+			pr_warn("[audio-codec]select dmic-default state failed\n");
 			return ret;
 		}
 	}
@@ -699,9 +717,9 @@ static int dmic_mux_ev(struct snd_soc_dapm_widget *w,
 	switch (event){
 	case SND_SOC_DAPM_PRE_PMU:
 		if (sunxi_internal_codec->adc_enable == 0){
-			snd_soc_update_bits(codec, SUNXI_MOD_CLK_ENA, (0x1<<DAC_DIGITAL_MOD_CLK_EN), (0x1<<DAC_DIGITAL_MOD_CLK_EN));
-			snd_soc_update_bits(codec, SUNXI_MOD_RST_CTL, (0x1<<DAC_DIGITAL_MOD_RST_CTL), (0x1<<DAC_DIGITAL_MOD_RST_CTL));
-			//snd_soc_update_bits(codec, SUNXI_DAC_DIG_CTRL, (0x1<<ENDA), (0x1<<ENDA));
+			snd_soc_update_bits(codec, SUNXI_MOD_CLK_ENA, (0x1<<ADC_DIGITAL_MOD_CLK_EN), (0x1<<ADC_DIGITAL_MOD_CLK_EN));
+			snd_soc_update_bits(codec, SUNXI_MOD_RST_CTL, (0x1<<ADC_DIGITAL_MOD_RST_CTL), (0x1<<ADC_DIGITAL_MOD_RST_CTL));
+			snd_soc_update_bits(codec, SUNXI_ADC_DIG_CTRL, (0x1<<ENAD), (0x1<<ENAD));
 			snd_soc_update_bits(codec, SUNXI_ADC_DIG_CTRL, (0x1<<ENDM), (0x1<<ENDM));
 		}
 		sunxi_internal_codec->adc_enable++;
@@ -710,9 +728,9 @@ static int dmic_mux_ev(struct snd_soc_dapm_widget *w,
 		if (sunxi_internal_codec->adc_enable > 0){
 			sunxi_internal_codec->adc_enable--;
 			if (sunxi_internal_codec->adc_enable == 0){
-				snd_soc_update_bits(codec, SUNXI_MOD_CLK_ENA, (0x1<<DAC_DIGITAL_MOD_CLK_EN), (0x0<<DAC_DIGITAL_MOD_CLK_EN));
-				snd_soc_update_bits(codec, SUNXI_MOD_RST_CTL, (0x1<<DAC_DIGITAL_MOD_RST_CTL), (0x0<<DAC_DIGITAL_MOD_RST_CTL));
-				//snd_soc_update_bits(codec, SUNXI_DAC_DIG_CTRL, (0x1<<ENDA), (0x0<<ENDA));
+				snd_soc_update_bits(codec, SUNXI_MOD_CLK_ENA, (0x1<<ADC_DIGITAL_MOD_CLK_EN), (0x0<<ADC_DIGITAL_MOD_CLK_EN));
+				snd_soc_update_bits(codec, SUNXI_MOD_RST_CTL, (0x1<<ADC_DIGITAL_MOD_RST_CTL), (0x0<<ADC_DIGITAL_MOD_RST_CTL));
+				snd_soc_update_bits(codec, SUNXI_ADC_DIG_CTRL, (0x1<<ENAD), (0x0<<ENAD));
 				snd_soc_update_bits(codec, SUNXI_ADC_DIG_CTRL, (0x1<<ENDM), (0x0<<ENDM));
 			}
 		}
@@ -2077,14 +2095,22 @@ static int codec_suspend(struct snd_soc_codec *codec)
 			return ret;
 		}
 	}
-
-	if (sunxi_internal_codec->aif_config.aif2config || sunxi_internal_codec->aif_config.aif3config){
+	if (sunxi_internal_codec->dmic_used) {
+		ret = pinctrl_select_state(sunxi_internal_codec->pinctrl, sunxi_internal_codec->dmicsleep_pinstate);
+		if (ret) {
+			pr_warn("[audio-codec]select dmic-sleep state failed\n");
+			return ret;
+		}
+	}
+	if (sunxi_internal_codec->aif_config.aif2config || sunxi_internal_codec->aif_config.aif3config || sunxi_internal_codec->dmic_used) {
 		devm_pinctrl_put(sunxi_internal_codec->pinctrl);
 		sunxi_internal_codec->pinctrl = NULL;
 		sunxi_internal_codec->aif3_pinstate = NULL;
 		sunxi_internal_codec->aif2_pinstate = NULL;
 		sunxi_internal_codec->aif3sleep_pinstate = NULL;
 		sunxi_internal_codec->aif2sleep_pinstate = NULL;
+		sunxi_internal_codec->dmic_pinstate = NULL;
+		sunxi_internal_codec->dmicsleep_pinstate = NULL;
 	}
 	if (spk_gpio.cfg) {
 		audio_gpio_iodisable(spk_gpio.gpio);
@@ -2355,12 +2381,14 @@ static int sunxi_internal_codec_probe(struct platform_device *pdev)
 		ret = PTR_ERR(sunxi_internal_codec->srcclk);
 		goto err1;
 	}
+#ifdef CONFIG_ARCH_SUN50IW1
 	sunxi_internal_codec->hp_en = of_clk_get(node,1);
 	if (IS_ERR(sunxi_internal_codec->hp_en)){
 		dev_err(&pdev->dev, "[audio-codec]Can't get hp_en clocks\n");
 		ret = PTR_ERR(sunxi_internal_codec->hp_en);
 		goto err1;
 	}
+#endif
 	/*initial speaker gpio */
 	spk_gpio.gpio = of_get_named_gpio_flags(node, "gpio-spk", 0, (enum of_gpio_flags *)&config);
 	if (!gpio_is_valid(spk_gpio.gpio)) {
@@ -2468,7 +2496,17 @@ static int sunxi_internal_codec_probe(struct platform_device *pdev)
 		sunxi_internal_codec->hwconfig.dachpf_cfg = temp_val;
 	}
 
-	ret = of_property_read_u32(node, "aif2config",&temp_val);
+	ret = of_property_read_u32(node, "dmic_used", &temp_val);
+	if (ret < 0) {
+		pr_err("[audio-codec]dmic_used configurations missing or invalid.\n");
+		ret = -EINVAL;
+		goto err1;
+	} else {
+		sunxi_internal_codec->dmic_used = temp_val;
+	}
+
+
+	ret = of_property_read_u32(node, "aif2config", &temp_val);
 	if (ret < 0) {
 		pr_err("[audio-codec]aif2config configurations missing or invalid.\n");
 		ret = -EINVAL;

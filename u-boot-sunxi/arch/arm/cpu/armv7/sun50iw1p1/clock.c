@@ -455,30 +455,31 @@ int sunxi_clock_get_axi(void)
 int sunxi_clock_get_ahb(void)
 {
 	unsigned int reg_val;
-	int factor;
+	int factor,div;
 	int clock;
-    int src = 0;
+	int src = 0;
 
 	reg_val = readl(CCMU_AHB1_APB1_CFG_REG);
 
-    src = (reg_val >> 12)&0x3;
-    clock = 0;
-    switch(src)
-    {
-        case 0://src is LOSC
-            break;
-        case 1://src is OSC24M
-            clock = 24;
-            break;
-        case 2://src is axi
-            factor  = (reg_val >> 4) & 0x03;
-            clock   = sunxi_clock_get_axi()>>factor;
-            break;
-        case 3://src is pll6(1x)/AHB1_PRE_DIV
-            factor  = (reg_val >> 6) & 0x03;
-            clock   = sunxi_clock_get_pll6()/(factor+1);
-        break;
-    }
+	src = (reg_val >> 12)&0x3;
+	clock = 0;
+	switch(src)
+	{
+		case 0://src is LOSC
+		    break;
+		case 1://src is OSC24M
+		    clock = 24;
+		    break;
+		case 2://src is axi
+		    factor  = (reg_val >> 4) & 0x03;
+		    clock   = sunxi_clock_get_axi()>>factor;
+		    break;
+		case 3://src is pll6(1x)/AHB1_PRE_DIV
+		    factor  = ((reg_val >> 6) & 0x03) +1 ;
+		    div = 1<<((reg_val >> 4) & 0x03);
+		    clock   = sunxi_clock_get_pll6()/(factor*div);
+		break;
+	}
 
 	return clock;
 }

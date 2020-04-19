@@ -72,8 +72,59 @@ extern int spinor_download_uboot(uint length, void *buffer);
 extern int spinor_download_boot0(uint length, void *buffer);
 #endif
 
+extern int read_boot_package(int storage_type, void *package_buf);
+extern int sunxi_flash_upload_boot0(char * buffer, int size);
+extern int sunxi_sprite_download_uboot(void *buffer, int production_media, int generate_checksum);
+extern int sunxi_sprite_download_boot0(void *buffer, int production_media);
+extern int sunxi_flash_get_boot0_size(void);
+
 extern int nand_force_download_uboot(uint length,void *buffer);
 extern uint add_sum(void *buffer, uint length);
 extern int sunxi_flash_update_boot0(void);
+
+extern int nand_secure_storage_read( int item, unsigned char *buf, unsigned int len);
+extern int nand_secure_storage_write(int item, unsigned char *buf, unsigned int len);
+
+/* for sdmmc secure storage */
+extern int sunxi_flash_mmc_secread( int item, unsigned char *buf, unsigned int len);
+extern int sunxi_flash_mmc_secread_backup( int item, unsigned char *buf, unsigned int len);
+extern int sunxi_flash_mmc_secwrite( int item, unsigned char *buf, unsigned int len);
+extern int sunxi_sprite_mmc_secwrite(int item ,unsigned char *buf,unsigned int nblock);
+extern int sunxi_sprite_mmc_secread(int item ,unsigned char *buf,unsigned int nblock);
+extern int sunxi_sprite_mmc_secread_backup(int item ,unsigned char *buf,unsigned int nblock);
+
+extern int sunxi_secstorage_read(int item, unsigned char *buf, unsigned int len);
+extern int sunxi_secstorage_write(int item, unsigned char *buf, unsigned int len);
+
+
+#define SUNXI_SECSTORE_VERSION	1
+
+#define MAX_STORE_LEN 0xc00 /*3K payload*/
+#define STORE_OBJECT_MAGIC	0x17253948
+#define STORE_REENCRYPT_MAGIC 0x86734716
+#define STORE_WRITE_PROTECT_MAGIC   0x8ad3820f
+typedef struct{
+	unsigned int     magic ; /* store object magic*/
+	int                 id ;    /*store id, 0x01,0x02.. for user*/
+	char            name[64]; /*OEM name*/
+	unsigned int    re_encrypt; /*flag for OEM object*/
+	unsigned int    version ;
+	unsigned int    write_protect ;  /*can be placed or not, =0, can be write_protectd*/
+	unsigned int    reserved[3];
+	unsigned int    actual_len ; /*the actual len in data buffer*/
+	unsigned char   data[MAX_STORE_LEN]; /*the payload of secure object*/
+	unsigned int    crc ; /*crc to check the sotre_objce valid*/
+}store_object_t;
+
+
+/* secure storage map, have the key info in the keysecure storage */
+#define SEC_BLK_SIZE (4096)
+struct map_info{
+	unsigned char data[SEC_BLK_SIZE - sizeof(int)*2];
+	unsigned int magic;
+	unsigned int crc;
+};
+
+
 
 #endif  /* __SUNXI_FLASH_H__ */

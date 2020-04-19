@@ -4,7 +4,7 @@ struct disp_vdevice_private_data {
 	u32 enabled;
 	bool suspended;
 
-	enum disp_output_type mode;
+	enum disp_tv_mode mode;
 
 	struct disp_device_func func;
 	struct disp_video_timings *video_info;
@@ -80,12 +80,12 @@ static s32 vdevice_clk_config(struct disp_device *vdevice)
 	para = (disp_panel_para*)kmalloc(sizeof(disp_panel_para), GFP_KERNEL | __GFP_ZERO);
 	dclk_rate = vdevicep->video_info->pixel_clk * (vdevicep->video_info->pixel_repeat + 1);
 	para->lcd_if = vdevicep->intf.intf;
+	para->lcd_hv_if = vdevicep->intf.sub_intf;
 	para->lcd_dclk_freq = dclk_rate;
+	para->ccir_clk_div = vdevicep->intf.ccir_clk_div;
 	disp_al_lcd_get_clk_info(vdevice->disp, &clk_info, para);
 	kfree((void*)para);
 
-	/* calculate the clk rate */
-	clk_info.tcon_div = 11;//fixme
 	lcd_rate = dclk_rate * clk_info.tcon_div;
 	pll_rate = lcd_rate * clk_info.lcd_div;
 
@@ -237,9 +237,46 @@ static s32 disp_vdevice_exit(struct disp_device* vdevice)
   return 0;
 }
 
+static s32 cal_real_frame_period(struct disp_device *vdevice)
+{
+	s32 ret = -1;
+	struct disp_vdevice_private_data *vdevicep;
+
+	if (!vdevice) {
+		DE_WRN("vdevice is null!\n");
+		goto OUT;
+	}
+
+	vdevicep = disp_vdevice_get_priv(vdevice);
+	if (!vdevicep) {
+		DE_WRN("vdevicep is null!\n");
+		goto OUT;
+	}
+
+	vdevice->timings.dclk_rate_set = 27000000;
+
+	if (vdevicep->video_info->vic == DISP_TV_MOD_PAL)
+		vdevice->timings.frame_period = 20000000ull; /*50hz*/
+	else
+		vdevice->timings.frame_period = 16683333ull; /*60Hz*/
+
+	vdevice->timings.start_delay =
+	    disp_al_device_get_start_delay(vdevice->hwdev_index);
+
+	DE_INF("vdevice frame period:%llu\n", vdevice->timings.frame_period);
+
+	ret = 0;
+
+OUT:
+
+	return ret;
+}
+
 static s32 disp_vdevice_enable(struct disp_device* vdevice)
 {
 	struct disp_vdevice_private_data *vdevicep = disp_vdevice_get_priv(vdevice);
+	s32 ret = -1;
+
 	if ((NULL == vdevice) || (NULL == vdevicep)) {
 		DE_WRN("null  hdl!\n");
 		return DIS_FAIL;
@@ -252,12 +289,12 @@ static s32 disp_vdevice_enable(struct disp_device* vdevice)
 
 	mutex_lock(&vdevicep->mlock);
 	if (NULL != vdevicep->func.enable)
-		vdevicep->func.enable();
+		ret = vdevicep->func.enable();
 	else
 		DE_WRN("vdevice_enable is NULL\n");
 	mutex_unlock(&vdevicep->mlock);
 
-	return 0;
+	return ret;
 }
 
 static s32 disp_vdevice_sw_enable(struct disp_device* vdevice)
@@ -307,6 +344,8 @@ static s32 disp_vdevice_sw_enable(struct disp_device* vdevice)
 	if (0 != vdevice_clk_enable(vdevice))
 		return -1;
 #endif
+	if (0 != cal_real_frame_period(vdevice))
+		DE_WRN("vdevice cal_real_frame_period fali\n");
 
 	disp_sys_register_irq(vdevicep->irq_no,0,disp_vdevice_event_proc,(void*)vdevice,0,0);
 	disp_sys_enable_irq(vdevicep->irq_no);
@@ -433,13 +472,20 @@ static s32 disp_vdevice_get_input_color_range(struct disp_device* vdevice)
 		DE_WRN("null  hdl!\n");
 		return DIS_FAIL;
 	}
+	if (vdevicep->func.get_input_csc == NULL)
+		return DIS_FAIL;
 
-	return DISP_COLOR_RANGE_0_255;
+	if (DISP_CSC_TYPE_RGB == vdevicep->func.get_input_csc())
+		return DISP_COLOR_RANGE_0_255;
+	else
+		return DISP_COLOR_RANGE_16_235;
 }
 
 static s32 disp_vdevice_suspend(struct disp_device* vdevice)
 {
 	struct disp_vdevice_private_data *vdevicep = disp_vdevice_get_priv(vdevice);
+	s32 ret = 0;
+
 	DE_WRN("\n");
 	if ((NULL == vdevice) || (NULL == vdevicep)) {
 		DE_WRN("null  hdl!\n");
@@ -449,18 +495,20 @@ static s32 disp_vdevice_suspend(struct disp_device* vdevice)
 	mutex_lock(&vdevicep->mlock);
 	if (false == vdevicep->suspended) {
 		if (vdevicep->func.suspend != NULL) {
-			vdevicep->func.suspend();
+			ret = vdevicep->func.suspend();
 		}
 		vdevicep->suspended = true;
 	}
 	mutex_unlock(&vdevicep->mlock);
 
-	return 0;
+	return ret;
 }
 
 static s32 disp_vdevice_resume(struct disp_device* vdevice)
 {
 	struct disp_vdevice_private_data *vdevicep = disp_vdevice_get_priv(vdevice);
+	s32 ret = 0;
+
 	DE_WRN("\n");
 	if ((NULL == vdevice) || (NULL == vdevicep)) {
 		DE_WRN("null  hdl!\n");
@@ -470,13 +518,13 @@ static s32 disp_vdevice_resume(struct disp_device* vdevice)
 	mutex_lock(&vdevicep->mlock);
 	if (true == vdevicep->suspended) {
 		if (vdevicep->func.resume != NULL) {
-			vdevicep->func.resume();
+			ret = vdevicep->func.resume();
 		}
 		vdevicep->suspended = false;
 	}
 	mutex_unlock(&vdevicep->mlock);
 
-	return 0;
+	return ret;
 }
 
 static s32 disp_vdevice_tcon_enable(struct disp_device* vdevice)
@@ -521,7 +569,12 @@ static s32 disp_vdevice_tcon_enable(struct disp_device* vdevice)
 	disp_sys_enable_irq(vdevicep->irq_no);
 
 	vdevice_clk_enable(vdevice);
-	disp_al_vdevice_cfg(vdevice->disp, &vdevice->timings, &vdevicep->intf);
+
+	if (cal_real_frame_period(vdevice) != 0)
+		DE_WRN("vdevice cal_real_frame_period fail\n");
+
+	disp_al_vdevice_cfg(vdevice->disp, &vdevice->timings, &vdevicep->intf,
+			    0);
 	disp_al_vdevice_enable(vdevice->disp);
 
 	vdevicep->enabled = 1;
@@ -593,7 +646,8 @@ static s32 disp_vdevice_tcon_simple_enable(struct disp_device* vdevice)
 	memcpy(&vdevice->timings, vdevicep->video_info, sizeof(struct disp_video_timings));
 
 	vdevice_calc_judge_line(vdevice);
-	disp_al_vdevice_cfg(vdevice->disp, &vdevice->timings, &vdevicep->intf);
+	disp_al_vdevice_cfg(vdevice->disp, &vdevice->timings, &vdevicep->intf,
+			    1);
 	disp_al_vdevice_enable(vdevice->disp);
 
 	return 0;
@@ -630,6 +684,55 @@ static s32 disp_vdevice_get_fps(struct disp_device *vdevice)
 	}
 
 	return vdevicep->frame_per_sec;
+}
+
+static bool disp_vdevice_check_config_dirty(struct disp_device *vdevice,
+					struct disp_device_config *config)
+{
+	bool ret = false;
+	struct disp_vdevice_private_data *vdevicep =
+	    disp_vdevice_get_priv(vdevice);
+
+	if ((vdevice == NULL) || (vdevicep == NULL)) {
+		DE_WRN("NULL hdl!\n");
+		ret = -1;
+		goto exit;
+	}
+
+	if ((vdevicep->enabled == 0) ||
+	    (config->mode != vdevicep->mode))
+		ret = true;
+
+exit:
+	return ret;
+}
+
+static s32 disp_vdevice_set_static_config(struct disp_device *vdevice,
+			       struct disp_device_config *config)
+{
+	return disp_vdevice_set_mode(vdevice, config->mode);
+}
+
+static s32 disp_vdevice_get_static_config(struct disp_device *vdevice,
+			      struct disp_device_config *config)
+{
+	int ret = 0;
+	struct disp_vdevice_private_data *vdevicep =
+	    disp_vdevice_get_priv(vdevice);
+
+	if ((vdevice == NULL) || (vdevicep == NULL)) {
+		DE_WRN("NULL hdl!\n");
+		ret = -1;
+		goto exit;
+	}
+
+	config->type = vdevice->type;
+	config->mode = vdevicep->mode;
+	if (vdevicep->func.get_input_csc)
+		config->format = vdevicep->func.get_input_csc();
+
+exit:
+	return ret;
 }
 
 struct disp_device* disp_vdevice_register(struct disp_vdevice_init_data *data)
@@ -688,6 +791,9 @@ struct disp_device* disp_vdevice_register(struct disp_vdevice_init_data *data)
 	vdevice->is_enabled = disp_vdevice_is_enabled;
 	vdevice->set_mode = disp_vdevice_set_mode;
 	vdevice->get_mode = disp_vdevice_get_mode;
+	vdevice->set_static_config = disp_vdevice_set_static_config;
+	vdevice->get_static_config = disp_vdevice_get_static_config;
+	vdevice->check_config_dirty = disp_vdevice_check_config_dirty;
 	vdevice->check_support_mode = disp_vdevice_check_support_mode;
 	vdevice->get_input_csc = disp_vdevice_get_input_csc;
 	vdevice->get_input_color_range = disp_vdevice_get_input_color_range;
@@ -695,6 +801,9 @@ struct disp_device* disp_vdevice_register(struct disp_vdevice_init_data *data)
 	vdevice->resume = disp_vdevice_resume;
 	vdevice->detect = disp_vdevice_detect;
 	vdevice->get_fps = disp_vdevice_get_fps;
+	vdevice->get_status = disp_device_get_status;
+	vdevice->is_in_safe_period = disp_device_is_in_safe_period;
+	vdevice->usec_before_vblank = disp_device_usec_before_vblank;
 
 	vdevice->priv_data = (void*)vdevicep;
 	vdevice->init(vdevice);

@@ -35,8 +35,38 @@
 #define SS_FLAG_HASH			BIT(17)
 
 /* Define the capability of SS controller. */
+#ifdef CONFIG_ARCH_SUN8IW6
+#define SS_CTR_MODE_ENABLE		1
+#define SS_CTS_MODE_ENABLE		1
+#define SS_SHA224_ENABLE		1
+#define SS_SHA256_ENABLE		1
+#define SS_TRNG_ENABLE			1
+#define SS_TRNG_POSTPROCESS_ENABLE	1
+#define SS_RSA512_ENABLE		1
+#define SS_RSA1024_ENABLE		1
+#define SS_RSA2048_ENABLE		1
+#define SS_RSA3072_ENABLE		1
+#define SS_IDMA_ENABLE			1
+#define SS_MULTI_FLOW_ENABLE	1
 
-#if defined(CONFIG_ARCH_SUN50I) || defined(CONFIG_ARCH_SUN8IW11)
+#define SS_SHA_SWAP_PRE_ENABLE	1 /* The initial IV need to be converted. */
+
+#define SS_DMA_BUF_SIZE			SZ_8K
+
+#define SS_RSA_MIN_SIZE			(512/8)  /* in Bytes. 512 bits */
+#define SS_RSA_MAX_SIZE			(3072/8) /* in Bytes. 3072 bits */
+
+#define SS_FLOW_NUM				2
+#endif
+
+#if defined(CONFIG_ARCH_SUN8IW5)
+#define SS_SHA_SWAP_PRE_ENABLE  1 /* The initial IV need to be swapped. */
+#define SS_SHA_NO_SWAP_IV4      1 /* The IV's 4th word needn't to be swapped. */
+#define SS_FLOW_NUM             1
+#endif
+
+#if defined(CONFIG_ARCH_SUN50I) || defined(CONFIG_ARCH_SUN8IW11) \
+		|| defined(CONFIG_ARCH_SUN8IW17)
 #define SS_CTR_MODE_ENABLE		1
 #define SS_CTS_MODE_ENABLE		1
 #define SS_SHA224_ENABLE		1
@@ -67,7 +97,7 @@
 #define SS_FLOW_NUM				4
 #endif
 
-#if defined(CONFIG_ARCH_SUN8IW11)
+#if defined(CONFIG_ARCH_SUN8IW11) || defined(CONFIG_ARCH_SUN8IW17)
 #define SS_CFB_MODE_ENABLE		1
 #define SS_OFB_MODE_ENABLE		1
 
@@ -82,9 +112,14 @@
 
 #if defined(CONFIG_ARCH_SUN50IW3) || defined(CONFIG_ARCH_SUN50IW6)
 #define SS_XTS_MODE_ENABLE		1
+#define SS_CFB_MODE_ENABLE		1
+#define SS_OFB_MODE_ENABLE		1
 #define SS_HASH_HW_PADDING		1
+#define SS_HASH_HW_PADDING_ALIGN_CASE	1
 
-#define SS_HMAC_SHA256_ENABLE	1
+#define SS_SHA384_ENABLE		1
+#define SS_SHA512_ENABLE		1
+#define SS_HMAC_SHA256_ENABLE		1
 
 #define SS_RSA3072_ENABLE		1
 #define SS_RSA4096_ENABLE		1
@@ -95,6 +130,7 @@
 #define SS_ECC_ENABLE			1
 
 #define SS_SUPPORT_CE_V3_2		1
+#undef SS_TRNG_POSTPROCESS_ENABLE
 #endif
 
 #if defined(SS_RSA512_ENABLE) || defined(SS_RSA1024_ENABLE) \
@@ -131,10 +167,10 @@
 #define SS_ALG_PRIORITY		260
 
 /* For debug */
-#define SS_DBG(fmt, arg...)	pr_debug("%s()%d - "fmt, __func__, __LINE__, ##arg)
-#define SS_ERR(fmt, arg...)	pr_err("%s()%d - "fmt, __func__, __LINE__, ##arg)
-#define SS_EXIT()  			SS_DBG("%s \n", "Exit")
-#define SS_ENTER() 			SS_DBG("%s \n", "Enter ...")
+#define SS_DBG(fmt, arg...) pr_debug("%s()%d - "fmt, __func__, __LINE__, ##arg)
+#define SS_ERR(fmt, arg...) pr_err("%s()%d - "fmt, __func__, __LINE__, ##arg)
+#define SS_EXIT()           SS_DBG("%s\n", "Exit")
+#define SS_ENTER()          SS_DBG("%s\n", "Enter ...")
 
 #define SS_FLOW_AVAILABLE	0
 #define SS_FLOW_UNAVAILABLE	1
@@ -185,6 +221,9 @@ typedef struct {
 	u32 nents;
 	struct dma_chan *chan;
 	struct scatterlist *sg;
+#ifdef SS_IDMA_ENABLE
+	struct sg_table sgt_for_cp; /* Used to copy data from/to user space. */
+#endif
 #ifdef SS_SCATTER_ENABLE
 	u32 has_padding;
 	u8 *padding;
@@ -239,6 +278,12 @@ typedef struct {
 } ss_hash_ctx_t;
 
 typedef struct {
+#ifdef SS_IDMA_ENABLE
+	char *buf_src;
+	dma_addr_t buf_src_dma;
+	char *buf_dst;
+	dma_addr_t buf_dst_dma;
+#endif
 #ifdef SS_SCATTER_ENABLE
 	ce_task_desc_t task;
 #endif
@@ -254,6 +299,7 @@ typedef struct {
 
 	struct clk *mclk;  /* module clock */
 	u32 gen_clkrate;
+	u32 rsa_clkrate;
 	u32 irq;
 	s8  dev_name[8];
 	
@@ -271,6 +317,7 @@ void ss_dev_lock(void);
 void ss_dev_unlock(void);
 void __iomem *ss_membase(void);
 void ss_reset(void);
+void ss_clk_set(u32 rate);
 
 #endif /* end of _SUNXI_SECURITY_SYSTEM_H_ */
 

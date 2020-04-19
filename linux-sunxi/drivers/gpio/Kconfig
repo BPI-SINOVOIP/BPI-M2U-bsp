@@ -412,6 +412,11 @@ config GPIO_PCF857X
 	  This driver provides an in-kernel interface to those GPIOs using
 	  platform-neutral GPIO calls.
 
+config IO_EXPAND
+	def_bool y
+	depends on GPIO_PCF857X
+	depends on ARCH_SUN3IW1P1
+
 config GPIO_RC5T583
 	bool "RICOH RC5T583 GPIO"
 	depends on MFD_RC5T583

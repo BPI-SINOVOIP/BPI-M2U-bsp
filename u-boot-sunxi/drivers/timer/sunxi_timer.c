@@ -29,6 +29,7 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/timer.h>
 #include <asm/arch/intc.h>
+#include <div64.h>
 
 #define TIMER_MODE   (0 << 7)   /* continuous mode */
 #define TIMER_DIV    (0 << 4)   /* pre scale 1 */
@@ -38,35 +39,19 @@
 
 static  int  timer_used_status;
 
-/*
- * This function is derived from PowerPC code (timebase clock frequency).
- * On ARM it returns the number of timer ticks per second.
- */
-ulong get_tbclk(void)
-{
-	ulong tbclk;
-	tbclk = CONFIG_SYS_HZ;
-	return tbclk;
-}
-
-
 
 /* init timer register */
 int timer_init(void)
 {
 	struct sunxi_timer_reg *timer_reg = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
-	//struct sunxi_ccm_reg *ccm_reg = (struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
-    writel(readl(CCMU_AVS_CLK_REG)|(1U << 31),CCMU_AVS_CLK_REG);
-
+	#ifdef CONFIG_ARCH_SUN3IW1P1
+	writel(readl(CCMU_AVS_CLK_REG)|(1U << 31),CCMU_AVS_CLK_REG);
+	timer_reg->avs.ctl  = 3;
+	timer_reg->avs.div  |= 0xb04af;
+	#endif
 	timer_reg->tirqen  = 0;
 	timer_reg->tirqsta |= 0x03;
-	/* start avs as counter */
-	//ccm_reg->avs_clk_cfg |= (1 << 31);
-	timer_reg->avs.ctl  = 3; //enable avs cnt0 and cnt1,source is 24M
-	/* div cnt0 12000 to 2000hz, high 32 bit means 1000hz.*/
-	/* div cnt 1 12 to 2000000hz ,high 32 bit means 1000000hz */
-	timer_reg->avs.div  |= 0xc0000;
-	//timer_reg->avs.cnt0 = 0;
+
 	return 0;
 }
 
@@ -76,81 +61,93 @@ void timer_exit(void)
 
 	timer_reg->tirqen  = 0;
 	timer_reg->tirqsta |= 0x043f;
+	timer_reg->timer[0].ctl = 0;
+	timer_reg->timer[1].ctl = 0;
+	#ifdef CONFIG_ARCH_SUN3IW1P1
 	timer_reg->avs.ctl = 0;
 	timer_reg->avs.div = 0x05DB05DB;
-	timer_reg->timer[0].ctl = 0;
-    timer_reg->timer[1].ctl = 0;
-    writel(readl(CCMU_AVS_CLK_REG) & 0x0fffffff, CCMU_AVS_CLK_REG);
+	writel(readl(CCMU_AVS_CLK_REG) & 0x0fffffff, CCMU_AVS_CLK_REG);
+	#endif
+}
 
+
+/*
+ * This function is derived from PowerPC code (timebase clock frequency).
+ * On ARM it returns the number of timer ticks per second.
+ */
+ulong get_tbclk(void)
+{
+	return 24000000;
+}
+
+#ifdef CONFIG_ARCH_SUN3IW1P1
+static inline u64 get_arch_counter(void)
+{
+	u32 t_us;
+	struct sunxi_timer_reg *timer_reg = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
+	t_us = timer_reg->avs.cnt1;
+	return (u64)(t_us*24);
+}
+#else
+/*
+* 64bit arch timer.CNTPCT
+* Freq = 24000000Hz
+*/
+static inline u64 get_arch_counter(void)
+{
+	u32 low=0, high = 0;
+	asm volatile("mrrc p15, 0, %0, %1, c14"
+		: "=r" (low), "=r" (high)
+		:
+		: "memory");
+	return (((u64)high)<<32 | low);
+}
+#endif
+
+void __usdelay(unsigned long us)
+{
+	u64 t1, t2;
+
+	t1 = get_arch_counter();
+	t2 = t1 + us*24;
+	do
+	{
+		t1 = get_arch_counter();
+	}
+	while(t2 >= t1);
+}
+void __msdelay(unsigned long ms)
+{
+	__usdelay(ms*1000);
 	return ;
 }
 
-/* timer without interrupts */
-/* count the delay by seconds */
-ulong get_timer(ulong base)
-{
-	//return get_timer_masked()/1000 - base;
 
-	//return ms
-    return get_timer_masked() - base;
-}
-
+/* get the current time(ms), freq = 24000000Hz*/
 int runtime_tick(void)
 {
-	struct sunxi_timer_reg *timer_reg = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
-
-	return timer_reg->avs.cnt0;
+	u64 cnt= 0;
+	cnt = get_arch_counter();
+	return lldiv(cnt, 24000);
 }
 
 ulong get_timer_masked(void)
 {
 	/* current tick value */
 	ulong now = runtime_tick();
-	/* notice:  this function doesnt consider if the timer count overrage */
-#if 0
-	if (now >= gd->lastinc)	/* normal (non rollover) */
-		gd->tbl += (now - gd->lastinc);
-	else			/* rollover */
-		gd->tbl += (TICKS_TO_HZ(TIMER_LOAD_VAL) - gd->lastinc) + now;
-	gd->lastinc = now;
-	return gd->tbl;
-#endif
 	return now;
 }
-/* delay x useconds */
-void __usdelay(unsigned long usec)
+
+
+
+/* timer without interrupts */
+/* count the delay by seconds */
+ulong get_timer(ulong base)
 {
-	u32 t1, t2;
-	struct sunxi_timer_reg *timer_reg = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
-	timer_reg->avs.cnt1 = 0;
-
-	t1 = timer_reg->avs.cnt1;
-	t2 = t1 + usec;
-	do
-	{
-		t1 = timer_reg->avs.cnt1;
-	}
-	while(t2 >= t1);
-
-	return ;
+    return get_timer_masked() - base;
 }
 
-/* delay x mseconds */
-void __msdelay(unsigned long msec)
-{
-	u32 t1, t2;
-	struct sunxi_timer_reg *timer_reg = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
 
-	t1 = timer_reg->avs.cnt0;
-	t2 = t1 + msec;
-	do
-	{
-		t1 = timer_reg->avs.cnt0;
-	}
-	while(t2 >= t1);
-
-	return ;
-}
 /*
  * This function is derived from PowerPC code (read timebase as long long).
  * On ARM it just returns the timer value.
@@ -180,9 +177,7 @@ struct __timer_callback timer_callback[2] =
 
 static void timerX_callback_default(void *data)
 {
-    printf("this is only for test, timer number=%d\n", (uint)(ulong)data);
-
-	return ;
+	printf("this is only for test, timer number=%d\n", (uint)(ulong)data);
 }
 
 void timer0_func(void *data)
@@ -190,19 +185,15 @@ void timer0_func(void *data)
 	struct sunxi_timer_reg *timer_control = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
 
 	if(!(timer_control->tirqsta & 0x01))
-    {
-    	return ;
-    }
+	{
+		return ;
+	}
 	timer_control->tirqen  &= ~0x01;
-    timer_control->tirqsta  =  0x01;
-    irq_disable(AW_IRQ_TIMER0);
+	timer_control->tirqsta  =  0x01;
+	irq_disable(AW_IRQ_TIMER0);
 	timer_used_status &= ~1;
-
 	debug("timer 0 occur\n");
-
-    timer_callback[0].func_back((void *)timer_callback[0].data);
-
-	return ;
+	timer_callback[0].func_back((void *)timer_callback[0].data);
 }
 
 void timer1_func(void *data)
@@ -210,19 +201,15 @@ void timer1_func(void *data)
 	struct sunxi_timer_reg *timer_control = (struct sunxi_timer_reg *)SUNXI_TIMER_BASE;
 
 	if(!(timer_control->tirqsta & 0x02))
-    {
-        return ;
-    }
+	{
+		return ;
+	}
 	timer_control->tirqen  &= ~0x02;
-    timer_control->tirqsta  =  0x02;
-    irq_disable(AW_IRQ_TIMER1);
+	timer_control->tirqsta  =  0x02;
+	irq_disable(AW_IRQ_TIMER1);
 	timer_used_status &= ~(1<<1);
-
 	debug("timer 1 occur\n");
-
-    timer_callback[1].func_back((void *)timer_callback[1].data);
-
-	return ;
+	timer_callback[1].func_back((void *)timer_callback[1].data);
 }
 
 
@@ -337,7 +324,7 @@ void stick_printf(void)
 {
 	uint time, time_sec, time_rest;
 
-	time = *(volatile unsigned int *)(0x01c20C00 + 0x84);
+	time = get_ticks();
 	time_sec = time/1000;
 	time_rest = time%1000;
 	printf("[%8d.%3d]\n",time_sec, time_rest);
@@ -349,7 +336,7 @@ void tick0_printf(char *s, int line)
 {
 	uint time, time_sec, time_rest;
 
-	time = *(volatile unsigned int *)(0x01c20C00 + 0x84);
+	time = get_ticks();
 	time_sec = time/1000;	time_rest = time%1000;
 	if(s == NULL)
 	{

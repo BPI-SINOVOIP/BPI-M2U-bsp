@@ -91,7 +91,7 @@ typedef union
 	} bits;
 } A13_WAVEDATA;
 
-/************B100 8DATA TCON INTERFACE********
+/************8DATA TCON INTERFACE********
 D15->D7
 D14->D6
 D13->D5
@@ -130,7 +130,7 @@ typedef union
 		__u16 d6                    	:  1 ;    //D14
 		__u16 d7                    	:  1 ;    //D15
 	} bits;
-} B100_WAVEDATA_8;
+} WAVEDATA_8;
 
 
 /************B100 16DATA TCON INTERFACE********
@@ -193,7 +193,7 @@ typedef union
 
 		__u32 res1	              :  8 ;   //D24~D31
 	} bits;
-} B100_WAVEDATA_16;
+} WAVEDATA_16;
 
 extern int init_eink_ctrl_data_8(unsigned long wavedata_buf, struct eink_timing_param *eink_timing_info, unsigned int i);
 extern int init_eink_ctrl_data_16(unsigned long wavedata_buf, struct eink_timing_param *eink_timing_info);

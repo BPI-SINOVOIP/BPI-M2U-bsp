@@ -21,7 +21,7 @@
 	};
 
 	soc@03000000 {
-		twi0: twi@0x01c2ac00{
+		twi0: twi@0x05002000{
 			status = "disabled";
 
 			eeprom@50 {
@@ -30,7 +30,7 @@
 			};
 		};
 
-		spi0: spi@01c68000 {
+		spi0: spi@0x05010000 {
 			status = "disabled";
 
 			nor_flash@0 {
@@ -45,6 +45,15 @@
 					reg = <0x00000000 0x00800000>;
 				};
 			};
+		};
+
+		disp: disp@01000000 {
+			compatible = "allwinner,sunxi-disp";
+			clocks = <&clk_de>,
+				 <&clk_display_top>,
+				 <&clk_tcon_lcd0>,
+				 <&clk_tcon_lcd1>,
+				 <&clk_lvds0>;
 		};
 	};
 };

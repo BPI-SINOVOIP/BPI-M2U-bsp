@@ -20,6 +20,7 @@ static const struct axp_config_info *axp_config = &axp81x_config;
 
 static aw_charge_type axp_usbcurflag = CHARGE_AC;
 static aw_charge_type axp_usbvolflag = CHARGE_AC;
+int axp_usb_connect;
 
 s32 axp_usbvol(aw_charge_type type)
 {
@@ -44,15 +45,37 @@ s32 axp_usb_det(void)
 
 	axp_read(axp_charger->master, AXP_CHARGE_STATUS, &ret);
 	if (ret & 0x10)
-		return 1;
+		axp_usb_connect = 1;
 	else
-		return 0;
+		axp_usb_connect = 0;
+
+	return axp_usb_connect;
 }
 EXPORT_SYMBOL_GPL(axp_usb_det);
 
+int axp_usb_is_connected(void)
+{
+	return axp_usb_connect;
+}
+EXPORT_SYMBOL_GPL(axp_usb_is_connected);
+
 s32 axp_usb_vbus_output(int high)
 {
-	return 0;
+	s32 ret = -1;
+
+	if (axp_charger == NULL || axp_charger->master == NULL)
+		return ret;
+
+	ret = axp_clr_bits_sync(axp_charger->master, AXP_HOTOVER_CTL, 0x10);
+	if (ret)
+		return ret;
+
+	if (high)
+		return axp_set_bits_sync(axp_charger->master,
+				AXP_IPS_SET, 0x04);
+	else
+		return axp_clr_bits_sync(axp_charger->master,
+				AXP_IPS_SET, 0x04);
 }
 EXPORT_SYMBOL_GPL(axp_usb_vbus_output);
 

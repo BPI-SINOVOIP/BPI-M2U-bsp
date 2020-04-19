@@ -8,7 +8,7 @@
 #include <common.h>
 #include <command.h>
 #include <mmc.h>
-extern int mmc_no;
+
 static int curr_device = -1;
 #ifndef CONFIG_GENERIC_MMC
 int do_mmc (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
@@ -112,7 +112,7 @@ static int do_mmcinfo(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	if (curr_device < 0) {
 		if (get_mmc_num() > 0)
-			curr_device = mmc_no;
+			curr_device = 0;
 		else {
 			puts("No MMC device available\n");
 			return 1;
@@ -635,7 +635,7 @@ static int do_mmcops(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	if (curr_device < 0) {
 		if (get_mmc_num() > 0) {
-			curr_device = mmc_no;
+			curr_device = 0;
 		} else {
 			puts("No MMC device available\n");
 			return CMD_RET_FAILURE;
@@ -685,7 +685,8 @@ U_BOOT_CMD(
 int do_card0_probe(cmd_tbl_t *cmdtp, int flag,
 			 int argc, char * const argv[])
 {
-	int boot_type = uboot_spare_head.boot_data.storage_type ;
+	extern int get_boot_storage_type(void);
+	int boot_type = get_boot_storage_type() ;
 	struct mmc *mmc_boot = NULL;
 	static int card0_init = 0;
 

@@ -5,5 +5,5 @@
 #
 
 obj-y += disp/
-obj-y += hdmi/
-obj-y += tv/
+obj-$(CONFIG_SUNXI_MODULE_HDMI) += hdmi/
+obj-$(CONFIG_SUNXI_MODULE_TV) += tv/

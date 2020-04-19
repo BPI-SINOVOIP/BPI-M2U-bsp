@@ -1443,7 +1443,7 @@ unknown:
 		    && ctrl->wIndex == 0x0) {
 			u8 ret_data = 0x06;
 
-			value = min_t(w_length, (u16) 1);
+			value = min_t(u16, w_length, (u16) 1);
 			memcpy(req->buf, &ret_data, value);
 			break;
 		}

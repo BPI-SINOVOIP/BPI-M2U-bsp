@@ -367,7 +367,8 @@ static int axp22_gpio_probe(struct platform_device *pdev)
 	int ret, i, irq;
 
 	axp22_pin = axp_pinctrl_register(&pdev->dev,
-			axp_dev, &axp22_pinctrl_pins_desc, &axp22_gpio_ops);
+				axp_dev, &axp22_pinctrl_pins_desc,
+				&axp22_gpio_ops, axp_dev->pmu_num);
 	if (IS_ERR_OR_NULL(axp22_pin))
 		goto fail;
 
@@ -436,6 +437,7 @@ static int axp22_gpio_remove(struct platform_device *pdev)
 static const struct of_device_id axp22_gpio_dt_ids[] = {
 	{ .compatible = "axp221s-gpio", },
 	{ .compatible = "axp227-gpio", },
+	{ .compatible = "axp223-gpio", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, axp22_gpio_dt_ids);

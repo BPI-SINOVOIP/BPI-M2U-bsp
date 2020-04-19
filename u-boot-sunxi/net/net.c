@@ -1299,6 +1299,7 @@ NetCksumOk(uchar *ptr, int len)
 unsigned
 NetCksum(uchar *ptr, int len)
 {
+#ifndef CONFIG_HARD_CHECKSUM
 	ulong	xsum;
 	ushort *p = (ushort *)ptr;
 
@@ -1308,6 +1309,9 @@ NetCksum(uchar *ptr, int len)
 	xsum = (xsum & 0xffff) + (xsum >> 16);
 	xsum = (xsum & 0xffff) + (xsum >> 16);
 	return xsum & 0xffff;
+#else
+	return ~0UL;
+#endif
 }
 
 int

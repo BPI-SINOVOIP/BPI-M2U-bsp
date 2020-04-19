@@ -63,6 +63,10 @@
 #define CCMU_AVS_CLK_REG                   (SUNXI_CCM_BASE + 0x740)
 #define CCMU_AVS_BGR_REG                   (SUNXI_CCM_BASE + 0x74C)
 
+/*IOMMU*/
+#define CCMU_IOMMU_BGR_REG                 (SUNXI_CCM_BASE + 0x7bc)
+#define IOMMU_AUTO_GATING_REG              (SUNXI_IOMMU_BASE + 0X40)
+
 /* storage */
 #define CCMU_DRAM_CLK_REG                  (SUNXI_CCM_BASE + 0x800)
 #define CCMU_MBUS_MST_CLK_GATING_REG       (SUNXI_CCM_BASE + 0x804)
@@ -117,6 +121,22 @@
 #define CE_RST_REG_BASE                   CCMU_CE_BGR_REG
 #define CE_RST_BIT                        (16)
 #define CE_DEASSERT                       (1)
+
+
+//--for other file ,use before define 
+#define CCM_AVS_SCLK_CTRL                   (CCMU_AVS_CLK_REG)
+#define CCM_AHB1_GATE0_CTRL			        (CCMU_BUS_CLK_GATING_REG0)
+#define CCM_AHB1_RST_REG0                   (CCMU_BUS_SOFT_RST_REG0)
+
+/* ehci */
+#define CCMU_USB0_CLK				0x0a70
+#define CCMU_USB1_CLK				0x0a74
+#define CCMU_USB_BUS_GATING_RST			0x0a8c
+
+#define USBEHCI0_RST_BIT 20
+#define USBEHCI0_GATIING_BIT 4
+#define USBPHY0_RST_BIT 30
+#define USBPHY0_SCLK_GATING_BIT 29
 
 #endif
 

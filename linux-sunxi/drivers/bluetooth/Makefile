@@ -12,6 +12,9 @@ obj-$(CONFIG_BT_HCIBT3C)	+= bt3c_cs.o
 obj-$(CONFIG_BT_HCIBLUECARD)	+= bluecard_cs.o
 obj-$(CONFIG_BT_HCIBTUART)	+= btuart_cs.o
 
+obj-$(CONFIG_BT_RTKHCIBTUSB)    += rtkbt_usb.o
+rtkbt_usb-y                     := rtk_bt.o rtk_coex.o
+
 obj-$(CONFIG_BT_HCIBTUSB)	+= btusb.o
 obj-$(CONFIG_BT_HCIBTSDIO)	+= btsdio.o
 

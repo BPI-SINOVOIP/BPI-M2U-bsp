@@ -26,6 +26,7 @@ typedef struct
 	u32                   lcd_registered[3];
 	u32                   hdmi_registered;
 	u32					  tv_registered;
+	u32		       edp_registered;
 }disp_dev_t;
 
 extern disp_dev_t gdisp;
@@ -34,8 +35,10 @@ s32 bsp_disp_shadow_protect(u32 disp, bool protect);
 s32 bsp_disp_set_print_level(u32 print_level);
 s32 bsp_disp_get_print_level(void);
 void sync_event_proc(u32 disp, bool timeout);
-s32 disp_device_attached(int disp_mgr, int disp_dev, enum disp_output_type output_type, enum disp_output_type mode);
-s32 disp_device_attached_and_enable(int disp_mgr, int disp_dev, enum disp_output_type output_type, enum disp_output_type mode);
+s32 disp_device_attached(int disp_mgr, int disp_dev,
+					struct disp_device_config *config);
+s32 disp_device_attached_and_enable(int disp_mgr, int disp_dev,
+				    struct disp_device_config *config);
 s32 disp_device_detach(int disp_mgr, int disp_dev, enum disp_output_type output_type);
 void LCD_OPEN_FUNC(u32 screen_id, LCD_FUNC func, u32 delay);
 void LCD_CLOSE_FUNC(u32 screen_id, LCD_FUNC func, u32 delay);
@@ -65,6 +68,7 @@ s32 bsp_disp_get_tv_registered(void);
 
 s32 bsp_disp_get_output_type(u32 disp);
 s32 bsp_disp_device_switch(int disp, enum disp_output_type output_type, enum disp_output_type mode);
+s32 bsp_disp_device_set_config(int disp, struct disp_device_config *config);
 s32 bsp_disp_set_hdmi_func(struct disp_device_func * func);
 s32 bsp_disp_hdmi_check_support_mode(u32 disp, enum disp_output_type mode);
 s32 bsp_disp_hdmi_set_detect(bool hpd);
@@ -96,6 +100,12 @@ s32 bsp_disp_tv_resume(void);
 
 int bsp_disp_get_fb_info(unsigned int disp, struct disp_layer_info *info);
 int bsp_disp_get_display_size(u32 disp, unsigned int *width, unsigned int *height);
+s32 bsp_disp_lcd_dsi_close(u32 disp);
+s32 bsp_disp_lcd_dsi_open(u32 disp);
+s32 bsp_disp_lcd_dsi_clk_enable(u32 disp, u32 en);
+s32 bsp_disp_lcd_dsi_dcs_wr(u32 disp, u8 command, u8 *para, u32 para_num);
+s32 bsp_disp_lcd_dsi_gen_wr(u32 disp, u8 command, u8 *para, u32 para_num);
+s32 bsp_disp_set_edp_func(struct disp_tv_func *func);
 
 #ifdef CONFIG_DEVFREQ_DRAM_FREQ_IN_VSYNC
 /* dramfreq interface */

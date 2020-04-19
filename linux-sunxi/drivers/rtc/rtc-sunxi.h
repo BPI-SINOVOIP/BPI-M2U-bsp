@@ -32,8 +32,11 @@
 	|| (defined CONFIG_ARCH_SUN50IW2) \
 	|| (defined CONFIG_ARCH_SUN50IW3) \
 	|| (defined CONFIG_ARCH_SUN50IW6) \
+	|| (defined CONFIG_ARCH_SUN8IW5P1) \
 	|| (defined CONFIG_ARCH_SUN8IW10P1) \
-	|| (defined CONFIG_ARCH_SUN8IW11P1)
+	|| (defined CONFIG_ARCH_SUN8IW11P1)\
+	|| (defined CONFIG_ARCH_SUN8IW17P1) \
+	|| (defined CONFIG_ARCH_SUN8IW8)
 #define SUNXI_RTC_YMD				0x0010
 
 #define SUNXI_RTC_HMS				0x0014
@@ -85,6 +88,22 @@
 #define SUNXI_ALRM_IRQ_STA_CNT_IRQ_PEND		BIT(0)
 
 #endif
+
+/* debug */
+#define SUNXI_DEBUG_MODE_FLAG           (0x59)
+/* efex */
+#define SUNXI_EFEX_CMD_FLAG             (0x5A)
+/* boot-resignature */
+#define SUNXI_BOOT_RESIGNATURE_FLAG     (0x5B)
+/* recovery or boot-recovery */
+#define SUNXI_BOOT_RECOVERY_FLAG        (0x5C)
+/* sysrecovery */
+#define SUNXI_SYS_RECOVERY_FLAG         (0x5D)
+/* usb-recovery*/
+#define SUNXI_USB_RECOVERY_FLAG         (0x5E)
+/* bootloader */
+#define SUNXI_FASTBOOT_FLAG             (0x5F)
+
 
 #define SUNXI_MASK_DH				0x0000001f
 #define SUNXI_MASK_SM				0x0000003f

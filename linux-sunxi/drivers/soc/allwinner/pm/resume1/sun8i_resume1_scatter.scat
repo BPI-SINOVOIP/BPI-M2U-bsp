@@ -1,0 +1,36 @@
+/*
+ * ************************************************************************
+ *                                  eGON
+ *                  the Embedded GO-ON Bootloader System
+ *      Copyright(C), 2006-2008, SoftWinners Microelectronic Co., Ltd.
+ *                           All Rights Reserved
+ *
+ * Author : Gary.Wang
+ * Version : 1.1.0
+ * Date : 2007.11.6
+ * Description : scatter file of resume0
+ * History :
+ *  <Author>        <time>       <version>      <description>
+ * Gary.Wang       2007.11.6       1.1.0        build the file
+ *
+ * *************************************************************************
+ */
+
+OUTPUT_ARCH(arm)
+
+SECTIONS
+{
+	__resume1_start = . ;
+	.text  0x00020000:
+	{	drivers/soc/allwinner/pm/resume1/resume1_head.o( .rodata )
+		drivers/soc/allwinner/pm/resume1/resume1_entry.o( .text )
+		*(.text)
+	}
+	.rodata ALIGN(4) : { *(.rodata) }
+	.data  ALIGN(4)  : { *(.data) }
+
+	__bss_start = . ;
+	.bss ALIGN(4) : { *(.sbss) *(.scommon) *(.bss) *(COMMON) }
+	__bss_end = .;
+	__resume1_end = . ;
+}

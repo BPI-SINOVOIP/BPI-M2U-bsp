@@ -289,7 +289,11 @@ int sunxi_bmp_display(char *name)
 
 	argv[0] = "fatload";
 	argv[1] = "sunxi_flash";
+#ifdef CONFIG_GPT_SUPPORT
+	argv[2] = "1:0";
+#else
 	argv[2] = "0:0";
+#endif
 	argv[3] = bmp_head;
 	argv[4] = bmp_name;
 	argv[5] = NULL;
@@ -309,47 +313,45 @@ int sunxi_bmp_display(char *name)
 
 int sunxi_bmp_display(char *name)
 {
-
-        sunxi_bmp_store_t bmp_info;
-	char  bmp_name[32];
-	char  bmp_addr[32] = {0};
-	char*  bmp_buff = NULL;
+	sunxi_bmp_store_t bmp_info;
+	char *argv[6];
+	char  bmp_head[32];
+	char  bmp_name[32] = {0};
+	ulong bmp_buff = CONFIG_SYS_SDRAM_BASE;
 	int  ret = -1;
-	//const size_t bmp_buff_len = 10<<20; //10M
-	//size_t file_size = 0;
-	char * bmp_argv[6] = { "fatload", "sunxi_flash", "0:0", "00000000", bmp_name, NULL };
 
-	// free() function  will  take a long time,so not use malloc memory
-	bmp_buff = (char*)CONFIG_SYS_SDRAM_BASE; 
-	if(bmp_buff == NULL)
+	/* set bmp decode addr is CONFIG_SYS_SDRAM_BASE */
+	sprintf(bmp_head, "%lx", (ulong)bmp_buff);
+	strncpy(bmp_name, name, sizeof(bmp_name));
+
+	argv[0] = "fatload";
+	argv[1] = "sunxi_flash";
+#ifdef CONFIG_GPT_SUPPORT
+	argv[2] = "1:0";
+#else
+	argv[2] = "0:0";
+#endif
+	argv[3] = bmp_head;
+	argv[4] = bmp_name;
+	argv[5] = NULL;
+
+	if (do_fat_fsload(0, 0, 5, argv))
 	{
-		printf("sunxi bmp: alloc buffer for %s fail\n", name);
+		pr_error("unable to open logo file %s\n", argv[4]);
 		return -1;
 	}
-	//set bmp decode addr is CONFIG_SYS_SDRAM_BASE
-	sprintf(bmp_addr,"%lx", (ulong)bmp_buff);
-	bmp_argv[3] = bmp_addr;
-
-	memset(bmp_name, 0, 32);
-	strcpy(bmp_name, name);
-	if(do_fat_fsload(0, 0, 5, bmp_argv))
-	{
-		printf("sunxi bmp info error : unable to open logo file %s\n", bmp_argv[4]);
-		return -1;
-	}
-	//file_size = simple_strtoul(getenv("filesize"), NULL, 16);
 
 #if defined(CONFIG_SUNXI_LOGBUFFER)
 	bmp_info.buffer = (void *)(CONFIG_SYS_SDRAM_BASE + gd->ram_size - SUNXI_DISPLAY_FRAME_BUFFER_SIZE);
 #else
 	bmp_info.buffer = (void *)(SUNXI_DISPLAY_FRAME_BUFFER_ADDR);
 #endif
-	printf("bmp file buffer: 0x%lx, bmp_info.buffer: %lx\n",(ulong)bmp_buff,(ulong)bmp_info.buffer);
-	if(!sunxi_bmp_decode((ulong)bmp_buff, &bmp_info))
-	{
-		debug("decode bmp ok\n");
-		ret = sunxi_bmp_show(bmp_info);
-	}
+	pr_msg("bmp file buffer: 0x%lx, bmp_info.buffer: %lx\n",
+		bmp_buff, (ulong)bmp_info.buffer);
+	if (sunxi_bmp_decode(bmp_buff, &bmp_info))
+		return -1;
+
+	ret = sunxi_bmp_show(bmp_info);
 	return ret;
 
 }
@@ -364,7 +366,7 @@ int sunxi_bmp_display_mem(unsigned char *source, sunxi_bmp_store_t *bmp_info)
 #else
 	bmp_info->buffer = (void *)(SUNXI_DISPLAY_FRAME_BUFFER_ADDR);
 #endif
-	printf("bmp file buffer: 0x%lx, bmp_info.buffer: %lx\n",(ulong)source,(ulong)bmp_info->buffer);
+	pr_notice("bmp file buffer: 0x%lx, bmp_info.buffer: %lx\n",(ulong)source,(ulong)bmp_info->buffer);
 	ret = sunxi_bmp_decode((ulong)source, bmp_info);
 	if (!ret)
 		debug("decode bmp ok\n");

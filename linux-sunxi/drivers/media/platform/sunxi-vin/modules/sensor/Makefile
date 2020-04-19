@@ -44,3 +44,6 @@ obj-m			+= ov5640.o
 #obj-m			+= ov2710_mipi.o
 obj-m			+= ov2686.o
 obj-m			+= ov2710_aw6131.o
+obj-m			+= imx291_dvp.o
+obj-m			+= ar0238.o
+obj-m			+= tw2866.o

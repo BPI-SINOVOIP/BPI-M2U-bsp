@@ -31,6 +31,7 @@
 #define RC5_BIT_END		(1 * RC5_UNIT)
 #define RC5X_SPACE		(4 * RC5_UNIT)
 
+static u8 repeat_num;
 enum rc5_state {
 	STATE_INACTIVE,
 	STATE_BIT_START,
@@ -39,6 +40,24 @@ enum rc5_state {
 	STATE_FINISHED,
 };
 
+static int ir_rc5_keydown(struct rc_dev *dev, int scancode, u8 toggle)
+{
+	bool new_eventtoggle = dev->last_toggle != toggle;
+
+	if (!new_eventtoggle)
+		repeat_num++;
+
+	if (new_eventtoggle && scancode != 0) {
+		dev->last_toggle = toggle;
+		repeat_num = 0;
+	}
+	if (1 == repeat_num)
+		return 0;
+	else
+		rc_keydown(dev, scancode, toggle);
+
+	return 1;
+}
 /**
  * ir_rc5_decode() - Decode one RC-5 pulse or space
  * @dev:	the struct rc_dev descriptor of the device
@@ -158,8 +177,7 @@ again:
 			IR_dprintk(1, "RC5 scancode 0x%04x (toggle: %u)\n",
 				   scancode, toggle);
 		}
-
-		rc_keydown(dev, scancode, toggle);
+		ir_rc5_keydown(dev, scancode, toggle);
 		data->state = STATE_INACTIVE;
 		return 0;
 	}

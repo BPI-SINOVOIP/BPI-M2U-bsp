@@ -15,10 +15,16 @@
 #include "./lowlevel_sun8iw10/de_feat.h"
 #elif defined(CONFIG_ARCH_SUN8IW11)
 #include "./lowlevel_v2x/de_feat.h"
+#elif defined(CONFIG_ARCH_SUN8IW17)
+#include "./lowlevel_v2x/de_feat.h"
 #elif defined(CONFIG_ARCH_SUN50IW1)
 #include "./lowlevel_sun50iw1/de_feat.h"
 #elif defined(CONFIG_ARCH_SUN50IW2)
 #include "./lowlevel_v2x/de_feat.h"
+#elif defined(CONFIG_ARCH_SUN50IW3)
+#include "./lowlevel_v3x/de_feat.h"
+#elif defined(CONFIG_ARCH_SUN50IW6)
+#include "./lowlevel_v3x/de_feat.h"
 #else
 #error "undefined platform!!!"
 #endif
@@ -34,6 +40,10 @@ struct disp_features {
 	const int *supported_output_types;
 };
 
+struct disp_feat_init {
+	unsigned int chn_cfg_mode;
+};
+
 int bsp_disp_feat_get_num_screens(void);
 int bsp_disp_feat_get_num_devices(void);
 int bsp_disp_feat_get_num_channels(unsigned int disp);
@@ -42,7 +52,7 @@ int bsp_disp_feat_get_num_layers_by_chn(unsigned int disp, unsigned int chn);
 int bsp_disp_feat_is_supported_output_types(unsigned int screen_id, unsigned int output_type);
 int bsp_disp_feat_is_support_capture(unsigned int disp);
 int disp_feat_is_support_smbl(unsigned int disp);
-int disp_init_feat(void);
+int disp_init_feat(struct disp_feat_init *feat_init);
 
 #endif
 

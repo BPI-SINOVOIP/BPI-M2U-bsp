@@ -64,7 +64,7 @@ int auto_update_check(void)
 	int ret;
 	int key;
 
-	keyvalue = gd->key_pressd_value;
+	keyvalue = uboot_spare_head.boot_ext[0].data[2];
 	printf("key %d\n", keyvalue);
 
 	ret = script_parser_fetch("auto_update_key", "key_val", &key, 1);
@@ -798,7 +798,7 @@ int sunxi_card_update_main(void)
 
 	tick_printf("sunxi update begin\n");
 
-	production_media = uboot_spare_head.boot_data.storage_type;
+	production_media = get_boot_storage_type();
 
 	imgname = malloc(strlen(IMG_NAME)+1);
 	if (imgname == NULL)

@@ -28,6 +28,9 @@ typedef struct __MEM_TMR_REG {
 	volatile __u32 Tmr2IntVal;
 	volatile __u32 Tmr2CntVal;
 	volatile __u32 reserved3;
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	volatile __u32 reserved6[16];
+#else
 	/*  offset:0x40 */
 	volatile __u32 Tmr3Ctl;
 	volatile __u32 Tmr3IntVal;
@@ -42,6 +45,7 @@ typedef struct __MEM_TMR_REG {
 	volatile __u32 Tmr5IntVal;
 	volatile __u32 Tmr5CntVal;
 	volatile __u32 reserved6[5];
+#endif
 	/*  offset:0x80 */
 	volatile __u32 AvsCtl;
 	volatile __u32 Avs0Cnt;

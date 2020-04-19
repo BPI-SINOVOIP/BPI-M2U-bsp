@@ -7,9 +7,7 @@
 
 #CROSS_COMPILE :=~/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/arm-linux-gnueabihf-
 #CROSS_COMPILE := $(src)/../armv8_toolchain/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/arm-linux-gnueabihf-
-#CROSS_COMPILE := $(src)/../gcc-linaro/bin/arm-linux-gnueabi-
-#BPI
-CROSS_COMPILE := arm-linux-gnueabi-
+CROSS_COMPILE := $(TOPDIR)/../lichee/brandy/tool_chain/gcc-linaro/bin/arm-linux-gnueabi-
 # If armv7-a is not supported by GCC fall-back to armv5, which is
 # supported by more tool-chains
 PF_CPPFLAGS_ARMV7 := $(call cc-option, -march=armv7-a, -march=armv5)

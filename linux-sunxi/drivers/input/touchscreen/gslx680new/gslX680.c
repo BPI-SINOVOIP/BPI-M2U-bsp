@@ -173,8 +173,6 @@ struct key_data {
 	u16 y_max;
 };
 
-#define KEY_HOME	172
-
 const u16 key_array[]={
       KEY_BACK,
       KEY_HOME,
@@ -1499,12 +1497,12 @@ static void glsX680_resume_events (struct work_struct *work)
 #ifdef CONFIG_PM
 static int gsl_ts_suspend(struct device *dev)
 {
-	dprintk(DEBUG_SUSPEND, "@@@@@@@@gsl_ts_suspend start @@@@@@@@@@@@@\n");
 #ifndef GSL_TIMER
 	int ret;
 #endif
         struct gsl_ts *ts = dev_get_drvdata(dev);
         
+	dprintk(DEBUG_SUSPEND, "@@@@@@@@gsl_ts_suspend start @@@@@@@@@@@@@\n");
         cancel_work_sync(&glsX680_resume_work);
         flush_workqueue(gslX680_resume_wq);
 

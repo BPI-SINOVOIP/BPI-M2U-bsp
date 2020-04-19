@@ -39,12 +39,20 @@ static int sunxi_sndspdif_hw_params(struct snd_pcm_substream *substream,
 	case	48000:
 	case	96000:
 	case	192000:
+#ifdef CONFIG_AHUB_FREQ_REQ
+		freq = 98304000;
+#else
 		freq = 24576000;
+#endif
 		break;
 	case	22050:
 	case	44100:
 	case	176400:
+#ifdef CONFIG_AHUB_FREQ_REQ
+		freq = 90316800;
+#else
 		freq = 22579200;
+#endif
 		break;
 	default:
 		pr_debug("[sunxi spdif]Invalid rate\n");

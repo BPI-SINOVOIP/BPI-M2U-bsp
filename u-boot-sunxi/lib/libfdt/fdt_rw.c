@@ -449,3 +449,81 @@ int fdt_pack(void *fdt)
 
 	return 0;
 }
+
+#ifdef CONFIG_SUNXI_MULITCORE_BOOT
+
+#include "common.h"
+struct sunxi_fdt_w_request {
+	char head_name[32];
+	char node_name[32];
+	uint32_t  val;
+	uint32_t  node_offset;
+};
+
+struct sunxi_fdt_w_request  fdt_w_group[16];
+
+int sunxi_fdt_getprop_store(void *fdt, const char *path, const char *name,
+				  uint32_t val)
+{
+	struct sunxi_fdt_w_request  *fdt_w_pt;
+	int  i;
+
+	for(i=0;i<16;i++) {
+		fdt_w_pt = fdt_w_group + i;
+		if(!fdt_w_pt->head_name[0]) {
+			strcpy(fdt_w_pt->head_name, path);
+			strcpy(fdt_w_pt->node_name, name);
+			fdt_w_pt->val = val;
+
+			break;
+		}
+	}
+
+	return 0;
+}
+
+int sunxi_fdt_reflush_all(void)
+{
+	struct sunxi_fdt_w_request  *fdt_w_pt, *fdt_w_pt_pre;
+	int  node, ret;
+	int  i, j;
+
+	for(i=0;i<16;i++) {
+		fdt_w_pt = fdt_w_group + i;
+
+		if(fdt_w_pt->head_name[0]) {
+			node = 0;
+			for (j=0;j<i;j++) {
+				fdt_w_pt_pre = fdt_w_group + j;
+				if (!strcmp(fdt_w_pt_pre->head_name, fdt_w_pt->head_name)) {
+					node = fdt_w_pt_pre->node_offset;
+					break;
+				}
+			}
+			if (!node) {
+				node = fdt_path_offset(working_fdt, fdt_w_pt->head_name);
+				if (node < 0) {
+					printf("%s:disp_fdt_nodeoffset %s fail\n", __func__,
+												fdt_w_pt->head_name);
+					return -1;
+				}
+				fdt_w_pt->node_offset = node;
+			}
+
+			ret = fdt_setprop_u32(working_fdt, node, fdt_w_pt->node_name, fdt_w_pt->val);
+			if ( ret < 0) {
+				printf("fdt_setprop_u32 %s.%s(0x%x) fail.err code:%s\n",
+						fdt_w_pt->head_name, fdt_w_pt->node_name, fdt_w_pt->val,fdt_strerror(ret));
+				return -1;
+			}
+
+		} else {
+			break;
+		}
+	}
+
+	return 0;
+}
+
+#endif
+

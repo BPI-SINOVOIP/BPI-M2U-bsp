@@ -16,7 +16,6 @@
  */
 #include <linux/kernel.h>
 #include "isp_platform_drv.h"
-#include "sun8iw6p1/sun8iw6p1_isp_reg_cfg.h"
 #include "sun8iw12p1/sun8iw12p1_isp_reg_cfg.h"
 struct isp_platform_drv *isp_platform_curr;
 
@@ -30,17 +29,11 @@ int isp_platform_register(struct isp_platform_drv *isp_drv)
 
 int isp_platform_init(unsigned int platform_id)
 {
-	printk("[ISP] isp platform_id = %d!\n", platform_id);
 	switch (platform_id) {
-	case ISP_PLATFORM_SUN8IW6P1:
-		sun8iw6p1_isp_platform_register();
-		break;
-
 	case ISP_PLATFORM_SUN8IW12P1:
 		sun8iw12p1_isp_platform_register();
 		break;
 	default:
-		printk("ISP platform init ERR! No that Platform ID!\n");
 		sun8iw12p1_isp_platform_register();
 		break;
 	}

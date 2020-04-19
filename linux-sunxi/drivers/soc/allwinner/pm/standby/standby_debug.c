@@ -38,8 +38,10 @@ void mem_status_exit(void)
 void save_mem_status(volatile __u32 val)
 {
 	*(volatile __u32 *)(STANDBY_STATUS_REG + 0x0c) = val;
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	asm volatile ("dsb");
 	asm volatile ("isb");
+#endif
 	return;
 }
 
@@ -75,15 +77,19 @@ void save_cpux_mem_status_nommu(volatile __u32 val)
 void save_super_flags(volatile __u32 val)
 {
 	*(volatile __u32 *)(STANDBY_SUPER_FLAG_REG) = val;
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	asm volatile ("dsb");
 	asm volatile ("isb");
+#endif
 	return;
 }
 
 void save_super_addr(volatile __u32 val)
 {
 	*(volatile __u32 *)(STANDBY_SUPER_ADDR_REG) = val;
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	asm volatile ("dsb");
 	asm volatile ("isb");
+#endif
 	return;
 }

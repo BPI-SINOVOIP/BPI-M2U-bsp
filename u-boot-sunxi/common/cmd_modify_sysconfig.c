@@ -396,7 +396,7 @@ int do_savecfg(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
         //download uboot
         gd->force_download_uboot = 0;
-        sunxi_sprite_download_uboot(tmp_target_buffer,uboot_spare_head.boot_data.storage_type,1);
+        sunxi_sprite_download_uboot(tmp_target_buffer,get_boot_storage_type(),1);
         free(tmp_target_buffer);
         tmp_target_buffer = NULL;
     }

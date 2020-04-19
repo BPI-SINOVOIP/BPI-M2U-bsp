@@ -191,6 +191,32 @@ static int sunxi_wdt_start(struct watchdog_device *wdt_dev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int sunxi_wdt_suspend(struct platform_device *pdev, pm_message_t state)
+
+{
+	struct sunxi_wdt_dev *sunxi_wdt = platform_get_drvdata(pdev);
+
+	if (watchdog_active(&sunxi_wdt->wdt_dev))
+		sunxi_wdt_stop(&sunxi_wdt->wdt_dev);
+
+	return 0;
+}
+
+static int sunxi_wdt_resume(struct platform_device *pdev)
+{
+	struct sunxi_wdt_dev *sunxi_wdt = platform_get_drvdata(pdev);
+
+	if (watchdog_active(&sunxi_wdt->wdt_dev)) {
+		sunxi_wdt_set_timeout(&sunxi_wdt->wdt_dev,
+				      sunxi_wdt->wdt_dev.timeout);
+		sunxi_wdt_start(&sunxi_wdt->wdt_dev);
+	}
+
+	return 0;
+}
+#endif /* CONFIG_PM */
+
 static const struct watchdog_info sunxi_wdt_info = {
 	.identity	= DRV_NAME,
 	.options	= WDIOF_SETTIMEOUT |
@@ -309,6 +335,10 @@ static struct platform_driver sunxi_wdt_driver = {
 	.probe		= sunxi_wdt_probe,
 	.remove		= sunxi_wdt_remove,
 	.shutdown	= sunxi_wdt_shutdown,
+#ifdef CONFIG_PM
+	.suspend        = sunxi_wdt_suspend,
+	.resume         = sunxi_wdt_resume,
+#endif
 	.driver		= {
 		.name		= DRV_NAME,
 		.of_match_table	= sunxi_wdt_dt_ids,

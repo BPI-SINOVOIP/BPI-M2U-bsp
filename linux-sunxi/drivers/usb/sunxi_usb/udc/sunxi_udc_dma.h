@@ -61,6 +61,7 @@ void sunxi_udc_disable_dma_channel_irq(struct sunxi_udc_ep *ep);
 void sunxi_dma_set_config(dm_hdl_t dma_hdl, struct dma_config_t *pcfg);
 dm_hdl_t sunxi_udc_dma_request(void);
 int sunxi_udc_dma_release(dm_hdl_t dma_hdl);
+int sunxi_udc_dma_chan_disable(dm_hdl_t dma_hdl);
 void sunxi_udc_dma_set_config(struct sunxi_udc_ep *ep, struct sunxi_udc_request *req, __u32 buff_addr, __u32 len);
 void sunxi_udc_dma_start(struct sunxi_udc_ep *ep, void __iomem  *fifo, __u32 buffer, __u32 len);
 void sunxi_udc_dma_stop(struct sunxi_udc_ep *ep);

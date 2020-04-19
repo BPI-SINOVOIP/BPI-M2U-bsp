@@ -52,7 +52,11 @@ MODULE_LICENSE("GPL");
 /*
  * Our nominal (default) frame rate.
  */
+#ifdef CONFIG_ARCH_SUN3IW1P1
+#define SENSOR_FRAME_RATE 30
+#else
 #define SENSOR_FRAME_RATE 10
+#endif
 
 /*
  * The gc0308 sits on i2c with ID 0x42

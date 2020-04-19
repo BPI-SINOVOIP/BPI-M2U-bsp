@@ -34,9 +34,10 @@ extern int NAND_PhysicUnLock(void);
 extern int nand_get_param(boot_nand_para_t *nand_param);
 extern int nand_get_param_for_uboottail(boot_nand_para_t *nand_param);
 
-extern int nand_read_nboot_data(void *buf, unsigned int length);
-extern int nand_write_nboot_data(void *buf, unsigned int length);
-extern int nand_write_uboot_data(void *buf, unsigned int length);
+extern int nand_read_nboot_data(unsigned char *buf, unsigned int len);
+extern int nand_read_uboot_data(unsigned char *buf, unsigned int len);
+extern int nand_write_nboot_data(unsigned char *buf, unsigned int len);
+extern int nand_write_uboot_data(unsigned char *buf, unsigned int len);
 extern int nand_dragonborad_test_one(unsigned char *buf, unsigned char *oob,
 				     unsigned int blk_num);
 extern int NAND_IS_Secure_sys(void);
@@ -237,6 +238,93 @@ int get_nand_para_for_boot1(void *boot_buf)
 
 	boot1_buf = (boot1_file_head_t *) boot_buf;
 	nand_para = (boot_nand_para_t *) boot1_buf->prvt_head.nand_spare_data;
+
+	return 0;
+}
+
+/*****************************************************************************
+*Name         :
+*Description  :
+*Parameter    :
+*Return       : 0:ok  -1:fail
+*Note         :
+*****************************************************************************/
+int NAND_ReadBoot0(unsigned int length, void *buf)
+{
+	void *buffer;
+	__u32 ret;
+
+	NAND_PhysicLock();
+
+	buffer = vmalloc(length);
+	if (buffer == NULL) {
+		NAND_Print("read boot0 malloc failed!\n");
+		NAND_PhysicUnLock();
+		return -1;
+	}
+
+	if (nand_read_nboot_data(buffer, length) != 0) {
+		vfree(buffer);
+		NAND_Print("read boot0 failed\n");
+		NAND_PhysicUnLock();
+		return -1;
+	}
+
+	ret = copy_to_user(buf, buffer, length);
+	if (ret != 0) {
+		vfree(buffer);
+		NAND_Print("copy_to_user failed\n");
+		NAND_PhysicUnLock();
+		return -1;
+	}
+
+	vfree(buffer);
+	NAND_Print("read boot0 success\n");
+	NAND_PhysicUnLock();
+
+	return 0;
+}
+
+
+/*****************************************************************************
+*Name         :
+*Description  :
+*Parameter    :
+*Return       : 0:ok  -1:fail
+*Note         :
+*****************************************************************************/
+int NAND_ReadBoot1(unsigned int length, void *buf)
+{
+	void *buffer;
+	__u32 ret;
+
+	NAND_PhysicLock();
+
+	buffer = vmalloc(length);
+	if (buffer == NULL) {
+		NAND_Print("read boot1 malloc failed!\n\n");
+		NAND_PhysicUnLock();
+		return -1;
+	}
+
+	if (nand_read_uboot_data(buffer, length) != 0) {
+		vfree(buffer);
+		NAND_Print("read boot1 failed\n");
+		NAND_PhysicUnLock();
+		return -1;
+	}
+
+	ret = copy_to_user(buf, buffer, length);
+	if (ret != 0) {
+		vfree(buffer);
+		NAND_Print("copy_to_user failed\n");
+		NAND_PhysicUnLock();
+		return -1;
+	}
+
+	vfree(buffer);
+	NAND_Print("read boot1 success\n");
+	NAND_PhysicUnLock();
 
 	return 0;
 }

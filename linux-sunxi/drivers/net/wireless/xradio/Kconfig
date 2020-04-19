@@ -1,0 +1,16 @@
+menuconfig XR_WLAN
+	tristate "XRadio WLAN support"
+	default m
+	select CFG80211
+	select AVERAGE
+	select CRYPTO
+	select CRYPTO_ARC4
+	---help---
+	  To compile this code as a module, choose M here.
+
+if XR_WLAN
+
+source "drivers/net/wireless/xradio/umac/Kconfig"
+source "drivers/net/wireless/xradio/wlan/Kconfig"
+
+endif # XR_WLAN

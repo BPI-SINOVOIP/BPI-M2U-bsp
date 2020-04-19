@@ -66,9 +66,10 @@ scene_extended_standby_t extended_standby[] = {
 					BITMAP(VCC_PLL_BIT) |
 					BITMAP(VCC_PL_BIT) |
 					BITMAP(VDD_SYS_BIT) |
+					BITMAP(VDD_CPUA_BIT) |
 					BITMAP(VCC_IO_BIT),
 		/* mean: donot need care about the voltage. */
-		.soc_pwr_dep.soc_pwr_dm_state.volt[0]      = 0x0,
+		.soc_pwr_dep.soc_pwr_dm_state.volt[0] = 0x0,
 		/* mean all osc is off. +losc, +hosc */
 		.soc_pwr_dep.cpux_clk_state.osc_en
 				= BITMAP(OSC_LOSC_BIT) |
@@ -78,21 +79,10 @@ scene_extended_standby_t extended_standby[] = {
 		/* mean pll5 is shutdowned & open by dram driver.*/
 		.soc_pwr_dep.cpux_clk_state.init_pll_dis
 				= BITMAP(PM_PLL_DRAM) |
-					BITMAP(PM_PLL_PERIPH),
+				BITMAP(PM_PLL_PERIPH),
 		/* hsic pll can be disabled,
 		 * cpus can change cci400 clk from hsic_pll.*/
 		.soc_pwr_dep.cpux_clk_state.exit_pll_en    = 0x0,
-		/* PLL_PERIPH freq = 24*1*1/2= 12M */
-		.soc_pwr_dep.cpux_clk_state.pll_change
-				= BITMAP(PM_PLL_PERIPH),
-		.soc_pwr_dep.cpux_clk_state.pll_factor[PM_PLL_PERIPH] = {
-			/* N=1 */
-		    .factor1 = 0,
-			/* Div1 = 0 + 1 = 1 */
-		    .factor2 = 0,
-			/* Div2 = 0 + 1 = 1, only used in plltest debug */
-			.factor3 = 0,
-			},
 		.soc_pwr_dep.cpux_clk_state.bus_change
 			= BITMAP(BUS_AHB1) |
 				BITMAP(BUS_AHB2),

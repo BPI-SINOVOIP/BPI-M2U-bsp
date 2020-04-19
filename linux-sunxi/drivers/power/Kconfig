@@ -39,8 +39,8 @@ config AW_AXP15
 
 config AW_AXP22
 	bool "AXP22x driver"
-	depends on ARCH_SUN8IW10 || ARCH_SUN8IW11
-	depends on AXP_TWI_USED
+	depends on ARCH_SUN8IW10 || ARCH_SUN8IW11 || ARCH_SUN8IW5
+	depends on AXP_TWI_USED || SUNXI_ARISC
 	help
 	  AXP22x driver
 
@@ -67,10 +67,24 @@ config AW_AXP20
 
 config AW_AXP80
 	bool "AXP80x driver"
-	depends on ARCH_SUN50IW2
+	depends on ARCH_SUN50IW2 || ARCH_SUN50IW6
 	depends on SUNXI_ARISC
 	help
 	  AXP80x driver
+
+config AW_AXP803
+	bool "AXP803 driver"
+	depends on ARCH_SUN8IW17 || ARCH_SUN50IW3
+	depends on SUNXI_ARISC
+	help
+	  AXP803 driver
+
+config AW_PMU1736
+	bool "PMU1736 driver"
+	depends on ARCH_SUN50IW3 || ARCH_SUN8IW17
+	depends on SUNXI_ARISC
+	help
+	  PMU1736 driver
 
 config AW_AXPDUMMY
 	bool "AXPDUMMY driver"

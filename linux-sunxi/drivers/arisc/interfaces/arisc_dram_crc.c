@@ -22,6 +22,39 @@
 
 #include "../arisc_i.h"
 
+#if defined CONFIG_SUNXI_ARISC_COM_DIRECTLY
+/**
+ * set arisc debug dram crc paras.
+ * @dram_crc_en: arisc debug dram crc enable or disable;
+ * @dram_crc_srcaddr: source address of dram crc area
+ * @dram_crc_len: lenght of dram crc area
+ *
+ * return: 0 - set arisc debug dram crc paras successed, !0 - set arisc debug dram crc paras failed;
+ */
+int arisc_set_dram_crc_paras(unsigned int dram_crc_en, unsigned int dram_crc_srcaddr, unsigned int dram_crc_len)
+{
+	struct arisc_message *pmessage;
+
+	/* allocate a message frame */
+	pmessage = arisc_message_allocate(0);
+	if (pmessage == NULL) {
+		ARISC_ERR("allocate message for seting dram crc paras request failed\n");
+		return -ENOMEM;
+	}
+
+	/* initialize message */
+	pmessage->type     = ARISC_SET_DEBUG_DRAM_CRC_PARAS;
+	pmessage->paras[0] = dram_crc_en;
+	pmessage->paras[1] = dram_crc_srcaddr;
+	pmessage->paras[2] = dram_crc_len;
+	pmessage->state    = ARISC_MESSAGE_INITIALIZED;
+
+	/* send set debug level request to arisc */
+	arisc_hwmsgbox_send_message(pmessage, ARISC_SEND_MSG_TIMEOUT);
+
+	return 0;
+}
+#else
 /**
  * set arisc debug dram crc paras.
  * @dram_crc_en: arisc debug dram crc enable or disable;
@@ -38,4 +71,4 @@ int arisc_set_dram_crc_paras(unsigned int dram_crc_en, unsigned int dram_crc_src
 
 	return result;
 }
-
+#endif

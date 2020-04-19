@@ -72,20 +72,20 @@ void dummy_reg_init(void)
 }
 #endif // of CONFIG_SUNXI_CLK_DUMMY_DEBUG
 
-/*                                          ns  nw  ks  kw  ms  mw  ps  pw  d1s d1w d2s d2w {frac   out mode}   en-s    sdmss   sdmsw   sdmpat         sdmval*/
-SUNXI_CLK_FACTORS(          pll_cpu,        8,  5,  4,  2,  0,  2,  16, 2,  0,  0,  0,  0,    0,    0,  0,      31,     24,     0,      PLL_CPUPAT,    0xd1303333);
-SUNXI_CLK_FACTORS(          pll_audio,      8,  7,  0,  0,  0,  5,  16, 4,  0,  0,  0,  0,    0,    0,  0,      31,     0,      0,      0,             0         );
-SUNXI_CLK_FACTORS(          pll_video0,     8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_VIDEO0PAT, 0xd1303333);
-SUNXI_CLK_FACTORS(          pll_ve,         8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_VEPAT,     0xd1303333);
-SUNXI_CLK_FACTORS_UPDATE(   pll_ddr0,       8,  5,  4,  2,  0,  2,  0,  0,  0,  0,  0,  0,    0,    0,  0,      31,     24,     0,      PLL_DRR0PAT,   0xd1303333 , 20);
-SUNXI_CLK_FACTORS(          pll_periph0,    8,  5,  4,  2,  0,  0,  0,  0,  0,  0,  0,  0,    0,    0,  0,      31,     0,      0,      0,             0);
-SUNXI_CLK_FACTORS(          pll_periph1,    8,  5,  4,  2,  0,  0,  0,  0,  0,  0,  0,  0,    0,    0,  0,      31,     20,     0,      PLL_PERI1PAT,  0xd1303333);
-SUNXI_CLK_FACTORS(          pll_video1,     8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_VEDEO1PAT, 0xd1303333);
-SUNXI_CLK_FACTORS(          pll_gpu,        8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_GPUPAT,    0xd1303333);
-SUNXI_CLK_FACTORS(          pll_mipi,       8,  4,  4,  2,  0,  4,  0,  0,  0,  0,  0,  0,    0,    0,  0,      31,     20,     0,      PLL_MIPIPAT,   0xd1303333);
-SUNXI_CLK_FACTORS(          pll_hsic,       8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_HSICPAT ,  0xd1303333);
-SUNXI_CLK_FACTORS(          pll_de,         8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_DEPAT   ,  0xd1303333);
-SUNXI_CLK_FACTORS_UPDATE(   pll_ddr1,       8,  7,  0,  0,  0,  2,  0,  0,  0,  0,  0,  0,    0,    0,  0,      31,     24,     0,      PLL_DDR1PAT,   0xf1303333 , 30);
+/*                                       ns  nw  ks  kw  ms  mw  ps  pw  d1s d1w d2s d2w {frac   out mode}   en-s    sdmss   sdmsw   sdmpat         sdmval*/
+SUNXI_CLK_FACTORS       (pll_cpu,        8,  5,  4,  2,  0,  2,  16, 2,  0,  0,  0,  0,    0,    0,  0,      31,     24,     0,      PLL_CPUPAT,    0xd1303333);
+SUNXI_CLK_FACTORS       (pll_audio,      8,  7,  0,  0,  0,  5,  16, 4,  0,  0,  0,  0,    0,    0,  0,      31,     24,     1,      PLL_AUDIOPAT,  0xc0010d84);
+SUNXI_CLK_FACTORS       (pll_video0,     8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_VIDEO0PAT, 0xd1303333);
+SUNXI_CLK_FACTORS       (pll_ve,         8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_VEPAT,     0xd1303333);
+SUNXI_CLK_FACTORS_UPDATE(pll_ddr0,       8,  5,  4,  2,  0,  2,  0,  0,  0,  0,  0,  0,    0,    0,  0,      31,     24,     0,      PLL_DRR0PAT,   0xd1303333 , 20);
+SUNXI_CLK_FACTORS       (pll_periph0,    8,  5,  4,  2,  0,  0,  0,  0,  0,  0,  0,  0,    0,    0,  0,      31,     0,      0,      0,             0);
+SUNXI_CLK_FACTORS       (pll_periph1,    8,  5,  4,  2,  0,  0,  0,  0,  0,  0,  0,  0,    0,    0,  0,      31,     20,     0,      PLL_PERI1PAT,  0xd1303333);
+SUNXI_CLK_FACTORS       (pll_video1,     8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_VEDEO1PAT, 0xd1303333);
+SUNXI_CLK_FACTORS       (pll_gpu,        8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_GPUPAT,    0xd1303333);
+SUNXI_CLK_FACTORS       (pll_mipi,       8,  4,  4,  2,  0,  4,  0,  0,  0,  0,  0,  0,    0,    0,  0,      31,     20,     0,      PLL_MIPIPAT,   0xd1303333);
+SUNXI_CLK_FACTORS       (pll_hsic,       8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_HSICPAT ,  0xd1303333);
+SUNXI_CLK_FACTORS       (pll_de,         8,  7,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,    1,    25, 24,     31,     20,     0,      PLL_DEPAT   ,  0xd1303333);
+SUNXI_CLK_FACTORS_UPDATE(pll_ddr1,       8,  7,  0,  0,  0,  2,  0,  0,  0,  0,  0,  0,    0,    0,  0,      31,     24,     0,      PLL_DDR1PAT,   0xf1303333 , 30);
 
 static int get_factors_pll_cpu(u32 rate, u32 parent_rate, struct clk_factors_value *factor)
 {
@@ -108,13 +108,15 @@ static int get_factors_pll_cpu(u32 rate, u32 parent_rate, struct clk_factors_val
 static int get_factors_pll_audio(u32 rate, u32 parent_rate, struct clk_factors_value *factor)
 {
 	if(rate == 22579200) {
-		factor->factorn = 78;
-		factor->factorm = 20;
-		factor->factorp = 3;
+		factor->factorn = 6;
+		factor->factorm = 0;
+		factor->factorp = 7;
+		sunxi_clk_factor_pll_audio.sdmval = 0xc0010d84;
 	} else if(rate == 24576000) {
-		factor->factorn = 85;
-		factor->factorm = 20;
-		factor->factorp = 3;
+		factor->factorn = 13;
+		factor->factorm = 0;
+		factor->factorp = 13;
+		sunxi_clk_factor_pll_audio.sdmval = 0xc000ac02;
 	} else
 		return -1;
 
@@ -438,9 +440,9 @@ static unsigned long calc_rate_pll_cpu(u32 parent_rate, struct clk_factors_value
 static unsigned long calc_rate_pll_audio(u32 parent_rate, struct clk_factors_value *factor)
 {
 	u64 tmp_rate = (parent_rate?parent_rate:24000000);
-	if((factor->factorn == 78) && (factor->factorm == 20) && (factor->factorp == 3))
+	if ((factor->factorn == 6) && (factor->factorm == 0) && (factor->factorp == 7))
 		return 22579200;
-	else if((factor->factorn == 85) && (factor->factorm == 20) && (factor->factorp == 3))
+	else if ((factor->factorn == 13) && (factor->factorm == 0) && (factor->factorp == 13))
 		return 24576000;
 	else
 	{
@@ -608,7 +610,7 @@ static const char *addax4_parents[] = {"pll_audiox4"};
 static const char *hdmi_parents[]= {"pll_video0","pll_video1","",""};
 static const char *mipidsi_parents[] = {"pll_video0", "", "pll_periph0",""};
 static const char *gpu_parents[] = {"pll_gpu"};
-static const char *lvds_parents[] = {"tcon0"};
+static const char *lvds_parents[] = {"hosc"};
 static const char *ahb1mod_parents[] = {"ahb1"};
 static const char *ahb2mod_parents[] = { "ahb2"};
 static const char *apb1mod_parents[] = {"apb1"};

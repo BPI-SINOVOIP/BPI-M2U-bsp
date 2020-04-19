@@ -17,6 +17,7 @@
 #include <asm/cacheflush.h>
 #include <asm/idmap.h>
 #include <asm/cputype.h>
+#include <linux/irqchip/arm-gic.h>
 
 extern unsigned long mcpm_entry_vectors[MAX_NR_CLUSTERS][MAX_CPUS_PER_CLUSTER];
 
@@ -56,6 +57,45 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster)
 	might_sleep();
 	return platform_ops->power_up(cpu, cluster);
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+void __ref mcpm_smp_init_cpus(void)
+{
+	unsigned int i, ncores;
+
+	ncores = MAX_NR_CLUSTERS * MAX_CPUS_PER_CLUSTER;
+
+	/* sanity check, the cr_cpu_ids is configured form CONFIG_NR_CPUS */
+	if (ncores > nr_cpu_ids) {
+		pr_info("SMP: %u cores greater than maximum (%u), clipping\n",
+				ncores, nr_cpu_ids);
+		ncores = nr_cpu_ids;
+	}
+
+	pr_info("[%s] ncores=%d\n", __func__, ncores);
+
+	for (i = 0; i < ncores; i++)
+		set_cpu_possible(i, true);
+
+	set_smp_cross_call(gic_raise_softirq);
+}
+
+int mcpm_cpu_kill(unsigned int cpu)
+{
+	if (platform_ops && platform_ops->cpu_kill)
+		return platform_ops->cpu_kill(cpu);
+
+	return -EUNATCH;
+}
+
+int mcpm_cpu_disable(unsigned int cpu)
+{
+	if (platform_ops && platform_ops->cpu_disable)
+		return platform_ops->cpu_disable(cpu);
+
+	return -EUNATCH;
+}
+#endif
 
 typedef void (*phys_reset_t)(unsigned long);
 

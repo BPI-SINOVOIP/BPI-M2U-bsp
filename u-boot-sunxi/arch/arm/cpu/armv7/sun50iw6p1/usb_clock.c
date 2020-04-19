@@ -13,7 +13,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -26,60 +26,67 @@
 #include  <asm/arch/ccmu.h>
 #include  <asm/arch/timer.h>
 
+
 int usb_open_clock(void)
 {
-    u32 reg_value = 0;
+	u32 reg_value = 0;
 
-#ifdef FPGA_PLATFORM
-    /*change interfor on  fpga  */
-    reg_value = USBC_Readl(SUNXI_SYSCRL_BASE+0x04);
-    reg_value |= 0x01;
-    USBC_Writel(reg_value,SUNXI_SYSCRL_BASE+0x04);
-#endif
+	//USB0 Clock Reg
+	//bit30: USB PHY0 reset
+	//Bit29: Gating Special Clk for USB PHY0
+	reg_value = readl(SUNXI_CCM_BASE + 0xA70);
+	reg_value |= (1 << 29) | (1 << 30);
+	writel(reg_value, (SUNXI_CCM_BASE + 0xA70));
+	//delay some time
+	__msdelay(1);
 
-    /*Enable module clock for USB phy0  */
-    reg_value = readl(CCMU_USB0_CLK_REG);
-    reg_value |= (1 << 29)|(1 << 30);
-    writel(reg_value, CCMU_USB0_CLK_REG);
-    __msdelay(10);
+	//USB BUS Gating Reset Reg
+	//bit8:USB_OTG Gating
+	reg_value = readl(SUNXI_CCM_BASE + 0xA8C);
+	reg_value |= (1 << 8);
+	writel(reg_value, (SUNXI_CCM_BASE + 0xA8C));
 
-    /*Gating AHB clock for USB_phy0  */
-    reg_value = readl(CCMU_USB_BGR_REG);
-    reg_value |= (1 << 8);
-    writel(reg_value, CCMU_USB_BGR_REG);
-    __msdelay(10);
+	//delay to wati SIE stable
+	__msdelay(1);
 
-    /* AHB reset */
-    reg_value = readl(CCMU_USB_BGR_REG);
-    reg_value |= (1 << 24);
-    writel(reg_value, CCMU_USB_BGR_REG);
-    __msdelay(10);
+	//USB BUS Gating Reset Reg: USB_OTG reset
+	reg_value = readl(SUNXI_CCM_BASE + 0xA8C);
+	reg_value |= (1 << 24);
+	writel(reg_value, (SUNXI_CCM_BASE + 0xA8C));
+	__msdelay(1);
 
-    return 0;
+	reg_value = readl(SUNXI_USBOTG_BASE + 0x420);
+	reg_value |= (0x01 << 0);
+	writel(reg_value, (SUNXI_USBOTG_BASE + 0x420));
+	__msdelay(1);
+
+	return 0;
 }
-
 int usb_close_clock(void)
 {
-    u32 reg_value = 0;
+	u32 reg_value = 0;
 
-    /* AHB reset */
-    reg_value = readl(CCMU_USB_BGR_REG);
-    reg_value &= ~(1 << 24);
-    writel(reg_value, CCMU_USB_BGR_REG);
-    __msdelay(10);
+	//USB0 Clock Reg
+	//bit30: USB PHY0 reset
+	//Bit29: Gating Special Clk for USB PHY0
+	reg_value = readl(SUNXI_CCM_BASE + 0xA70);
+	reg_value &= ~((1 << 29) | (1 << 30));
+	writel(reg_value, (SUNXI_CCM_BASE + 0xA70));
+	__msdelay(1);
 
-    /*close usb ahb clock  */
-    reg_value = readl(CCMU_USB_BGR_REG);
-    reg_value &= ~(1 << 8);
-    writel(reg_value, CCMU_USB_BGR_REG);
-    __msdelay(10);
+	//USB BUS Gating Reset Reg
+	//bit8:USB_OTG Gating
+	reg_value = readl(SUNXI_CCM_BASE + 0xA8C);
+	reg_value &= ~(1 << 8);
+	writel(reg_value, (SUNXI_CCM_BASE + 0xA8C));
 
-    /*close usb phy clock  */
-    reg_value = readl(CCMU_USB0_CLK_REG);
-    reg_value &= ~((1 << 29) | (1 <<30));
-    writel(reg_value, CCMU_USB0_CLK_REG);
-    __msdelay(10);
+	//delay to wati SIE stable
+	__msdelay(1);
 
-    return 0;
+	//USB BUS Gating Reset Reg: USB_OTG reset
+	reg_value = readl(SUNXI_CCM_BASE + 0xA8C);
+	reg_value &= ~(1 << 24);
+	writel(reg_value, (SUNXI_CCM_BASE + 0xA8C));
+	__msdelay(1);
+	return 0;
 }
-

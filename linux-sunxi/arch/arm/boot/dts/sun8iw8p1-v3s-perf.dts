@@ -1,0 +1,22 @@
+/*
+ * Allwinnertech <chenzunyin@allwinnertech.com>
+ */
+
+/dts-v1/;
+#include "sun8iw8p1.dtsi"
+/ {
+	soc: soc@01c00000 {
+
+		spi0: spi@01c68000 {
+
+			nor_flash@0 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				compatible = "mx25l12805d";
+				spi-max-frequency = <10000000>;
+				reg = <0>;
+			};
+		};
+	};
+
+};

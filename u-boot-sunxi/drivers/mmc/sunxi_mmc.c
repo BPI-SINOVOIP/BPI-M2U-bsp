@@ -91,7 +91,22 @@ static void dumpmmcreg(struct sunxi_mmc *reg)
 //#define MMCDBG(fmt...)
 //#define dumpmmcreg(fmt...)
 //#define  dumphex32(fmt...)
+#if 1
 void dumphex32(char* name, char* base, int len) {};
+#else
+void dumphex32(char* name, char* base, int len)
+{
+	__u32 i;
+
+	printf("dump %s registers:", name);
+	for (i=0; i<len; i+=4) {
+		if (!(i&0xf))
+			printf("\n0x%p : ", base + i);
+		printf("0x%08x ", readl((ulong)base + i));
+	}
+	printf("\n");
+}
+#endif
 
 #endif /* SUNXI_MMCDBG */
 

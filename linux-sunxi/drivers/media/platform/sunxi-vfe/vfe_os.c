@@ -192,8 +192,8 @@ int os_mem_alloc(struct vfe_mm *mem_man)
 		vfe_err("sunxi_ion_client_create failed!!");
 		goto err_client;
 	}
-	mem_man->handle = ion_alloc(mem_man->client, mem_man->size, PAGE_SIZE, 
-							/*ION_HEAP_CARVEOUT_MASK|*/ION_HEAP_TYPE_DMA_MASK, 0);
+	mem_man->handle = ion_alloc(mem_man->client, mem_man->size, PAGE_SIZE,
+			ION_HEAP_CARVEOUT_MASK | ION_HEAP_TYPE_DMA_MASK, 0);
 	if (IS_ERR_OR_NULL(mem_man->handle))
 	{
 		vfe_err("ion_alloc failed!!");

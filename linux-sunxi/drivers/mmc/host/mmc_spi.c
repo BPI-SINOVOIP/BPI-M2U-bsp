@@ -909,6 +909,8 @@ mmc_spi_data_do(struct mmc_spi_host *host, struct mmc_command *cmd,
 		  data->timeout_clks * 1000000 / clock_rate;
 	timeout = usecs_to_jiffies((unsigned int)(timeout / 1000)) + 1;
 
+	data->bytes_xfered = 0;
+
 	/* Handle scatterlist segments one at a time, with synch for
 	 * each 512-byte block
 	 */

@@ -69,6 +69,20 @@ static int ep0_recv_op(void);
 extern int fastboot_data_flag;
 #endif
 extern volatile int sunxi_usb_burn_from_boot_init;
+
+/* for fastboot */
+__weak int get_fastboot_data_flag(void)
+{
+	return 0;
+}
+
+/* for usb burn */
+__weak void set_usb_burn_boot_init_flag(int flag )
+{
+
+}
+
+
 /*
 ************************************************************************************************************
 *
@@ -155,7 +169,7 @@ void sunxi_usb_irq(void *data)
 	{
 	    sunxi_usb_dbg("IRQ: SOF\n");
 
-		sunxi_usb_burn_from_boot_init = 1;
+		set_usb_burn_boot_init_flag(1);
 		USBC_INT_DisableUsbMiscUint(sunxi_udc_source.usbc_hd, USBC_INTUSB_SOF);
 
 		USBC_INT_ClearMiscPending(sunxi_udc_source.usbc_hd, USBC_INTUSB_SOF);
@@ -338,6 +352,15 @@ int sunxi_usb_init(int delaytime)
 	reg_val = readl(SUNXI_USBOTG_BASE+USBC_REG_o_PHYCTL);
 	reg_val &= ~(0x01<<1);
 	writel(reg_val, SUNXI_USBOTG_BASE+USBC_REG_o_PHYCTL);
+
+#if defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1) || \
+	defined(CONFIG_ARCH_SUN8IW12P1)
+	reg_val = readl(SUNXI_USBOTG_BASE+USBC_REG_o_PHYCTL);
+	reg_val &= ~(0x01<<USBC_PHY_CTL_SIDDQ);
+	reg_val |= 0x01<<USBC_PHY_CTL_VBUSVLDEXT;
+	writel(reg_val, SUNXI_USBOTG_BASE+USBC_REG_o_PHYCTL);
+#endif
 
 	return 0;
 
@@ -1341,11 +1364,7 @@ static int eprx_recv_op(void)
     	if(USBC_Dev_IsReadDataReady(sunxi_udc_source.usbc_hd, USBC_EP_TYPE_RX))
 		{
 			this_len = USBC_ReadLenFromFifo(sunxi_udc_source.usbc_hd, USBC_EP_TYPE_RX);
-#ifndef CONFIG_SUNXI_SPINOR_PLATFORM
-			if(fastboot_data_flag == 1)
-#else
-			if(0)
-#endif
+			if(get_fastboot_data_flag() == 1)
 			{
 				fifo = USBC_SelectFIFO(sunxi_udc_source.usbc_hd, SUNXI_USB_BULK_OUT_EP_INDEX);
 

@@ -36,10 +36,26 @@ enum color_space
 struct video_para
 {
 	unsigned int 			vic;
-	enum color_space	csc;
+	enum color_space		csc;
 	unsigned char			is_hdmi;
 	unsigned char			is_yuv;
 	unsigned char			is_hcts;
+	unsigned int    pixel_clk;
+	unsigned int    clk_div;
+	unsigned int    pixel_repeat;
+	unsigned int    x_res;
+	unsigned int    y_res;
+	unsigned int    hor_total_time;
+	unsigned int    hor_back_porch;
+	unsigned int    hor_front_porch;
+	unsigned int    hor_sync_time;
+	unsigned int    ver_total_time;
+	unsigned int    ver_back_porch;
+	unsigned int    ver_front_porch;
+	unsigned int    ver_sync_time;
+	unsigned int    hor_sync_polarity; /* 0: negative, 1: positive */
+	unsigned int    ver_sync_polarity; /* 0: negative, 1: positive */
+	unsigned int    b_interlace;
 };
 
 enum audio_type

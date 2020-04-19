@@ -450,53 +450,9 @@ static int axp259_charger_init(struct axp_dev *axp_dev)
 	return 0;
 }
 
-static irqreturn_t axp_ac_usb_in_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	axp_usbac_in(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_ac_usb_out_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	axp_usbac_out(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_capchange_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_capchange(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_change_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_low_warning1_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t axp_low_warning2_isr(int irq, void *data)
-{
-	struct axp_charger_dev *chg_dev = data;
-	axp_change(chg_dev);
-	return IRQ_HANDLED;
-}
-
 static struct axp_interrupts axp259_charger_irq[] = {
-	{"ac in",         axp_ac_usb_in_isr},
-	{"ac out",        axp_ac_usb_out_isr},
+	{"ac in",         axp_ac_in_isr},
+	{"ac out",        axp_ac_out_isr},
 	{"bat in",        axp_capchange_isr},
 	{"bat out",       axp_capchange_isr},
 	{"charging",      axp_change_isr},

@@ -4,7 +4,7 @@
 
 #include "disp_private.h"
 
-#define LCD_GPIO_NUM 6
+#define LCD_GPIO_NUM 8
 #define LCD_POWER_NUM 4
 #define LCD_POWER_STR_LEN 32
 #define LCD_GPIO_REGU_NUM 3

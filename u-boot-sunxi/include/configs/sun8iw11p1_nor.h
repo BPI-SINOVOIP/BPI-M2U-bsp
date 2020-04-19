@@ -135,7 +135,7 @@
 #define FEL_BASE                         0xffff0020
 #define SUNXI_RUN_EFEX_FLAG              (0x5AA5A55A)
 
-
+#define CONFIG_NORMAL_DEBUG_BASE         (CONFIG_SYS_SRAMA3_BASE)
 
 #define SUNXI_RUN_EFEX_ADDR              (SUNXI_RTC_BASE + 0x108)
 #define DRAM_PARA_STORE_ADDR             (CONFIG_SYS_SDRAM_BASE + 0x00800000)

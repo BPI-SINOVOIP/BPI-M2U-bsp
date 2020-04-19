@@ -48,6 +48,8 @@
 #define PLL_AUDIOPAT0       0x0178
 #define PLL_AUDIOPAT1       0x017C
 
+#define PLL_VE_BIAS_REG     0x0358
+
 #define CPU_CFG             0x0500
 #define PSI_CFG             0x0510
 #define AHB3_CFG            0x051C
@@ -123,6 +125,7 @@
 #define TCON_LCD0_CFG       0x0B60
 #define TCON_LCD1_CFG       0x0B64
 #define TCON_LCD_GATE       0x0B7C
+#define LVDS_GATE           0x0BAC
 #define EDP_CFG             0x0BE0
 #define EDP_GATE            0x0BEC
 #define CSI_MISC_CFG        0x0C00
@@ -136,8 +139,8 @@
 #define CPUS_APBS1_CFG      0x000C
 #define CPUS_APBS2_CFG      0x0010
 #define CPUS_TIMER_GATE     0x011C
-#define CPUS_TWDOG_GATE     0x0028
-#define CPUS_PWM_GATE       0x003C
+#define CPUS_TWDOG_GATE     0x012C
+#define CPUS_PWM_GATE       0x013C
 #define CPUS_UART_GATE      0x018C
 #define CPUS_TWI_GATE       0x019C
 #define CPUS_RSB_GATE       0x01BC

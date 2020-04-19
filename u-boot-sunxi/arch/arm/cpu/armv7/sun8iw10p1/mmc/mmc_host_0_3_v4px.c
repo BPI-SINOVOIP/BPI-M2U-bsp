@@ -240,7 +240,10 @@ static int mmc_get_timing_cfg_tm4(u32 sdc_no, u32 spd_md_id, u32 freq_id, u8 *od
 				}
 			}
 
-			*odly = 0;
+			if (spd_md_id == HSDDR52_DDR50)
+				*odly = 1;
+			else
+				*odly = 0;
 			*sdly = dly;
 			mmcdbg("%s: %d %d 0x%x 0x%x, odly %d sdly %d\n", __FUNCTION__, spd_md_id, freq_id, spd_md_sdly, dly, *odly, *sdly);
 		}

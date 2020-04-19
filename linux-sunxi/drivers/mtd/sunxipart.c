@@ -52,6 +52,9 @@ struct sunxi_mbr {
 	unsigned  char		res[MBR_RESERVED];
 } __packed;
 
+/* save partition's name */
+static char partition_name[MBR_MAX_PART_COUNT][16];
+
 static void sunxipart_add_part(struct mtd_partition *part, char *name,
 				uint64_t size, uint64_t offset)
 {
@@ -98,12 +101,18 @@ static int sunxipart_parse(struct mtd_info *master,
 		return -ENOMEM;
 	}
 
-	sunxipart_add_part(&parts[0], "uboot", MBR_OFFSET + MBR_SIZE, 0);
-	for (i = 0; i < nrparts; i++)
+	strncpy(partition_name[0], "uboot", 16);
+	sunxipart_add_part(&parts[0], partition_name[0],
+					MBR_OFFSET + MBR_SIZE, 0);
+	for (i = 0; i < nrparts; i++) {
+		strncpy(partition_name[i+1],
+			sunxi_mbr->array[i].name, 16);
+
 		sunxipart_add_part(&parts[i+1],
-			sunxi_mbr->array[i].name,
+			partition_name[i+1],
 			sunxi_mbr->array[i].lenlo * NOR_BLK_SIZE,
 			sunxi_mbr->array[i].addrlo * NOR_BLK_SIZE + MBR_OFFSET);
+	}
 
 	kfree(sunxi_mbr);
 	*pparts = parts;

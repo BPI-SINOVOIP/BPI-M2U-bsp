@@ -21,6 +21,12 @@
 #define CPUIDLE_NAME_LEN	16
 #define CPUIDLE_DESC_LEN	32
 
+
+#if defined(CONFIG_ARCH_SUN50IW6P1)
+#define SUN50IW6_RTC_PBASE			(0x07000000)
+#define SUNXI_CPUCFG_PBASE			(0x07000400)
+#endif
+
 struct module;
 
 struct cpuidle_device;

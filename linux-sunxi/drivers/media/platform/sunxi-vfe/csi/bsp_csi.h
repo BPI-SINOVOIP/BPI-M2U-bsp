@@ -7,6 +7,8 @@
 
 #if defined CONFIG_ARCH_SUN8IW11P1
 #include "csi_reg_v1.h"
+#elif defined CONFIG_ARCH_SUN3IW1P1
+#include "csi_reg_v1.h"
 #else
 #include "csi_reg.h"
 #endif
@@ -15,6 +17,7 @@
 #define MAX_CH_NUM 4
 
 #define CSI_ALIGN_4K(x) (((x) + (4095)) & ~(4095))
+#define CSI_ALIGN_64B(x) (((x) + (63)) & ~(63))
 #define CSI_ALIGN_32B(x) (((x) + (31)) & ~(31))
 #define CSI_ALIGN_16B(x) (((x) + (15)) & ~(15))
 #define CSI_ALIGN_8B(x) (((x) + (7)) & ~(7))
@@ -110,12 +113,12 @@ struct frame_arrange
 
 struct frame_info
 {
-  struct frame_arrange  arrange;
-  struct frame_size     ch_size[MAX_CH_NUM];
-  struct frame_offset   ch_offset[MAX_CH_NUM];
-  enum   pixel_fmt    pix_ch_fmt[MAX_CH_NUM];
-  enum   field      ch_field[MAX_CH_NUM];   /* define the same as V4L2 */
-  unsigned int      frm_byte_size;
+	struct frame_arrange  arrange;
+	struct frame_size     ch_size[MAX_CH_NUM];
+	struct frame_offset   ch_offset[MAX_CH_NUM];
+	enum   pixel_fmt    pix_ch_fmt[MAX_CH_NUM];
+	enum   field      ch_field[MAX_CH_NUM];   /* define the same as V4L2 */
+	unsigned int      frm_byte_size[MAX_CH_NUM];
 };
 
 
@@ -126,6 +129,7 @@ extern void bsp_csi_reset(unsigned int sel);
 extern int  bsp_csi_set_fmt(unsigned int sel, struct bus_info *bus_info, struct frame_info *frame_info);
 extern int  bsp_csi_set_size(unsigned int sel, struct bus_info *bus_info, struct frame_info *frame_info);
 extern void bsp_csi_set_addr(unsigned int sel, u64 buf_base_addr);
+extern void bsp_csi_set_ch_addr(unsigned int sel, unsigned int ch, u64 buf_base_addr);
 extern void bsp_csi_cap_start(unsigned int sel, unsigned int ch_total_num, enum csi_cap_mode csi_cap_mode);
 extern void bsp_csi_cap_stop(unsigned int sel, unsigned int ch_total_num, enum csi_cap_mode csi_cap_mode);
 extern void bsp_csi_int_enable(unsigned int sel, unsigned int ch, enum csi_int_sel interrupt);

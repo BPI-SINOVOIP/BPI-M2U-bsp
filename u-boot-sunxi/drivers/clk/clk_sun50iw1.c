@@ -491,10 +491,10 @@ struct clk_ops pll_mipi_ops;
 
 struct factor_init_data sunxi_factos[] = {
 	/* name         parent        parent_num, flags                                      reg          lock_reg     lock_bit     pll_lock_ctrl_reg lock_en_bit lock_mode           config                         get_factors               calc_rate              priv_ops*/
-	{"pll_video0",  hosc_parents, 1,          CLK_IGNORE_DISABLE,                        PLL_VIDEO0,  PLL_VIDEO0,  LOCKBIT(28), PLL_CLK_CTRL,     2,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_video0,  &get_factors_pll_video0,  &calc_rate_media,      (struct clk_ops*)NULL},
-	{"pll_video1",  hosc_parents, 1,          CLK_IGNORE_DISABLE,                        PLL_VIDEO1,  PLL_VIDEO1,  LOCKBIT(28), PLL_CLK_CTRL,     6,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_video1,  &get_factors_pll_video1,  &calc_rate_media,      (struct clk_ops*)NULL},
-	{"pll_mipi",    mipi_parents, 2,          CLK_IGNORE_DISABLE,                        MIPI_PLL,    MIPI_PLL,    LOCKBIT(28), PLL_CLK_CTRL,     8,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_mipi,    &get_factors_pll_mipi,    &calc_rate_pll_mipi,   &pll_mipi_ops        },
-	{"pll_de",      hosc_parents, 1,          CLK_IGNORE_DISABLE,                        PLL_DE,      PLL_DE,      LOCKBIT(28), PLL_CLK_CTRL,     10,         PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_de,      &get_factors_pll_de,      &calc_rate_media,      (struct clk_ops*)NULL},
+	{"pll_video0",  hosc_parents, 1,          0,                        PLL_VIDEO0,  PLL_VIDEO0,  LOCKBIT(28), PLL_CLK_CTRL,     2,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_video0,  &get_factors_pll_video0,  &calc_rate_media,      (struct clk_ops*)NULL},
+	{"pll_video1",  hosc_parents, 1,          0,                        PLL_VIDEO1,  PLL_VIDEO1,  LOCKBIT(28), PLL_CLK_CTRL,     6,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_video1,  &get_factors_pll_video1,  &calc_rate_media,      (struct clk_ops*)NULL},
+	{"pll_mipi",    mipi_parents, 2,          0,                        MIPI_PLL,    MIPI_PLL,    LOCKBIT(28), PLL_CLK_CTRL,     8,          PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_mipi,    &get_factors_pll_mipi,    &calc_rate_pll_mipi,   &pll_mipi_ops        },
+	{"pll_de",      hosc_parents, 1,          0,                        PLL_DE,      PLL_DE,      LOCKBIT(28), PLL_CLK_CTRL,     10,         PLL_LOCK_NONE_MODE, &sunxi_clk_factor_pll_de,      &get_factors_pll_de,      &calc_rate_media,      (struct clk_ops*)NULL},
 };
 
 static const char *de_parents[] = {"pll_periph0x2", "pll_de", "", "", "", "","",""};

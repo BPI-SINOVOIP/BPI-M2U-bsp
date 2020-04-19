@@ -19,11 +19,21 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
+#include <linux/sunxi-sid.h>
+#ifdef CONFIG_ARM
+#include <asm/firmware.h>
+#endif
 #include "arisc_i.h"
 
+#define DEBUG_POWER_TREE 0
 struct arisc_cfg arisc_cfg;
 
+#if (defined CONFIG_ARCH_SUN8IW5P1) || (defined CONFIG_ARCH_SUN8IW6P1)
+extern char *arisc_binary_start;
+extern char *arisc_binary_end;
+#endif
+
+#define ARISC_RESERVE_MEMSIZE  (0x4000)
 static unsigned int arisc_debug_baudrate = 115200;
 unsigned int arisc_debug_dram_crc_en = 0;
 unsigned int arisc_debug_dram_crc_srcaddr = 0x40000000;
@@ -35,7 +45,7 @@ unsigned int arisc_debug_level = 2;
 static unsigned char arisc_version[40] = "arisc defualt version";
 static unsigned int arisc_pll = 0;
 
-#if defined CONFIG_ARCH_SUN50IW2P1
+#if (defined CONFIG_ARCH_SUN50IW2P1) || (defined CONFIG_ARCH_SUN50IW6P1)
 static struct arisc_twi_block_cfg block_cfg;
 static u8 regaddr;
 static u8 data;
@@ -45,6 +55,28 @@ static u32 devaddr;
 static u8 regaddr;
 static u32 data;
 static u32 datatype;
+#endif
+
+#if defined CONFIG_SUNXI_ARISC_COM_DIRECTLY
+static atomic_t arisc_suspend_flag;
+
+int arisc_suspend_flag_query(void)
+{
+	return atomic_read(&arisc_suspend_flag);
+}
+
+static void sunxi_arisc_shutdown(struct platform_device *dev)
+{
+	atomic_set(&arisc_suspend_flag, 1);
+	while (arisc_semaphore_used_num_query()) {
+			msleep(1);
+	}
+}
+#else
+static void sunxi_arisc_shutdown(struct platform_device *dev)
+{
+	/* do nothing */
+}
 #endif
 
 /* for save power check configuration */
@@ -59,6 +91,15 @@ static ssize_t arisc_version_show(struct device *dev,
 
 	return size;
 }
+
+#if defined CONFIG_SUNXI_ARISC_COM_DIRECTLY
+static void *arisc_version_store(const void *src, size_t count)
+{
+	memcpy((void *)arisc_version, src, count);
+
+	return (void *)arisc_version;
+}
+#endif
 
 static ssize_t arisc_debug_mask_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -299,7 +340,10 @@ static const unsigned char pmu_powername[32][8] = {
 	(defined CONFIG_ARCH_SUN8IW7P1) || \
 	(defined CONFIG_ARCH_SUN8IW9P1) || \
 	(defined CONFIG_ARCH_SUN50IW1P1) || \
-	(defined CONFIG_ARCH_SUN50IW2P1)
+	(defined CONFIG_ARCH_SUN8IW17P1) || \
+	(defined CONFIG_ARCH_SUN50IW2P1) || \
+	(defined CONFIG_ARCH_SUN50IW3P1) || \
+	(defined CONFIG_ARCH_SUN50IW6P1)
 #define SST_POWER_MASK 0x07ffff
 static const unsigned char pmu_powername[20][8] = {
 	"dc5ldo", "dcdc1",  "dcdc2",  "dcdc3", "dcdc4", "dcdc5", "aldo1", "aldo2",
@@ -309,10 +353,10 @@ static const unsigned char pmu_powername[20][8] = {
 #elif (defined CONFIG_ARCH_SUN8IW6P1)
 #define SST_POWER_MASK 0xffffff
 static const unsigned char pmu_powername[26][10] = {
-	"dcdc1", "dcdc2",  "dcdc3",  "dcdc4", "dcdc5", "dcdc6", "dcdc7", "reserved0",
-	"eldo1",  "eldo2",  "eldo3",  "dldo1", "dldo2", "dldo3", "dldo4", "dc1sw",
-	"reserved1",  "reserved2",  "fldo1",  "fldo2", "fldo3", "aldo1", "aldo2", "aldo3",
-	"io0ldo",  "io1ldo",
+	"dcdc1", "dcdc2",  "dcdc3",  "dcdc4", "dcdc5", "dcdc6", "dcdc7",
+	"reserved0", "eldo1",  "eldo2",  "eldo3",  "dldo1", "dldo2", "dldo3",
+	"dldo4", "dc1sw", "reserved1",  "reserved2",  "fldo1",  "fldo2",
+	"fldo3", "aldo1", "aldo2", "aldo3", "io0ldo",  "io1ldo",
 };
 #endif
 
@@ -463,19 +507,22 @@ static ssize_t arisc_freq_show(struct device *dev,
 
 	struct clk *pll = NULL;
 
-#if (defined CONFIG_ARCH_SUN8IW1P1) || (defined CONFIG_ARCH_SUN8IW3P1)
+#if (defined CONFIG_ARCH_SUN8IW1P1) ||\
+	(defined CONFIG_ARCH_SUN8IW3P1)
 	if (arisc_pll == 1)
 		pll = clk_get(NULL, "pll1");
-#elif defined CONFIG_ARCH_SUN9IW1P1
+#elif (defined CONFIG_ARCH_SUN9IW1P1)
 	if (arisc_pll == 1) {
 		pll = clk_get(NULL, "pll1");
 	} else if (arisc_pll == 2) {
 		pll = clk_get(NULL, "pll2");
 	}
-#elif (defined CONFIG_ARCH_SUN8IW5P1) || \
+#elif (defined CONFIG_ARCH_SUN8IW5P1) ||\
 	(defined CONFIG_ARCH_SUN8IW7P1) || \
+	(defined CONFIG_ARCH_SUN8IW17P1) || \
 	(defined CONFIG_ARCH_SUN50IW1P1) || \
-	(defined CONFIG_ARCH_SUN50IW2P1)
+	(defined CONFIG_ARCH_SUN50IW2P1) || \
+	(defined CONFIG_ARCH_SUN50IW3P1)
 	if (arisc_pll == 1)
 		pll = clk_get(NULL, "pll_cpu");
 #elif (defined CONFIG_ARCH_SUN8IW6P1) || (defined CONFIG_ARCH_SUN8IW9P1)
@@ -510,13 +557,18 @@ static ssize_t arisc_freq_store(struct device *dev,
 	(defined CONFIG_ARCH_SUN8IW5P1) || \
 	(defined CONFIG_ARCH_SUN8IW7P1) || \
 	(defined CONFIG_ARCH_SUN50IW1P1) || \
-	(defined CONFIG_ARCH_SUN50IW2P1)
+	(defined CONFIG_ARCH_SUN50IW2P1) || \
+	(defined CONFIG_ARCH_SUN50IW3P1) || \
+	(defined CONFIG_ARCH_SUN50IW6P1)
 	if ((pll != 1) || (freq < 0) || (freq > 3000000)) {
 		ARISC_WRN("invalid pll [%u] or freq [%u] to set, this platform only support pll1, freq [0, 3000000]KHz\n", pll, freq);
 		ARISC_WRN("pls echo like that: echo pll freq > freq\n");
 		return size;
 	}
-#elif (defined CONFIG_ARCH_SUN9IW1P1) || (defined CONFIG_ARCH_SUN8IW6P1) || (defined CONFIG_ARCH_SUN8IW9P1)
+#elif (defined CONFIG_ARCH_SUN9IW1P1) || \
+	(defined CONFIG_ARCH_SUN8IW6P1) || \
+	(defined CONFIG_ARCH_SUN8IW9P1) || \
+	(defined CONFIG_ARCH_SUN8IW17P1)
 	if (((pll != 1) && (pll != 2)) || (freq < 0) || (freq > 3000000)) {
 		ARISC_WRN("invalid pll [%u] or freq [%u] to set, this platform only support pll1 and pll2, freq [0, 3000000]KHz\n", pll, freq);
 		ARISC_WRN("pls echo like that: echo pll freq > freq\n");
@@ -534,7 +586,7 @@ static ssize_t arisc_freq_store(struct device *dev,
 	return size;
 }
 
-#ifdef CONFIG_ARCH_SUN50IW2P1
+#if (defined CONFIG_ARCH_SUN50IW2P1) || (defined CONFIG_ARCH_SUN50IW6P1)
 static ssize_t arisc_regulator_state_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -620,7 +672,7 @@ static ssize_t arisc_regulator_voltage_store(struct device *dev,
 }
 #endif /* CONFIG_ARCH_SUN50IW2P1 */
 
-#if defined CONFIG_ARCH_SUN50IW2P1
+#if (defined CONFIG_ARCH_SUN50IW2P1) || (defined CONFIG_ARCH_SUN50IW6P1)
 static ssize_t arisc_twi_read_block_data_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -835,6 +887,14 @@ static ssize_t arisc_rsb_write_block_data_store(struct device *dev,
 #ifdef CONFIG_PM
 static int sunxi_arisc_suspend(struct device *dev)
 {
+#if (defined CONFIG_ARCH_SUN8IW5P1) || \
+	(defined CONFIG_ARCH_SUN8IW6P1) || \
+	(defined CONFIG_ARCH_SUN8IW17P1)
+	atomic_set(&arisc_suspend_flag, 1);
+	while (arisc_semaphore_used_num_query()) {
+			msleep(1);
+	}
+#endif
 	return 0;
 }
 
@@ -843,6 +903,9 @@ static int sunxi_arisc_resume(struct device *dev)
 	u32 wake_event;
 	standby_info_para_t sst_info;
 
+#if defined CONFIG_SUNXI_ARISC_COM_DIRECTLY
+	atomic_set(&arisc_suspend_flag, 0);
+#endif
 	arisc_query_wakeup_source(&wake_event);
 	if (wake_event & CPUS_WAKEUP_POWER_EXP) {
 		ARISC_LOG("power exception during standby, enable:0x%x" \
@@ -880,7 +943,7 @@ static struct device_attribute sunxi_arisc_attrs[] = {
 	__ATTR(sst_power_consume_mask,  S_IRUGO | S_IWUSR,  arisc_power_consum_show,            arisc_power_consum_store),
 	__ATTR(sst_power_real_info,     S_IRUGO,            arisc_power_trueinfo_show,          NULL),
 	__ATTR(freq,                    S_IRUGO | S_IWUSR,  arisc_freq_show,                    arisc_freq_store),
-#if defined CONFIG_ARCH_SUN50IW2P1
+#if (defined CONFIG_ARCH_SUN50IW2P1) || (defined CONFIG_ARCH_SUN50IW6P1)
 	__ATTR(regulator_state,         S_IRUGO | S_IWUSR,  arisc_regulator_state_show,         arisc_regulator_state_store),
 	__ATTR(regulator_voltage,       S_IRUGO | S_IWUSR,  arisc_regulator_voltage_show,       arisc_regulator_voltage_store),
 	__ATTR(twi_read_block_data,     S_IRUGO | S_IWUSR,  arisc_twi_read_block_data_show,     arisc_twi_read_block_data_store),
@@ -900,42 +963,64 @@ static void sunxi_arisc_sysfs(struct platform_device *pdev)
 	}
 }
 
-static int  sunxi_arisc_clk_cfg(struct platform_device *pdev)
+static int sunxi_arisc_clk_cfg(struct platform_device *pdev)
 {
 	ARISC_INF("device [%s] clk resource request enter\n", dev_name(&pdev->dev));
 
-	if(clk_prepare_enable(arisc_cfg.core.losc)) {
+	if (clk_prepare_enable(arisc_cfg.core.losc)) {
 		ARISC_ERR("try to enable losc output failed!\n");
 		return -EINVAL;
 	}
 
-	if(clk_prepare_enable(arisc_cfg.core.iosc)) {
+#if (defined CONFIG_ARCH_SUN8IW5P1) || \
+	(defined CONFIG_ARCH_SUN8IW6P1) || \
+	(defined CONFIG_ARCH_SUN8IW17P1)
+	/* nothing */
+#else
+	if (clk_prepare_enable(arisc_cfg.core.iosc)) {
 		ARISC_ERR("try to enable iosc output failed!\n");
 		return -EINVAL;
 	}
+#endif
 
-	if(clk_prepare_enable(arisc_cfg.core.hosc)) {
+	if (clk_prepare_enable(arisc_cfg.core.hosc)) {
 		ARISC_ERR("try to enable hosc output failed!\n");
 		return -EINVAL;
 	}
 
-	if(clk_prepare_enable(arisc_cfg.core.pllperiph0)) {
+	if (clk_prepare_enable(arisc_cfg.core.pllperiph0)) {
 		ARISC_ERR("try to enable pll_periph0 output failed!\n");
 		return -EINVAL;
 	}
 
 
-#if (defined CONFIG_ARCH_SUN50IW1P1)
-	if(clk_prepare_enable(arisc_cfg.dram.pllddr0)) {
+#if (defined CONFIG_ARCH_SUN50IW1P1) || (defined CONFIG_ARCH_SUN8IW17P1)
+	if (clk_prepare_enable(arisc_cfg.dram.pllddr0)) {
 		ARISC_ERR("try to enable pll_ddr0 output failed!\n");
 		return -EINVAL;
 	}
 
-	if(clk_prepare_enable(arisc_cfg.dram.pllddr1)) {
+	if (clk_prepare_enable(arisc_cfg.dram.pllddr1)) {
 		ARISC_ERR("try to enable pll_ddr1 output failed!\n");
 		return -EINVAL;
 	}
-#elif (defined CONFIG_ARCH_SUN50IW2P1)
+#elif (defined CONFIG_ARCH_SUN50IW2P1) || \
+	  (defined CONFIG_ARCH_SUN8IW6P1)
+	if (clk_prepare_enable(arisc_cfg.dram.pllddr0)) {
+		ARISC_ERR("try to enable pll_ddr0 output failed!\n");
+		return -EINVAL;
+	}
+#elif (defined CONFIG_ARCH_SUN50IW3P1)
+	if (clk_prepare_enable(arisc_cfg.dram.pllddr0)) {
+		ARISC_ERR("try to enable pll_ddr0 output failed!\n");
+		return -EINVAL;
+	}
+
+	if (clk_prepare_enable(arisc_cfg.dram.pllddr1)) {
+		ARISC_ERR("try to enable pll_ddr1 output failed!\n");
+		return -EINVAL;
+	}
+#elif (defined CONFIG_ARCH_SUN8IW5P1)
 	if (clk_prepare_enable(arisc_cfg.dram.pllddr0)) {
 		ARISC_ERR("try to enable pll_ddr0 output failed!\n");
 		return -EINVAL;
@@ -967,9 +1052,11 @@ static int  sunxi_arisc_pin_cfg(struct platform_device *pdev)
 			ARISC_ERR("set s_uart0 pin error!\n");
 			return -EINVAL;
 		}
+
+		ARISC_INF("set s_uart0 pin OK\n");
 	}
 
-#if defined CONFIG_ARCH_SUN50IW2P1
+#if (defined CONFIG_ARCH_SUN50IW2P1) || (defined CONFIG_ARCH_SUN50IW6P1)
 	/* s_twi0 gpio */
 	if (arisc_cfg.stwi.status) {
 		pdev_stwi = of_find_device_by_node(arisc_cfg.stwi.np);
@@ -1018,7 +1105,7 @@ static int  sunxi_arisc_pin_cfg(struct platform_device *pdev)
 	return 0;
 }
 
-#if 0
+#if DEBUG_POWER_TREE
 void hexdump(char* name, char * base, int len)
 {
 	u32 i;
@@ -1037,29 +1124,39 @@ static int sunxi_arisc_parse_cfg(struct platform_device *pdev)
 	struct resource res;
 	u32 ret;
 
+#if (defined CONFIG_SUNXI_ARISC_COM_DIRECTLY)
+	struct device_node *np;
+	union space_union space;
+#endif
 	arisc_cfg.core.np = pdev->dev.of_node;
 
 	/* parse arisc node */
 	arisc_cfg.core.losc = of_clk_get_by_name(arisc_cfg.core.np, "losc");
-	if(!arisc_cfg.core.losc || IS_ERR(arisc_cfg.core.losc)){
+	if (!arisc_cfg.core.losc || IS_ERR(arisc_cfg.core.losc)) {
 		ARISC_ERR("try to get losc failed!\n");
 		return -EINVAL;
 	}
 
+#if (defined CONFIG_ARCH_SUN8IW5P1) || \
+	(defined CONFIG_ARCH_SUN8IW6P1) || \
+	(defined CONFIG_ARCH_SUN8IW17P1)
+	/* nothing */
+#else
 	arisc_cfg.core.iosc = of_clk_get_by_name(arisc_cfg.core.np, "iosc");
-	if(!arisc_cfg.core.iosc || IS_ERR(arisc_cfg.core.iosc)){
+	if (!arisc_cfg.core.iosc || IS_ERR(arisc_cfg.core.iosc)) {
 		ARISC_ERR("try to get iosc failed!\n");
 		return -EINVAL;
 	}
+#endif
 
 	arisc_cfg.core.hosc = of_clk_get_by_name(arisc_cfg.core.np, "hosc");
-	if(!arisc_cfg.core.hosc || IS_ERR(arisc_cfg.core.hosc)){
+	if (!arisc_cfg.core.hosc || IS_ERR(arisc_cfg.core.hosc)) {
 		ARISC_ERR("try to get hosc failed!\n");
 		return -EINVAL;
 	}
 
 	arisc_cfg.core.pllperiph0 = of_clk_get_by_name(arisc_cfg.core.np, "pll_periph0");
-	if(!arisc_cfg.core.pllperiph0 || IS_ERR(arisc_cfg.core.pllperiph0)){
+	if (!arisc_cfg.core.pllperiph0 || IS_ERR(arisc_cfg.core.pllperiph0)) {
 		ARISC_ERR("try to get pll_periph0 failed!\n");
 		return -EINVAL;
 	}
@@ -1071,26 +1168,46 @@ static int sunxi_arisc_parse_cfg(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-#if (defined CONFIG_ARCH_SUN50IW1P1)
+#if (defined CONFIG_ARCH_SUN50IW1P1) || (defined CONFIG_ARCH_SUN8IW17P1)
 	arisc_cfg.dram.pllddr0 = of_clk_get_by_name(arisc_cfg.dram.np, "pll_ddr0");
-	if(!arisc_cfg.dram.pllddr0 || IS_ERR(arisc_cfg.dram.pllddr0)){
+	if (!arisc_cfg.dram.pllddr0 || IS_ERR(arisc_cfg.dram.pllddr0)) {
 		ARISC_ERR("try to get pll_ddr0 failed!\n");
 		return -EINVAL;
 	}
 
 	arisc_cfg.dram.pllddr1 = of_clk_get_by_name(arisc_cfg.dram.np, "pll_ddr1");
-	if(!arisc_cfg.dram.pllddr1 || IS_ERR(arisc_cfg.dram.pllddr1)){
+	if (!arisc_cfg.dram.pllddr1 || IS_ERR(arisc_cfg.dram.pllddr1)) {
 		ARISC_ERR("try to get pll_ddr1 failed!\n");
 		return -EINVAL;
 	}
-#elif (defined CONFIG_ARCH_SUN50IW2P1)
+#elif (defined CONFIG_ARCH_SUN50IW2P1) || \
+	  (defined CONFIG_ARCH_SUN8IW6P1)
 	arisc_cfg.dram.pllddr0 = of_clk_get_by_name(arisc_cfg.dram.np,
 			"pll_ddr");
 	if (!arisc_cfg.dram.pllddr0 || IS_ERR(arisc_cfg.dram.pllddr0)) {
 		ARISC_ERR("try to get pll_ddr0 failed!\n");
 		return -EINVAL;
 	}
+#elif (defined CONFIG_ARCH_SUN50IW3P1)
+	arisc_cfg.dram.pllddr0 = of_clk_get_by_name(arisc_cfg.dram.np, "pll_ddr0");
+	if (!arisc_cfg.dram.pllddr0 || IS_ERR(arisc_cfg.dram.pllddr0)) {
+		ARISC_ERR("try to get pll_ddr0 failed!\n");
+		return -EINVAL;
+	}
+
+	arisc_cfg.dram.pllddr1 = of_clk_get_by_name(arisc_cfg.dram.np, "pll_ddr1");
+	if (!arisc_cfg.dram.pllddr1 || IS_ERR(arisc_cfg.dram.pllddr1)) {
+		ARISC_ERR("try to get pll_ddr1 failed!\n");
+		return -EINVAL;
+	}
+#elif (defined CONFIG_ARCH_SUN8IW5P1)
+	arisc_cfg.dram.pllddr0 = of_clk_get_by_name(arisc_cfg.dram.np, "pll_ddr0");
+	if (!arisc_cfg.dram.pllddr0 || IS_ERR(arisc_cfg.dram.pllddr0)) {
+		ARISC_ERR("try to get pll_ddr0 failed!\n");
+		return -EINVAL;
+	}
 #endif
+
 	/* parse s_uart node */
 	arisc_cfg.suart.np = of_find_compatible_node(NULL, NULL, "allwinner,s_uart");
 	if (IS_ERR(arisc_cfg.suart.np)) {
@@ -1116,12 +1233,12 @@ static int sunxi_arisc_parse_cfg(struct platform_device *pdev)
 
 	arisc_cfg.suart.status = of_device_is_available(arisc_cfg.suart.np);
 
-	ARISC_INF("suart pbase:0x%p, vbase:0x%p, size:0x%zx, irq:0x%x, status:%u\n",
+	ARISC_INF("suart pbase:0x%p, vbase:0x%p, size:0x%x, irq:0x%x, status:%u\n",
 		(void *)arisc_cfg.suart.pbase, arisc_cfg.suart.vbase,
-		arisc_cfg.suart.size, arisc_cfg.suart.irq,
+		(unsigned int)arisc_cfg.suart.size, (unsigned int)arisc_cfg.suart.irq,
 		arisc_cfg.suart.status);
 
-#if defined CONFIG_ARCH_SUN50IW2P1
+#if (defined CONFIG_ARCH_SUN50IW2P1) || (defined CONFIG_ARCH_SUN50IW6P1)
 	/* parse s_twi node */
 	arisc_cfg.stwi.np = of_find_compatible_node(NULL, NULL,
 			"allwinner,s_twi");
@@ -1148,9 +1265,9 @@ static int sunxi_arisc_parse_cfg(struct platform_device *pdev)
 
 	arisc_cfg.stwi.status = of_device_is_available(arisc_cfg.stwi.np);
 
-	ARISC_INF("stwi pbase:0x%p, vbase:0x%p, size:0x%zx, irq:0x%x, status:%u\n",
+	ARISC_INF("stwi pbase:0x%p, vbase:0x%p, size:0x%x, irq:0x%x, status:%u\n",
 		(void *)arisc_cfg.stwi.pbase, arisc_cfg.stwi.vbase,
-		arisc_cfg.stwi.size, arisc_cfg.stwi.irq,
+		(unsigned int)arisc_cfg.stwi.size, (unsigned int)arisc_cfg.stwi.irq,
 		arisc_cfg.stwi.status);
 #else
 	/* parse s_rsb node */
@@ -1178,10 +1295,102 @@ static int sunxi_arisc_parse_cfg(struct platform_device *pdev)
 
 	arisc_cfg.srsb.status = of_device_is_available(arisc_cfg.srsb.np);
 
-	ARISC_INF("srsb pbase:0x%p, vbase:0x%p, size:0x%zx, irq:0x%x, status:%u\n",
+	ARISC_INF("srsb pbase:0x%p, vbase:0x%p, size:0x%x, irq:0x%x, status:%u\n",
 		(void *)arisc_cfg.srsb.pbase, arisc_cfg.srsb.vbase,
-		arisc_cfg.srsb.size, arisc_cfg.srsb.irq,
+		(unsigned int)arisc_cfg.srsb.size, (unsigned int)arisc_cfg.srsb.irq,
 		arisc_cfg.srsb.status);
+#endif
+
+#if (defined CONFIG_SUNXI_ARISC_COM_DIRECTLY)
+	/* parse msgbox node */
+	arisc_cfg.msgbox.np = of_find_compatible_node(NULL, NULL, "allwinner,msgbox");
+	if (IS_ERR(arisc_cfg.msgbox.np)) {
+		ARISC_ERR("get [allwinner,msgbox] device node error\n");
+		return -EINVAL;
+	}
+
+	ret = of_address_to_resource(arisc_cfg.msgbox.np, 0, &res);
+	if (ret || !res.start) {
+		ARISC_ERR("get msgbox pbase error\n");
+		return -EINVAL;
+	}
+	arisc_cfg.msgbox.pbase = res.start;
+	arisc_cfg.msgbox.size = resource_size(&res);
+
+	arisc_cfg.msgbox.vbase = of_iomap(arisc_cfg.msgbox.np, 0);
+	if (!arisc_cfg.msgbox.vbase)
+		panic("Can't map msgbox registers");
+
+	arisc_cfg.msgbox.irq = irq_of_parse_and_map(arisc_cfg.msgbox.np, 0);
+	if (arisc_cfg.msgbox.irq <= 0)
+		panic("Can't parse msgbox IRQ");
+
+	arisc_cfg.msgbox.status = of_device_is_available(arisc_cfg.msgbox.np);
+
+	ARISC_INF("msgbox pbase:0x%p, vbase:0x%p, size:0x%x, irq:0x%x, status:%u\n",
+		(void *)arisc_cfg.msgbox.pbase, arisc_cfg.msgbox.vbase,
+		arisc_cfg.msgbox.size, arisc_cfg.msgbox.irq,
+		arisc_cfg.msgbox.status);
+
+	/* parse s_cpuscfg node */
+	arisc_cfg.cpuscfg.np = of_find_compatible_node(NULL, NULL, "allwinner,s_cpuscfg");
+	if (IS_ERR(arisc_cfg.cpuscfg.np)) {
+		ARISC_ERR("get [allwinner,s_cpuscfg] device node error\n");
+		return -EINVAL;
+	}
+
+	ret = of_address_to_resource(arisc_cfg.cpuscfg.np, 0, &res);
+	if (ret || !res.start) {
+		ARISC_ERR("get s_cpuscfg pbase error\n");
+		return -EINVAL;
+	}
+	arisc_cfg.cpuscfg.pbase = res.start;
+	arisc_cfg.cpuscfg.size = resource_size(&res);
+
+	arisc_cfg.cpuscfg.vbase = of_iomap(arisc_cfg.cpuscfg.np, 0);
+	if (!arisc_cfg.cpuscfg.vbase)
+		panic("Can't map cpuscfg registers");
+	ARISC_INF("cpuscfg pbase:0x%p, vbase:0x%p, size:0x%x\n",
+		(void *)arisc_cfg.cpuscfg.pbase, arisc_cfg.cpuscfg.vbase,
+		arisc_cfg.cpuscfg.size);
+
+	np = of_find_compatible_node(NULL, NULL, "allwinner,arisc_space");
+	if (IS_ERR(np)) {
+		ARISC_ERR("get [allwinner,arisc_space] device node error\n");
+		return -EINVAL;
+	}
+#if (defined CONFIG_ARCH_SUN8IW17P1)
+	ret = of_property_read_u32_array(np, "space4",
+					 space.value, 3);
+	if (ret) {
+		ARISC_ERR("get arisc_space1 error.\n");
+		return -EINVAL;
+	}
+
+	arisc_cfg.space[0].vbase = phys_to_virt(space.info.dst);
+#elif (defined CONFIG_ARCH_SUN8IW5P1) || \
+	  (defined CONFIG_ARCH_SUN8IW6P1)
+	ret = of_property_read_u32_array(np, "space1",
+					 space.value, 3);
+	if (ret) {
+		ARISC_ERR("get arisc_space1 error.\n");
+		return -EINVAL;
+	}
+
+	arisc_cfg.space[0].vbase = ioremap(space.info.dst, space.info.size);
+#endif
+	arisc_cfg.space[0].size = space.info.size;
+
+	ret = of_property_read_u32_array(np, "space2",
+					 space.value, 3);
+	if (ret) {
+		ARISC_ERR("get arisc_space2 error.\n");
+		return -EINVAL;
+	}
+
+	arisc_cfg.space[1].vbase = phys_to_virt(space.info.dst);
+	arisc_cfg.space[1].size = space.info.size;
+
 #endif
 
 	/* parse s_jtag node */
@@ -1194,17 +1403,316 @@ static int sunxi_arisc_parse_cfg(struct platform_device *pdev)
 
 	ARISC_INF("sjtag status:%u\n", arisc_cfg.sjtag.status);
 
+	return 0;
+}
+
+#if defined CONFIG_SUNXI_ARISC_COM_DIRECTLY
+int sunxi_deassert_arisc(void)
+{
+	volatile unsigned long value;
+
+	ARISC_INF("set arisc reset to de-assert state\n");
+
+	value = readl(arisc_cfg.cpuscfg.vbase + 0x0);
+	value &= ~1;
+	writel(value, arisc_cfg.cpuscfg.vbase + 0x0);
+	value = readl(arisc_cfg.cpuscfg.vbase + 0x0);
+	value |= 1;
+	writel(value, arisc_cfg.cpuscfg.vbase + 0x0);
+
+	return 0;
+}
+#endif
+
+#if (defined CONFIG_ARCH_SUN8IW5P1) || \
+	(defined CONFIG_ARCH_SUN8IW6P1)
+static s32 sunxi_arisc_para_init(struct arisc_para *para)
+{
+	if (1 == arisc_cfg.suart.status)
+		para->uart_pin_used = 1;
+	else
+		para->uart_pin_used = 0;
+
 #ifdef CONFIG_AW_AXP
 	/* get power regulator tree */
-	get_pwr_regu_tree(arisc_cfg.power_regu_tree);
-	arisc_set_pwr_tree(arisc_cfg.power_regu_tree);
-	//hexdump("tree", arisc_cfg.power_regu_tree, sizeof(arisc_cfg.power_regu_tree));
+	get_pwr_regu_tree(para->power_regu_tree);
 #endif
 
 	return 0;
 }
 
-static int  sunxi_arisc_probe(struct platform_device *pdev)
+
+static void sunxi_arisc_setup_para(struct arisc_para *para)
+{
+	void *dest;
+
+	dest = (void *)(arisc_cfg.space[0].vbase + ARISC_PARA_ADDR_OFFSET);
+
+	/* copy arisc parameters to target address */
+	memcpy(dest, (void *)para, ARISC_PARA_SIZE);
+	ARISC_INF("setup arisc para sram_a2 finished\n");
+}
+
+u32 sunxi_load_arisc(void *image, u32 image_size, void *para, u32 para_size)
+{
+	u32 ret;
+	void *dest;
+
+	if (sunxi_soc_is_secure()) {
+		flush_cache_all();
+		ret = call_firmware_secure_op(load_arisc, image, image_size,
+			para, para_size, ARISC_PARA_ADDR_OFFSET);
+	} else {
+		/* clear sram_a2 area */
+		memset((void *)arisc_cfg.space[0].vbase, 0,
+			arisc_cfg.space[0].size);
+
+		/* load arisc system binary data to sram_a2 */
+		memcpy((void *)arisc_cfg.space[0].vbase, image, image_size);
+		ARISC_INF("load arisc image finish\n");
+
+		/* setup arisc parameters */
+		dest = (void *)(arisc_cfg.space[0].vbase +
+				ARISC_PARA_ADDR_OFFSET);
+		memcpy(dest, (void *)para, para_size);
+		ARISC_INF("setup arisc para finish\n");
+		flush_cache_all();
+
+		/* relese arisc reset */
+		sunxi_deassert_arisc();
+		ARISC_INF("release arisc reset finish\n");
+	}
+
+	ARISC_INF("load arisc finish\n");
+
+	return 0;
+}
+#endif
+
+#if defined CONFIG_SUNXI_ARISC_COM_DIRECTLY
+static int arisc_wait_ready(unsigned int timeout)
+{
+	unsigned long expire;
+
+	expire = msecs_to_jiffies(timeout) + jiffies;
+
+	/* wait arisc startup ready */
+	while (1) {
+		/*
+		 * linux cpu interrupt is disable now,
+		 * we should query message by hand.
+		 */
+		struct arisc_message *pmessage = arisc_hwmsgbox_query_message();
+		if (pmessage == NULL) {
+			if (time_is_before_eq_jiffies(expire)) {
+				return -ETIMEDOUT;
+			}
+			/* try to query again */
+			continue;
+		}
+		/* query valid message */
+		if (pmessage->type == ARISC_STARTUP_NOTIFY) {
+			/* check arisc software and driver version match or not */
+			if (pmessage->paras[0] != ARISC_VERSIONS) {
+				ARISC_ERR("arisc firmware:%d and driver version:%d not matched\n",
+					pmessage->paras[0], ARISC_VERSIONS);
+				return -EINVAL;
+			} else {
+				/* printf the main and sub version string */
+				ARISC_LOG("arisc version: [%s]\n",
+					(char *)arisc_version_store((const void *)(&(pmessage->paras[1])), 40));
+			}
+
+			/* received arisc startup ready message */
+			ARISC_INF("arisc startup ready\n");
+			if ((pmessage->attr & ARISC_MESSAGE_ATTR_SOFTSYN) ||
+				(pmessage->attr & ARISC_MESSAGE_ATTR_HARDSYN)) {
+				/* synchronous message, just feedback it */
+				ARISC_INF("arisc startup notify message feedback\n");
+#if (defined CONFIG_ARCH_SUN8IW5P1) || (defined CONFIG_ARCH_SUN8IW6P1)
+				pmessage->paras[0] = virt_to_phys((void *)&arisc_binary_start);
+#else
+				pmessage->paras[0] = 0;
+#endif
+				arisc_hwmsgbox_feedback_message(pmessage, ARISC_SEND_MSG_TIMEOUT);
+			} else {
+				/* asyn message, free message directly */
+				ARISC_INF("arisc startup notify message free directly\n");
+				arisc_message_free(pmessage);
+			}
+			break;
+		}
+		/*
+		 * invalid message detected, ignore it.
+		 * by sunny at 2012-7-6 18:34:38.
+		 */
+		ARISC_WRN("arisc startup waiting ignore message\n");
+		if ((pmessage->attr & ARISC_MESSAGE_ATTR_SOFTSYN) ||
+			(pmessage->attr & ARISC_MESSAGE_ATTR_HARDSYN)) {
+			/* synchronous message, just feedback it */
+			arisc_hwmsgbox_send_message(pmessage, ARISC_SEND_MSG_TIMEOUT);
+		} else {
+			/* asyn message, free message directly */
+			arisc_message_free(pmessage);
+		}
+		/* we need waiting continue */
+	}
+
+	return 0;
+}
+
+static void sunxi_rest_cfg(void)
+{
+	struct arisc_para para;
+	u32 message_addr = 0;
+	u32 message_phys = 0;
+	u32 message_size = 0;
+#if (defined CONFIG_ARCH_SUN8IW5P1) || (defined CONFIG_ARCH_SUN8IW6P1)
+	int binary_len;
+
+	binary_len = 0x13000;
+
+	if ((int)(&arisc_binary_end) - (int)(&arisc_binary_start) - 0x018000 > arisc_cfg.space[1].size)
+		ARISC_ERR("reserve dram space littler than cpus code!");
+	memcpy((void *)arisc_cfg.space[1].vbase,
+	       (void *)(((unsigned char *)&arisc_binary_start) + 0x018000),
+	       (int)(&arisc_binary_end) - (int)(&arisc_binary_start) - 0x018000);
+	ARISC_INF("cp arisc code1 [addr = %p, len = %x] to dram:%p finished\n",
+		(void *)(((unsigned char *)&arisc_binary_start) + 0x018000),
+		(int)(&arisc_binary_end) - (int)(&arisc_binary_start) - 0x018000,
+		(void *)arisc_cfg.space[1].vbase);
+
+	/* setup arisc parameter */
+	memset(&para, 0, sizeof(struct arisc_para));
+	sunxi_arisc_para_init(&para);
+	sunxi_arisc_setup_para(&para);
+#endif
+	/* initialize hwmsgbox */
+	ARISC_INF("hwmsgbox initialize\n");
+	arisc_hwmsgbox_init();
+
+	/* allocate shared message buffer,
+	 * the shared buffer should be non-cacheable.
+	 * secure    : sram-a2 last 4k byte;
+	 * non-secure: dram non-cacheable buffer.
+	 */
+	if (sunxi_soc_is_secure()) {
+		ARISC_INF("sunxi_soc_is_secure\n");
+		message_addr = (u32)dma_alloc_coherent(NULL, PAGE_SIZE, &(message_phys), GFP_KERNEL);
+		message_size = PAGE_SIZE;
+		para.message_pool_phys = message_phys;
+		para.message_pool_size = message_size;
+	} else {
+		/* use sram-a2 last 4k byte */
+		ARISC_INF("sunxi_soc_is_not_secure\n");
+#if (defined CONFIG_ARCH_SUN8IW5P1) || (defined CONFIG_ARCH_SUN8IW6P1)
+		message_addr = (u32)arisc_cfg.space[0].vbase + ARISC_MESSAGE_POOL_START;
+		message_size = ARISC_MESSAGE_POOL_END - ARISC_MESSAGE_POOL_START;
+		para.message_pool_phys = ARISC_MESSAGE_POOL_START;
+		para.message_pool_size = ARISC_MESSAGE_POOL_END - ARISC_MESSAGE_POOL_START;
+#elif (defined CONFIG_ARCH_SUN8IW17P1)
+		message_addr = (u32)arisc_cfg.space[0].vbase;
+		message_size = 0x1000;
+#endif
+	}
+
+	/* initialize message manager */
+	ARISC_INF("message manager initialize start:%x, end:%x\n", message_addr, message_size);
+	arisc_message_manager_init((void *)message_addr, message_size);
+
+#if (defined CONFIG_ARCH_SUN8IW5P1) || (defined CONFIG_ARCH_SUN8IW6P1)
+	/* load arisc */
+	sunxi_load_arisc((void *)(&arisc_binary_start), binary_len,
+			(void *)(&para), sizeof(struct arisc_para));
+
+#else
+	flush_cache_all();
+	sunxi_deassert_arisc();
+#endif
+
+	/* wait arisc ready */
+	ARISC_INF("wait arisc ready....\n");
+	if (arisc_wait_ready(10000)) {
+		ARISC_LOG("arisc startup failed\n");
+	}
+
+	/* enable arisc asyn tx interrupt */
+	arisc_hwmsgbox_enable_receiver_int(ARISC_HWMSGBOX_ARISC_ASYN_TX_CH, AW_HWMSG_QUEUE_USER_AC327);
+
+	/* enable arisc syn tx interrupt */
+	arisc_hwmsgbox_enable_receiver_int(ARISC_HWMSGBOX_ARISC_SYN_TX_CH, AW_HWMSG_QUEUE_USER_AC327);
+
+#if (defined CONFIG_ARCH_SUN8IW5P1) || (defined CONFIG_ARCH_SUN8IW6P1)
+	/* config dvfs v-f table */
+	if (arisc_dvfs_cfg_vf_table(0, 0, NULL)) {
+		ARISC_WRN("config dvfs v-f table failed\n");
+	}
+
+	/* config ir config paras */
+	if (arisc_sysconfig_ir_paras()) {
+		ARISC_WRN("config ir paras failed\n");
+	}
+	/* config pmu config paras */
+	if (arisc_config_pmu_paras()) {
+		ARISC_WRN("config pmu paras failed\n");
+	}
+
+	/* config dram config paras */
+	if (arisc_config_dram_paras()) {
+		ARISC_WRN("config dram paras failed\n");
+	}
+
+	/* config standby power paras */
+	if (arisc_sysconfig_sstpower_paras()) {
+		ARISC_WRN("config sst power paras failed\n");
+	}
+
+#endif
+	atomic_set(&arisc_suspend_flag, 0);
+}
+#else
+static void sunxi_rest_cfg(void)
+{
+	/* do nothing */
+}
+#endif
+
+#ifdef CONFIG_AW_AXP
+#if (defined CONFIG_ARCH_SUN8IW5P1)
+static int axp_notify_call(struct notifier_block *nfb,
+				unsigned long action, void *parg)
+{
+	return NOTIFY_OK;
+}
+#else
+static int axp_notify_call(struct notifier_block *nfb,
+				unsigned long action, void *parg)
+{
+	switch (action) {
+	case AXP_READY:
+		/* axp ready now, should send power tree to cpus */
+		/* get power regulator tree */
+		get_pwr_regu_tree(arisc_cfg.power_regu_tree);
+		arisc_set_pwr_tree(arisc_cfg.power_regu_tree);
+#if DEBUG_POWER_TREE
+		hexdump("tree", arisc_cfg.power_regu_tree,
+			sizeof(arisc_cfg.power_regu_tree));
+#endif
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+#endif
+
+static struct notifier_block axp_notifier = {
+	&axp_notify_call,
+	NULL,
+	0
+};
+#endif
+
+static int sunxi_arisc_probe(struct platform_device *pdev)
 {
 	int   ret;
 
@@ -1226,7 +1734,16 @@ static int  sunxi_arisc_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	sunxi_rest_cfg();
+
 	sunxi_arisc_sysfs(pdev);
+
+	/* register axp regulator notify, so the axp regulator will
+	 * call the arisc set power tree callback function when it ready
+	 */
+#ifdef CONFIG_AW_AXP
+	ret = raw_notifier_chain_register(&axp_regu_notifier, &axp_notifier);
+#endif
 
 	/* arisc init ok */
 	arisc_notify(ARISC_INIT_READY, NULL);
@@ -1234,7 +1751,7 @@ static int  sunxi_arisc_probe(struct platform_device *pdev)
 	/* arisc initialize succeeded */
 	ARISC_LOG("sunxi-arisc driver v%s startup succeeded\n", DRV_VERSION);
 
-	return 0;
+	return ret;
 }
 
 static const struct of_device_id sunxi_arisc_match[] = {
@@ -1245,6 +1762,7 @@ MODULE_DEVICE_TABLE(of, sunxi_arisc_match);
 
 static struct platform_driver sunxi_arisc_driver = {
 	.probe      = sunxi_arisc_probe,
+	.shutdown   = sunxi_arisc_shutdown,
 	.driver     = {
 		.name     = DRV_NAME,
 		.owner    = THIS_MODULE,
@@ -1278,7 +1796,7 @@ static void __exit arisc_exit(void)
 	ARISC_LOG("module unloaded\n");
 }
 
-subsys_initcall(arisc_init);
+arch_initcall_sync(arisc_init);
 module_exit(arisc_exit);
 
 MODULE_DESCRIPTION("SUNXI ARISC Driver");

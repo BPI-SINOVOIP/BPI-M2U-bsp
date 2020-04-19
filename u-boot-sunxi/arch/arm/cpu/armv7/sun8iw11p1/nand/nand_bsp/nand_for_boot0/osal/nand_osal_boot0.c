@@ -26,7 +26,8 @@
 */
 #include "../../nand_common.h"
 
-int NAND_Print(const char * str, ...);
+extern int printf(const char *fmt, ...);
+#define NAND_Print(fmt, args...) printf(fmt, ##args)
 
 #define get_wvalue(addr)	(*((volatile unsigned long  *)(addr)))
 #define put_wvalue(addr, v)	(*((volatile unsigned long  *)(addr)) = (unsigned long)(v))
@@ -454,8 +455,4 @@ void *NAND_IORemap(unsigned int base_addr, unsigned int size)
 *
 **********************************************************************************************************************
 */
-__s32 NAND_Print(const char * str, ...)
-{
-	printf(str);
-    return 0;
-}
+

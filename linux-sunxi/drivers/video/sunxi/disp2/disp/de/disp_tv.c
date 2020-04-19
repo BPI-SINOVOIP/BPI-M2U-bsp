@@ -172,6 +172,69 @@ static s32 tv_calc_judge_line(struct disp_device *ptv)
 	return 0;
 }
 
+static s32 cal_real_frame_period(struct disp_device *ptv)
+{
+	s32 ret = -1;
+	unsigned long clk_rate_set = 0;
+	struct disp_device_private_data *ptvp;
+	unsigned long long temp = 0;
+
+	if (!ptv) {
+		DE_WRN(" ptv is null\n");
+		goto OUT;
+	}
+
+	ptvp = disp_tv_get_priv(ptv);
+	if (!ptvp) {
+		DE_WRN(" ptvp is null\n");
+		goto OUT;
+	}
+
+	if (!ptvp->clk || !ptvp->video_info) {
+		DE_WRN(" clk | video_info is null\n");
+		goto OUT;
+	}
+
+	clk_rate_set = ptvp->video_info->pixel_clk;
+
+#if defined(TV_UGLY_CLK_RATE)
+	ptv->timings.dclk_rate_set = (clk_rate_set == TV_UGLY_CLK_RATE) ?
+	    TV_COMPOSITE_CLK_RATE : clk_rate_set;
+#else
+	ptv->timings.dclk_rate_set = clk_get_rate(ptvp->clk);
+#endif
+
+	if (ptv->timings.dclk_rate_set == 0) {
+		DE_WRN("tv dclk_rate_set is 0\n");
+		goto OUT;
+	}
+
+	temp = ONE_SEC * ptvp->video_info->hor_total_time *
+	       ptvp->video_info->ver_total_time;
+
+#if defined(TV_UGLY_CLK_RATE)
+	if (clk_rate_set == TV_UGLY_CLK_RATE)
+		do_div(temp, ptv->timings.dclk_rate_set);
+	else
+		do_div(temp, ptv->timings.dclk_rate_set *
+				 (ptvp->video_info->b_interlace + 1));
+#else
+	do_div(temp, ptv->timings.dclk_rate_set *
+	       (ptvp->video_info->b_interlace + 1));
+#endif
+
+	ptv->timings.frame_period = temp;
+
+	DE_INF("tv frame period:%llu\n", ptv->timings.frame_period);
+
+	ptv->timings.start_delay =
+	    disp_al_device_get_start_delay(ptv->hwdev_index);
+
+	ret = 0;
+OUT:
+	return ret;
+}
+
 s32 disp_tv_enable( struct disp_device* ptv)
 {
 	int ret;
@@ -218,6 +281,7 @@ s32 disp_tv_enable( struct disp_device* ptv)
 	tv_clk_config(ptv);  			//no need tcon clk for 1680
 	tv_clk_enable(ptv);
 #endif
+
 	if (NULL == ptvp->tv_func.tv_enable) {
 		DE_WRN("tv_enable is NULL\n");
 		return -1;
@@ -227,6 +291,10 @@ s32 disp_tv_enable( struct disp_device* ptv)
 		DE_WRN("fail to enable tv's clock\n");
 		goto exit;
 	}
+	ret = cal_real_frame_period(ptv);
+	if (!ret)
+		DE_WRN("cal_real_frame_period fail\n");
+
 
 	ptvp->tv_func.tv_enable(ptv->disp);
 	disp_al_tv_cfg(ptv->hwdev_index, ptvp->video_info);
@@ -252,7 +320,7 @@ s32 disp_tv_sw_enable( struct disp_device* ptv)
 
 	if (!ptv || !ptvp) {
 		DE_WRN("tv init null hdl!\n");
-		pr_debug("[DISP_TV] ptv | ptvp is wrong\n");
+		DE_WRN("[DISP_TV] ptv | ptvp is wrong\n");
 		return DIS_FAIL;
 	}
 
@@ -298,6 +366,8 @@ s32 disp_tv_sw_enable( struct disp_device* ptv)
 	if (0 != tv_clk_enable(ptv))
 		return -1;
 #endif
+	if (0 != cal_real_frame_period(ptv))
+		DE_WRN("cal_real_frame_period fail\n");
 
 	spin_lock_irqsave(&g_tv_data_lock, flags);
 	ptvp->enabled = 1;
@@ -461,7 +531,7 @@ s32 disp_tv_set_mode(struct disp_device *ptv, enum disp_tv_mode tv_mode)
 s32 disp_tv_get_mode(struct disp_device* ptv)
 {
 
-	enum disp_output_type  tv_mode;
+	enum disp_tv_mode  tv_mode;
 	struct disp_device_private_data *ptvp = disp_tv_get_priv(ptv);
 
 	if ((NULL == ptv) || (NULL == ptvp)) {
@@ -593,6 +663,88 @@ s32 disp_set_enhance_mode(struct disp_device *ptv, u32 mode)
 	return ptvp->tv_func.tv_set_enhance_mode(ptv->disp, mode);
 }
 
+static bool disp_tv_check_config_dirty(struct disp_device *ptv,
+					struct disp_device_config *config)
+{
+	bool ret = false;
+	struct disp_device_private_data *ptvp = disp_tv_get_priv(ptv);
+
+	if ((ptv == NULL) || (ptvp == NULL)) {
+		DE_WRN("NULL hdl!\n");
+		ret = false;
+		goto exit;
+	}
+
+	if ((ptvp->enabled == 0) ||
+	    (config->mode != ptvp->tv_mode))
+		ret = true;
+
+exit:
+	return ret;
+}
+
+static s32 disp_tv_set_static_config(struct disp_device *ptv,
+			       struct disp_device_config *config)
+{
+	return disp_tv_set_mode(ptv, config->mode);
+}
+
+static s32 disp_tv_get_static_config(struct disp_device *ptv,
+			      struct disp_device_config *config)
+{
+	int ret = 0;
+	struct disp_device_private_data *ptvp = disp_tv_get_priv(ptv);
+
+	if ((ptv == NULL) || (ptvp == NULL)) {
+		DE_WRN("NULL hdl!\n");
+		ret = -1;
+		goto exit;
+	}
+
+	config->type = ptv->type;
+	config->mode = ptvp->tv_mode;
+	if (ptvp->tv_func.tv_get_input_csc)
+		config->format = ptvp->tv_func.tv_get_input_csc(ptv->disp);
+
+exit:
+	return ret;
+}
+
+
+static s32 disp_tv_set_gamma_tbl(struct disp_device *ptv,
+			unsigned int *gamma_table, unsigned int size)
+{
+	struct disp_device_private_data *ptvp = disp_tv_get_priv(ptv);
+	panel_extend_para *p_extend_info;
+	int ret;
+
+	if ((NULL == ptv) || (NULL == ptvp) || (NULL == gamma_table)) {
+		DE_WRN("NULL hdl!\n");
+		return 0;
+	}
+	p_extend_info =
+	    kmalloc(sizeof(panel_extend_para), GFP_KERNEL | __GFP_ZERO);
+
+	if (p_extend_info == NULL) {
+		DE_WRN("malloc p_extend_info fail\n");
+		return -1;
+	}
+
+	memset(p_extend_info, 0, sizeof(panel_extend_para));
+
+	size = (size > LCD_GAMMA_TABLE_SIZE) ?
+	    LCD_GAMMA_TABLE_SIZE : size;
+
+	memcpy(p_extend_info->lcd_gamma_tbl, gamma_table,
+	       size);
+	p_extend_info->lcd_gamma_en = 1;
+
+	ret = disp_al_lcd_cfg_ext(ptv->hwdev_index, p_extend_info);
+
+	kfree(p_extend_info);
+
+	return ret;
+}
 
 s32 disp_init_tv(void)
 {
@@ -685,12 +837,19 @@ s32 disp_init_tv(void)
 		p_tv->is_enabled = disp_tv_is_enabled;
 		p_tv->set_mode = disp_tv_set_mode;
 		p_tv->get_mode = disp_tv_get_mode;
+		p_tv->set_static_config = disp_tv_set_static_config;
+		p_tv->get_static_config = disp_tv_get_static_config;
+		p_tv->check_config_dirty = disp_tv_check_config_dirty;
 		p_tv->check_support_mode = disp_tv_check_support_mode;
 		p_tv->get_input_csc = disp_tv_get_input_csc;
 		p_tv->suspend = disp_tv_suspend;
 		p_tv->resume = disp_tv_resume;
 		p_tv->set_enhance_mode = disp_set_enhance_mode;
 		p_tv->get_fps = disp_tv_get_fps;
+		p_tv->get_status = disp_device_get_status;
+		p_tv->set_gamma_tbl = disp_tv_set_gamma_tbl;
+		p_tv->is_in_safe_period = disp_device_is_in_safe_period;
+		p_tv->usec_before_vblank = disp_device_usec_before_vblank;
 		p_tv->init(p_tv);
 
 		disp_device_register(p_tv);

@@ -112,7 +112,7 @@ static void update_passive_instance(struct thermal_zone_device *tz,
 
 static void thermal_zone_trip_update(struct thermal_zone_device *tz, int trip)
 {
-	long trip_temp;
+	int trip_temp;
 	enum thermal_trip_type trip_type;
 	enum thermal_trend trend;
 	struct thermal_instance *instance;
@@ -132,7 +132,7 @@ static void thermal_zone_trip_update(struct thermal_zone_device *tz, int trip)
 	if (tz->temperature >= trip_temp)
 		throttle = true;
 
-	dev_dbg(&tz->device, "Trip%d[type=%d,temp=%ld]:trend=%d,throttle=%d\n",
+	dev_dbg(&tz->device, "Trip%d[type=%d,temp=%d]:trend=%d,throttle=%d\n",
 				trip, trip_type, trip_temp, trend, throttle);
 
 	mutex_lock(&tz->lock);

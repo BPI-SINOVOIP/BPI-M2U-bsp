@@ -4,69 +4,59 @@
 
 include chosen_board.mk
 
-SUDO=sudo
-CROSS_COMPILE=arm-linux-gnueabihf-
+CROSS_COMPILE=$(COMPILE_TOOL)/arm-linux-gnueabihf-
 U_CROSS_COMPILE=$(CROSS_COMPILE)
 K_CROSS_COMPILE=$(CROSS_COMPILE)
 
-OUTPUT_DIR=$(CURDIR)/output
-
-U_CONFIG_H=$(U_O_PATH)/include/config.h
-K_DOT_CONFIG=$(K_O_PATH)/.config
-
-LICHEE_KDIR=$(CURDIR)/linux-sunxi
 ROOTFS=$(CURDIR)/rootfs/linux/default_linux_rootfs.tar.gz
+GPU_PATH=modules/gpu/mali400/kernel_mode/driver/src/devicedrv/mali
 
 Q=
 J=$(shell expr `grep ^processor /proc/cpuinfo  | wc -l` \* 2)
 
 all: bsp
-
-## DK, if u-boot and kernel KBUILD_OUT issue fix, u-boot-clean and kernel-clean
-## are no more needed
-clean: u-boot-clean kernel-clean
-	rm -f chosen_board.mk
-
-## pack
-pack: sunxi-pack
-	$(Q)scripts/mk_pack.sh
+bsp: u-boot kernel
 
 # u-boot
-$(U_CONFIG_H): u-boot-sunxi
-	$(Q)$(MAKE) -C u-boot-sunxi $(UBOOT_CONFIG)_config CROSS_COMPILE=$(U_CROSS_COMPILE) -j$J
-
-u-boot: $(U_CONFIG_H)
+u-boot: 
+	$(Q)$(MAKE) -C u-boot-sunxi $(MACH)_config CROSS_COMPILE=$(U_CROSS_COMPILE) -j$J
 	$(Q)$(MAKE) -C u-boot-sunxi all CROSS_COMPILE=$(U_CROSS_COMPILE) -j$J
 
 u-boot-clean:
 	$(Q)$(MAKE) -C u-boot-sunxi CROSS_COMPILE=$(U_CROSS_COMPILE) -j$J distclean
 
-## linux
-$(K_DOT_CONFIG): linux-sunxi
-	$(Q)$(MAKE) -C linux-sunxi ARCH=arm $(KERNEL_CONFIG)
-
-kernel: $(K_DOT_CONFIG)
-	$(Q)$(MAKE) -C linux-sunxi ARCH=arm CROSS_COMPILE=${K_CROSS_COMPILE} -j$J INSTALL_MOD_PATH=output uImage dtbs
-	$(Q)$(MAKE) -C linux-sunxi ARCH=arm CROSS_COMPILE=${K_CROSS_COMPILE} -j$J INSTALL_MOD_PATH=output modules
-	$(Q)$(MAKE) -C linux-sunxi/modules/gpu/mali400/kernel_mode/driver/src/devicedrv/mali CROSS_COMPILE=$(K_CROSS_COMPILE) ARCH=arm TARGET_PLATFORM="" KDIR=${LICHEE_KDIR} LICHEE_KDIR=${LICHEE_KDIR} USING_DT=1 BUILD=release USING_UMP=0
-	$(Q)$(MAKE) -C linux-sunxi ARCH=arm CROSS_COMPILE=${K_CROSS_COMPILE} -j$J INSTALL_MOD_PATH=output modules_install
-#	$(Q)$(MAKE) -C linux-sunxi ARCH=arm CROSS_COMPILE=${K_CROSS_COMPILE} -j$J headers_install
-	$(Q)scripts/install_kernel_headers.sh
+kernel: 
+	$(Q)$(MAKE) -C linux-sunxi ARCH=$(ARCH) $(KERNEL_CONFIG)
+	$(Q)$(MAKE) -C linux-sunxi ARCH=$(ARCH) CROSS_COMPILE=${K_CROSS_COMPILE} -j$J uImage dtbs
+	$(Q)$(MAKE) -C linux-sunxi ARCH=$(ARCH) CROSS_COMPILE=${K_CROSS_COMPILE} -j$J INSTALL_MOD_PATH=output modules
+	$(Q)$(MAKE) -C linux-sunxi/$(GPU_PATH) ARCH=$(ARCH) CROSS_COMPILE=$(K_CROSS_COMPILE) KDIR=$(CURDIR)/linux-sunxi USING_DT=1 BUILD=release USING_UMP=0
+	$(Q)$(MAKE) -C linux-sunxi ARCH=$(ARCH) CROSS_COMPILE=${K_CROSS_COMPILE} -j$J INSTALL_MOD_PATH=output modules_install
+	$(Q)scripts/install_kernel_headers.sh $(K_CROSS_COMPILE)
 
 kernel-clean:
-#	$(Q)$(MAKE) -C linux-sunxi/modules/gpu CROSS_COMPILE=$(K_CROSS_COMPILE) ARCH=arm LICHEE_KDIR=${LICHEE_KDIR} clean
-	$(Q)$(MAKE) -C linux-sunxi/modules/gpu/mali400/kernel_mode/driver/src/devicedrv/mali CROSS_COMPILE=$(K_CROSS_COMPILE) ARCH=arm TARGET_PLATFORM="" KDIR=${LICHEE_KDIR} LICHEE_KDIR=${LICHEE_KDIR} USING_DT=1 BUILD=release USING_UMP=0 clean
-	$(Q)$(MAKE) -C linux-sunxi ARCH=arm CROSS_COMPILE=${K_CROSS_COMPILE} -j$J distclean
+	$(Q)$(MAKE) -C linux-sunxi/$(GPU_PATH) ARCH=$(ARCH) CROSS_COMPILE=$(K_CROSS_COMPILE) KDIR=$(CURDIR)/linux-sunxi USING_DT=1 BUILD=release USING_UMP=0 clean
+	$(Q)$(MAKE) -C linux-sunxi ARCH=$(ARCH) CROSS_COMPILE=${K_CROSS_COMPILE} -j$J distclean
 	rm -rf linux-sunxi/output/
 
-kernel-config: $(K_DOT_CONFIG)
-	$(Q)$(MAKE) -C linux-sunxi ARCH=arm CROSS_COMPILE=${K_CROSS_COMPILE} -j$J menuconfig
-	cp linux-sunxi/.config linux-sunxi/arch/arm/configs/$(KERNEL_CONFIG)
+kernel-config:
+	$(Q)$(MAKE) -C linux-sunxi ARCH=$(ARCH) $(KERNEL_CONFIG)
+	$(Q)$(MAKE) -C linux-sunxi ARCH=$(ARCH) CROSS_COMPILE=${K_CROSS_COMPILE} -j$J menuconfig
+	cp linux-sunxi/.config linux-sunxi/arch/$(ARCH)/configs/$(KERNEL_CONFIG)
 
-## bsp
-bsp: u-boot kernel
+clean: u-boot-clean kernel-clean
+	rm -rf out/
+	rm -f chosen_board.mk
+	rm -f env.sh
 
-## linux
+distclean: clean
+	rm -rf SD/
+
+pack: sunxi-pack
+	$(Q)scripts/mk_pack.sh
+
+install:
+	$(Q)scripts/mk_install_sd.sh
+
 linux: 
 	$(Q)scripts/mk_linux.sh $(ROOTFS)
 

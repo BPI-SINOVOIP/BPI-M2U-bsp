@@ -42,6 +42,7 @@
 #if defined(CONFIG_AW_AXP)
 #include <linux/mfd/axp-mfd.h>
 #endif
+
 int sunxi_usb_disable_ehci(__u32 usbc_no);
 int sunxi_usb_enable_ehci(__u32 usbc_no);
 int sunxi_usb_disable_ohci(__u32 usbc_no);
@@ -129,6 +130,12 @@ static void insmod_host_driver(struct usb_msg_center_info *center_info)
 
 	set_usb_role(center_info, USB_ROLE_HOST);
 
+#if defined(CONFIG_ARCH_SUN8IW6) || defined(CONFIG_ARCH_SUN3IW1) \
+	|| defined(CONFIG_ARCH_SUN8IW5)
+#if defined(CONFIG_USB_SUNXI_HCD0)
+	sunxi_usb_host0_enable();
+#endif
+#else
 	#if defined(CONFIG_USB_SUNXI_EHCI0)
 		sunxi_usb_enable_ehci(0);
 	#endif
@@ -136,7 +143,7 @@ static void insmod_host_driver(struct usb_msg_center_info *center_info)
 	#if defined(CONFIG_USB_SUNXI_OHCI0)
 		sunxi_usb_enable_ohci(0);
 	#endif
-
+#endif
 	return;
 }
 
@@ -144,6 +151,20 @@ static void rmmod_host_driver(struct usb_msg_center_info *center_info)
 {
 	DMSG_INFO("\nrmmod_host_driver\n\n");
 
+#if defined(CONFIG_ARCH_SUN8IW6) || defined(CONFIG_ARCH_SUN3IW1) \
+	|| defined(CONFIG_ARCH_SUN8IW5)
+#if defined(CONFIG_USB_SUNXI_HCD0)
+{
+	int ret = 0;
+
+	ret = sunxi_usb_host0_disable();
+	if (ret != 0) {
+		DMSG_PANIC("err: disable hcd0 failed\n");
+		return;
+	}
+}
+#endif
+#else
 	#if defined(CONFIG_USB_SUNXI_EHCI0)
 		sunxi_usb_disable_ehci(0);
 	#endif
@@ -151,7 +172,7 @@ static void rmmod_host_driver(struct usb_msg_center_info *center_info)
 	#if defined(CONFIG_USB_SUNXI_OHCI0)
 		sunxi_usb_disable_ohci(0);
 	#endif
-
+#endif
 	set_usb_role(center_info, USB_ROLE_NULL);
 	return;
 }

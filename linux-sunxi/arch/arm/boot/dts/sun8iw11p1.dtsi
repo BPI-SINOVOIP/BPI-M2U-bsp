@@ -50,6 +50,7 @@
 		nand0 =&nand0;
 		disp = &disp;
 		lcd0 = &lcd0;
+		lcd1 = &lcd1;
 		pwm = &pwm;
 		pwm0 = &pwm0;
 		tv0 = &tv0;
@@ -251,6 +252,52 @@
 		lv8_volt = <1000>;
 	};
 
+	dvfs_table1: dvfs_table1 {
+		compatible = "allwinner,dvfs_table1";
+		max_freq = <1200000000>;
+		min_freq = <480000000>;
+		lv_count = <8>;
+		lv1_freq = <1200000000>;
+		lv1_volt = <1320>;
+		lv2_freq = <1104000000>;
+		lv2_volt = <1260>;
+		lv3_freq = <1008000000>;
+		lv3_volt = <1180>;
+		lv4_freq = <912000000>;
+		lv4_volt = <1140>;
+		lv5_freq = <720000000>;
+		lv5_volt = <1040>;
+		lv6_freq = <0>;
+		lv6_volt = <1000>;
+		lv7_freq = <0>;
+		lv7_volt = <1000>;
+		lv8_freq = <0>;
+		lv8_volt = <1000>;
+	};
+
+	dvfs_table2: dvfs_table2 {
+		compatible = "allwinner,dvfs_table2";
+		max_freq = <1200000000>;
+		min_freq = <480000000>;
+		lv_count = <8>;
+		lv1_freq = <1200000000>;
+		lv1_volt = <1300>;
+		lv2_freq = <1104000000>;
+		lv2_volt = <1240>;
+		lv3_freq = <1008000000>;
+		lv3_volt = <1160>;
+		lv4_freq = <912000000>;
+		lv4_volt = <1100>;
+		lv5_freq = <720000000>;
+		lv5_volt = <1000>;
+		lv6_freq = <0>;
+		lv6_volt = <1000>;
+		lv7_freq = <0>;
+		lv7_volt = <1000>;
+		lv8_freq = <0>;
+		lv8_volt = <1000>;
+	};
+
 	dramfreq {
 		compatible = "allwinner,sunxi-dramfreq";
 		reg = <0x0 0x01c62000 0x0 0x1000>,
@@ -326,7 +373,7 @@
 		};
 
 		mbus0:mbus-controller@01c62000 {
-			compatible = "allwinner,sun8i-b100-mbus";
+			compatible = "allwinner,sun8i-mbus";
 			reg = <0x0 0x01c62000 0x0 0x110>;
 			#mbus-cells = <1>;
 		};
@@ -341,7 +388,7 @@
 			compatible = "allwinner,sunxi-timer";
 			device_type = "timer";
 			reg = <0x0 0x01c20c00 0x0 0x90>;
-			interrupts = <GIC_SPI 22 IRQ_TYPE_EDGE_RISING>;
+			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
 			clock-frequency = <24000000>;
 			timer-prescale = <16>;
 		};
@@ -549,7 +596,6 @@
 					#size-cells = <0>;
 					#gpio-cells = <6>;
 					status = "okay";
-					device_type = "axp_pio";
 				};
 
 				charger0: charger@0{
@@ -633,6 +679,14 @@
 			spi0_cs_number = <2>;
 			spi0_cs_bitmap = <3>;
 			status = "disabled";
+			nor_flash@0 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				compatible = "atmel,at25df641";
+				spi-max-frequency = <50000000>;
+				reg = <0>;	/* Chip select 0 */
+				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+			};
 		};
 
 		spi1: spi@01c06000 {
@@ -919,47 +973,6 @@
 			sunxi,spdif-controller = <&spdif>;
 			status = "okay";
 		};
-
-		sdc0: sdmmc@01c0f000 {
-			compatible = "allwinner,sunxi-mmc-v4p1x";
-			device_type = "sdc0";
-			reg = <0x0 0x01c0f000 0x0 0x1000>; /* only sdmmc0 */
-			interrupts = <GIC_SPI 32 0x0104>;  /*  */
-			clocks = <&clk_hosc>,<&clk_pll_periph1x2>,<&clk_sdmmc0_mod>,<&clk_sdmmc0_bus>,<&clk_sdmmc0_rst>;
-			clock-names = "osc24m","pll_periph","mmc","ahb","rst";
-			pinctrl-names = "default","sleep";
-			pinctrl-0 = <&sdc0_pins_a>;
-			pinctrl-1 = <&sdc0_pins_b>;
-			max-frequency = <50000000>;
-			bus-width = <4>;
-			/*cd-inverted*/
-			cd-gpios = <&pio PF 6 0 1 2 0>;
-			/* vmmc-supply = <&reg_3p3v>;*/
-			/* vqmc-supply = <&reg_3p3v>;*/
-			/* vdmc-supply = <&reg_3p3v>;*/
-			/*vmmc = "vcc-card";*/
-			/*vqmc = "";*/
-			/*vdmc = "";*/
-			/*sd-uhs-sdr50;*/
-			/*sd-uhs-ddr50;*/
-			/*cap-sdio-irq;*/
-			/*keep-power-in-suspend;*/
-			/*ignore-pm-notify;*/
-			/*sunxi-power-save-mode;*/
-			/*sunxi-dly-400k = <1 0 0 0>; */
-			/*sunxi-dly-26M  = <1 0 0 0>;*/
-			/*sunxi-dly-52M  = <1 0 0 0 1>;*/
-			/*sunxi-dly-52M-ddr4  = <1 0 0 0>;*/
-			/*sunxi-dly-52M-ddr8  = <1 0 0 0>;*/
-			/*sunxi-dly-104M  = <1 0 0 0>;*/
-			/*sunxi-dly-208M  = <1 0 0 0>;*/
-			/*sunxi-dly-104M-ddr  = <1 0 0 0>;*/
-			/*sunxi-dly-208M-ddr  = <1 0 0 0>;*/
-
-			status = "okay";
-			/*status = "disabled";*/
-		};
-
 		sdc2: sdmmc@01C11000 {
 			compatible = "allwinner,sunxi-mmc-v4p5x";
 			device_type = "sdc2";
@@ -1010,10 +1023,51 @@
 			/*vqmc = "";*/
 			/*vdmc = "";*/
 	    /*sunxi-power-save-mode;*/
-			/*status = "disabled";*/
-			status = "okay";
+			status = "disabled";
+			/*status = "okay";*/
 
        };
+
+		sdc0: sdmmc@01c0f000 {
+			compatible = "allwinner,sunxi-mmc-v4p1x";
+			device_type = "sdc0";
+			reg = <0x0 0x01c0f000 0x0 0x1000>; /* only sdmmc0 */
+			interrupts = <GIC_SPI 32 0x0104>;  /*  */
+			clocks = <&clk_hosc>,<&clk_pll_periph1x2>,<&clk_sdmmc0_mod>,<&clk_sdmmc0_bus>,<&clk_sdmmc0_rst>;
+			clock-names = "osc24m","pll_periph","mmc","ahb","rst";
+			pinctrl-names = "default","sleep";
+			pinctrl-0 = <&sdc0_pins_a>;
+			pinctrl-1 = <&sdc0_pins_b>;
+			max-frequency = <50000000>;
+			bus-width = <4>;
+			/*cd-inverted*/
+			cd-gpios = <&pio PF 6 0 1 2 0>;
+			/* vmmc-supply = <&reg_3p3v>;*/
+			/* vqmc-supply = <&reg_3p3v>;*/
+			/* vdmc-supply = <&reg_3p3v>;*/
+			/*vmmc = "vcc-card";*/
+			/*vqmc = "";*/
+			/*vdmc = "";*/
+			/*sd-uhs-sdr50;*/
+			/*sd-uhs-ddr50;*/
+			/*cap-sdio-irq;*/
+			/*keep-power-in-suspend;*/
+			/*ignore-pm-notify;*/
+			/*sunxi-power-save-mode;*/
+			/*sunxi-dly-400k = <1 0 0 0>; */
+			/*sunxi-dly-26M  = <1 0 0 0>;*/
+			/*sunxi-dly-52M  = <1 0 0 0 1>;*/
+			/*sunxi-dly-52M-ddr4  = <1 0 0 0>;*/
+			/*sunxi-dly-52M-ddr8  = <1 0 0 0>;*/
+			/*sunxi-dly-104M  = <1 0 0 0>;*/
+			/*sunxi-dly-208M  = <1 0 0 0>;*/
+			/*sunxi-dly-104M-ddr  = <1 0 0 0>;*/
+			/*sunxi-dly-208M-ddr  = <1 0 0 0>;*/
+
+			status = "okay";
+			/*status = "disabled";*/
+		};
+
 
 		sdc1: sdmmc@1C10000 {
 			compatible = "allwinner,sunxi-mmc-v4p1x";
@@ -1137,6 +1191,12 @@
 
 			status = "okay";
 		};
+		lcd1: lcd1@01c0c001 {
+			compatible = "allwinner,sunxi-lcd1";
+			pinctrl-names = "active","sleep";
+
+			status = "okay";
+		};
 
 		tv0: tv0@01c94000 {
 			compatible = "allwinner,sunxi-tv";
@@ -1205,6 +1265,19 @@
 			clocks = <&clk_tvd3>;
 			tvd_used = <1>;
 			tvd_if = <0>;
+			status = "okay";
+		};
+
+		v4in1: v4in1@01c30000 {
+			compatible = "allwinner,sunxi-v4in1";
+			reg = <0x0 0x01c30000 0x0 0x00010000>,/*tvd top*/
+				  <0x0 0x01c31000 0x0 0x00010000>,/*tvd0*/
+				  <0x0 0x01c32000 0x0 0x00010000>,/*tvd1*/
+				  <0x0 0x01c33000 0x0 0x00010000>,/*tvd2*/
+				  <0x0 0x01c34000 0x0 0x00010000>;/*tvd3*/
+			clocks = <&clk_tvd_top>, <&clk_tvd0>, <&clk_tvd1>,
+					 <&clk_tvd2>, <&clk_tvd3>;
+			interrupts = <GIC_SPI 97 0x0104>;
 			status = "okay";
 		};
 
@@ -1552,17 +1625,17 @@
 			clocks = <&clk_deinterlace> ,<&clk_pll_periph0>;
 			status = "okay";
 		};
-		smc:smartcard@0x01c2c400{
+		scr0:smartcard@0x01c2c400{
 			#address-cells = <1>;
 			#size-cells = <0>;
 			compatible = "allwinner,sunxi-scr";
 			reg = <0x0 0x01c2c400 0x0 0x400>;
 			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&clk_scr>, <&clk_apb2>;
+			clocks = <&clk_scr0>, <&clk_apb2>;
 			clock-frequency = <24000000>;
 			pinctrl-names = "default", "sleep";
-			pinctrl-0 = <&scr_pins_a>;
-			pinctrl-1 = <&scr_pins_b>;
+			pinctrl-0 = <&scr0_pins_a>;
+			pinctrl-1 = <&scr0_pins_b>;
 			status = "okay";
 		};
 		nmi:nmi@0{
@@ -1594,7 +1667,7 @@
 			nand0_p1 = <0x55aaaa55>;
 			nand0_p2 = <0x55aaaa55>;
 			nand0_p3 = <0x55aaaa55>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		sunxi_thermal_sensor:thermal_sensor{
@@ -1603,15 +1676,28 @@
 			interrupts = <GIC_SPI 36 IRQ_TYPE_NONE>;
 			clocks = <&clk_hosc>,<&clk_ths>;
 			sensor_num = <2>;
+			combine_num = <2>;
 			shut_temp= <120>;
 			status = "okay";
 
-			combine0:combine0{
+			ths_combine0:ths_combine0{
+				compatible = "allwinner,ths_combine0";
 				#thermal-sensor-cells = <1>;
-				combine_cnt = <2>;
-				combine_type = "max";
-				combine_chn = <0 1>;
+				combine_sensor_num = <1>;
+				combine_sensor_type = "cpu";
+				combine_sensor_temp_type = "max";
+				combine_sensor_id = <0>;
 			};
+			ths_combine1:ths_combine1{
+				compatible = "allwinner,ths_combine1";
+				#thermal-sensor-cells = <1>;
+				combine_sensor_num = <1>;
+				combine_sensor_type = "gpu";
+				combine_sensor_temp_type = "max";
+				combine_sensor_id = <1>;
+			};
+
+
 		};
 
 		cpu_budget_cooling:cpu_budget_cool{
@@ -1642,11 +1728,11 @@
 		};
 
 		thermal-zones{
-			soc_thermal{
+			cpu_thermal_zone{
 
 				polling-delay-passive = <1000>;
 				polling-delay = <10000>;
-				thermal-sensors = <&combine0 0>;
+				thermal-sensors = <&ths_combine0 0>;
 
 				trips{
 					cpu_trip0:t0{
@@ -1665,26 +1751,16 @@
 						hysteresis = <0>;
 					};
 					cpu_trip3:t3{
-						temperature = <115>;
+						temperature = <114>;
 						type = "passive";
 						hysteresis = <0>;
 					};
-					gpu_trip0:t4{
-						temperature = <90>;
-						type = "passive";
-						hysteresis = <0>;
-					};
-					gpu_trip1:t5{
-						temperature = <100>;
-						type = "passive";
-						hysteresis = <0>;
-					};
-					gpu_trip2:t6{
-						temperature = <110>;
-						type = "passive";
-						hysteresis = <0>;
-					};
-					crt_trip:t7{
+                                        cpu_trip4:t4{
+                                                temperature = <117>;
+                                                type = "passive";
+                                                hysteresis = <0>;
+                                        };
+					crt_trip0:t5{
 						temperature = <120>;
 						type = "critical";
 						hysteresis = <0>;
@@ -1710,25 +1786,69 @@
 					bind3{
 						contribution = <0>;
 						trip = <&cpu_trip3>;
-						cooling-device = <&cpu_budget_cooling 4 6>;
+						cooling-device = <&cpu_budget_cooling 4 4>;
 					};
-					bind4{
+                                        bind4{
+                                                contribution = <0>;
+                                                trip = <&cpu_trip4>;
+                                                cooling-device = <&cpu_budget_cooling 5 6>;
+                                        };
+				};
+			};
+			gpu_thermal_zone{
+
+				polling-delay-passive = <1000>;
+				polling-delay = <10000>;
+				thermal-sensors = <&ths_combine1 1>;
+
+				trips{
+					gpu_trip0:t0{
+						temperature = <90>;
+						type = "passive";
+						hysteresis = <0>;
+					};
+					gpu_trip1:t1{
+						temperature = <100>;
+						type = "passive";
+						hysteresis = <0>;
+					};
+					gpu_trip2:t2{
+						temperature = <110>;
+						type = "passive";
+						hysteresis = <0>;
+					};
+					crt_trip1:t3{
+						temperature = <120>;
+						type = "critical";
+						hysteresis = <0>;
+					};
+				};
+
+				cooling-maps{
+
+					bind0{
 						contribution = <0>;
 						trip = <&gpu_trip0>;
 						cooling-device = <&gpu_cooling 1 1>;
 					};
-					bind5{
+					bind1{
 						contribution = <0>;
 						trip = <&gpu_trip1>;
 						cooling-device = <&gpu_cooling 2 2>;
 					};
-					bind6{
+					bind2{
 						contribution = <0>;
 						trip = <&gpu_trip2>;
 						cooling-device = <&gpu_cooling 3 3>;
 					};
 				};
 			};
+		};
+		tpadc:tpadc{
+			compatible = "allwinner,sunxi-tpadc";
+			reg = <0x0 0x01c25000 0x0 0x400>;
+			interrupts = <GIC_SPI 29 IRQ_TYPE_NONE>;
+			status = "okay";
 		};
 
 		keyboard0:keyboard{
@@ -1737,11 +1857,11 @@
 			interrupts = <GIC_SPI 31 IRQ_TYPE_NONE>;
 			status = "okay";
 			key_cnt = <5>;
-			key1 = <240 115>;
-			key2 = <500 114>;
-			key3 = <700 139>;
-			key4 = <890 28>;
-			key5 = <2000 102>;
+			key0 = <190 115>;
+			key1 = <390 114>;
+			key2 = <600 139>;
+			key3 = <800 28>;
+			key4 = <980 102>;
 		};
 		keypad0:keypad{
 			compatible = "allwinner,keypad";
@@ -1803,9 +1923,9 @@
 			tx-delay = <7>;
 			rx-delay = <31>;
 			phy-rst;
-			gmac_power1 = "";
-			gmac_power2 = "";
-			gmac_power3 = "";
+			gmac-power0;
+			gmac-power1;
+			gmac-power2;
 			status = "disabled";
 		};
 

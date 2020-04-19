@@ -13,9 +13,9 @@
 #include <linux/vmalloc.h>
 #include <linux/spinlock.h>
 #include <linux/platform_device.h>
+#include <linux/dma-mapping.h>
 #include <crypto/internal/hash.h>
 #include <crypto/internal/rng.h>
-
 #include "sunxi_ss.h"
 #include "sunxi_ss_proc.h"
 #include "sunxi_ss_reg.h"
@@ -24,15 +24,36 @@ void ss_print_hex(char *_data, int _len, void *_addr)
 {
 	int i;
 
-	pr_debug("-------------------- The valid len = %d ----------------------- ", _len);
+	pr_debug("---------------- The valid len = %d ----------------\n",
+		_len);
 	for (i=0; i<_len/8; i++) {
-		pr_debug("0x%p: %02X %02X %02X %02X %02X %02X %02X %02X \n", i*8 + _addr,
+		pr_debug("0x%p: %02X %02X %02X %02X %02X %02X %02X %02X\n",
+			i*8 + _addr,
 			_data[i*8+0], _data[i*8+1], _data[i*8+2], _data[i*8+3],
 			_data[i*8+4], _data[i*8+5], _data[i*8+6], _data[i*8+7]);
 	}
-	pr_debug("-------------------------------------------------------------- ");
+	pr_debug("----------------------------------------------------\n");
 }
+#ifdef SS_SCATTER_ENABLE
+void ss_print_task_info(ce_task_desc_t *task)
+{
+	void *src_ptr = phys_to_virt(task->src[0].addr);
+	unsigned int src_len = task->src[0].len << 2;
+	void *dst_ptr = phys_to_virt(task->dst[0].addr);
+	unsigned int dst_len = task->dst[0].len << 2;
 
+	pr_debug("---------------------task_info--------------------\n");
+	ss_print_hex((char *)task, sizeof(*task), task);
+	dma_sync_single_for_cpu(&ss_dev->pdev->dev, task->src[0].addr,
+					  src_len, DMA_FROM_DEVICE);
+	pr_debug("--------------src_len = 0x%x-------------\n", src_len);
+	ss_print_hex(src_ptr, src_len, src_ptr);
+	dma_sync_single_for_cpu(&ss_dev->pdev->dev, task->dst[0].addr,
+					  dst_len, DMA_FROM_DEVICE);
+	pr_debug("--------------dst_len = 0x%x-------------\n", dst_len);
+	ss_print_hex(dst_ptr, dst_len, dst_ptr);
+}
+#endif
 int ss_sg_cnt(struct scatterlist *sg, int total)
 {
 	int cnt = 0;
@@ -123,14 +144,13 @@ void ss_hash_padding_sg_prepare(struct scatterlist *last, int total)
 	WARN_ON(sg_dma_len(last) > total);
 }
 
-#ifdef SS_HASH_HW_PADDING
-int ss_hash_padding(ss_hash_ctx_t *ctx, int type)
+int ss_hash_hw_padding(ss_hash_ctx_t *ctx, int type)
 {
 	SS_DBG("type: %d, n: %d, cnt: %d\n", type, ctx->tail_len, ctx->cnt);
-	return 0;
+	return SS_HASH_PAD_SIZE;
 }
-#else
-int ss_hash_padding(ss_hash_ctx_t *ctx, int type)
+
+int ss_hash_sw_padding(ss_hash_ctx_t *ctx, int type)
 {
 	int blk_size = ss_hash_blk_size(type);
 	int len_threshold = blk_size == SHA512_BLOCK_SIZE ? 112 : 56;
@@ -176,7 +196,19 @@ int ss_hash_padding(ss_hash_ctx_t *ctx, int type)
 
 	return p + 8 - ctx->pad;
 }
+
+int ss_hash_padding(ss_hash_ctx_t *ctx, int type)
+{
+#ifdef SS_HASH_HW_PADDING
+#ifdef SS_HASH_HW_PADDING_ALIGN_CASE
+	if (ctx->tail_len == 0)
+		return ss_hash_sw_padding(ctx, type);
 #endif
+	return ss_hash_hw_padding(ctx, type);
+#else
+	return ss_hash_sw_padding(ctx, type);
+#endif
+}
 
 static int ss_hash_one_req(sunxi_ss_t *sss, struct ahash_request *req)
 {
@@ -269,17 +301,17 @@ int ss_hash_final(struct ahash_request *req)
 	SS_DBG("Pad len: %d\n", pad_len);
 	req_ctx->dma_src.sg = &last;
 	sg_init_table(&last, 1);
-#ifdef SS_HASH_HW_PADDING
-	if (pad_len == 0)
-		sg_set_buf(&last, ctx->pad, SS_HASH_PAD_SIZE);
-	else
-#endif
-		sg_set_buf(&last, ctx->pad, pad_len);
+	sg_set_buf(&last, ctx->pad, pad_len);
 
 	SS_DBG("Padding data:\n");
 	ss_print_hex((s8 *)ctx->pad, 128, ctx->pad);
 	ss_dev_lock();
-	ss_hash_start(ctx, req_ctx, pad_len, 1);
+#ifdef SS_HASH_HW_PADDING_ALIGN_CASE
+	if (ctx->tail_len == 0)
+		ss_hash_start(ctx, req_ctx, pad_len, 0);
+	else
+#endif
+		ss_hash_start(ctx, req_ctx, pad_len, 1);
 
 	ss_sha_final();
 

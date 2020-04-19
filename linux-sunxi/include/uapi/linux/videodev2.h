@@ -282,7 +282,9 @@ struct v4l2_pix_format {
 	__u32          		sizeimage;
 	__u32			colorspace;	/* enum v4l2_colorspace */
 	__u32			priv;		/* private data, depends on pixelformat */
+#if defined(CONFIG_ARM64)
 	__u32			flags;		/* format flags (V4L2_PIX_FMT_FLAG_*) */
+#endif
 };
 
 /*      Pixel format         FOURCC                          depth  Description  */

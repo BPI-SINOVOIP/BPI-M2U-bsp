@@ -28,4 +28,6 @@ int get_core_pos(void);
 
 int sunxi_secondary_cpu_poweroff(void);
 
+int cpu0_set_irq_stack(uint32_t sp);
+
 #endif /* __CPU_TASK_H__ */

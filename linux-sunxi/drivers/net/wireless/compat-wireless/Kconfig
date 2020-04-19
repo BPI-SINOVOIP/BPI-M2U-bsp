@@ -1,6 +1,8 @@
 config COMPAT_WIRELESS
 	tristate "Compat Wireless for Xradio driver"
 	select AVERAGE
+	select CRYPTO
+	select CRYPTO_ARC4
 	default y
 	---help---
 	     To compile this code as a module, choose M here.

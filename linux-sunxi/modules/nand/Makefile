@@ -55,7 +55,15 @@ ifneq ($(strip $(CONFIG_ARCH_SUN50IW2P1)),)
 obj-m += sun50iw2p1/
 endif
 
-install: build	
+ifneq ($(strip $(CONFIG_ARCH_SUN50IW3P1)),)
+obj-m += sun50iw3p1/
+endif
+
+ifneq ($(strip $(CONFIG_ARCH_SUN50IW6P1)),)
+obj-m += sun50iw6p1/
+endif
+
+install: build
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN8IW1P1=y" >/dev/null 2>&1;then \
 	cp sun8iw1p1/nand.ko $(LICHEE_MOD_DIR)/;\
 	fi
@@ -64,13 +72,13 @@ install: build
 	fi
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN9IW1P1=y" >/dev/null 2>&1;then \
 	cp sun9iw1p1/nand.ko $(LICHEE_MOD_DIR)/;\
-	fi 
+	fi
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN8IW5P1=y" >/dev/null 2>&1;then \
 	cp sun8iw5p1/nand.ko $(LICHEE_MOD_DIR)/;\
 	fi
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN8IW6P1=y" >/dev/null 2>&1;then \
 	cp sun8iw6p1/nand.ko $(LICHEE_MOD_DIR)/;\
-	fi	 
+	fi
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN8IW7P1=y" >/dev/null 2>&1;then \
 	cp sun8iw7p1/nand.ko $(LICHEE_MOD_DIR)/;\
 	fi
@@ -89,7 +97,12 @@ install: build
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN50IW2P1=y" >/dev/null 2>&1;then \
 	cp sun50iw2p1/nand.ko $(LICHEE_MOD_DIR)/;\
 	fi
-	
+	@if cat ../../.config|grep "CONFIG_ARCH_SUN50IW6P1=y" >/dev/null 2>&1;then \
+	cp sun50iw6p1/nand.ko $(LICHEE_MOD_DIR)/;\
+	fi
+	@if cat ../../.config|grep "CONFIG_ARCH_SUN50IW3P1=y" >/dev/null 2>&1;then \
+	cp sun50iw3p1/nand.ko $(LICHEE_MOD_DIR)/;\
+	fi
 build:
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN8IW1P1=y" >/dev/null 2>&1;then \
 	cp sun8iw1p1/libnand_sun8iw1p1 sun8iw1p1/libnand_sun8iw1p1.a;\
@@ -99,16 +112,16 @@ build:
 	fi
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN9IW1P1=y" >/dev/null 2>&1;then \
 	cp sun9iw1p1/libnand_sun9iw1p1 sun9iw1p1/libnand_sun9iw1p1.a;\
-	fi	
+	fi
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN8IW5P1=y" >/dev/null 2>&1;then \
-	cp sun8iw5p1/libnand_sun8iw5p1 sun8iw5p1/libnand_sun8iw5p1.a;\
+	cp sun8iw5p1/libnand sun8iw5p1/libnand.a;\
 	fi
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN8IW6P1=y" >/dev/null 2>&1;then \
 	cp sun8iw6p1/libnand_sun8iw6p1 sun8iw6p1/libnand_sun8iw6p1.a;\
 	fi
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN8IW7P1=y" >/dev/null 2>&1;then \
 	cp sun8iw7p1/libnand_sun8iw7p1 sun8iw7p1/libnand_sun8iw7p1.a;\
-	fi	
+	fi
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN8IW9P1=y" >/dev/null 2>&1;then \
 	cp sun8iw9p1/libnand_sun8iw9p1 sun8iw9p1/libnand_sun8iw9p1.a;\
 	fi
@@ -128,6 +141,13 @@ build:
 	@if cat ../../.config|grep "CONFIG_ARCH_SUN50IW2P1=y" >/dev/null 2>&1;then \
 	cp sun50iw2p1/libnand_sun50iw2p1 sun50iw2p1/libnand_sun50iw2p1.a;\
 	fi
+	@if cat ../../.config|grep "CONFIG_ARCH_SUN50IW6P1=y" >/dev/null 2>&1;then \
+	cp sun50iw6p1/libnand sun50iw6p1/libnand.a;\
+	fi
+	@if cat ../../.config|grep "CONFIG_ARCH_SUN50IW3P1=y" >/dev/null 2>&1;then \
+	cp sun50iw3p1/libnand sun50iw3p1/libnand.a;\
+	fi
+
 	$(MAKE) -C $(LICHEE_KDIR) M=$(PWD)
 
 clean:

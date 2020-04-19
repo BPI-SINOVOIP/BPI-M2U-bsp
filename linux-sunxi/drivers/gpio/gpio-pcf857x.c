@@ -29,6 +29,11 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
+#include <linux/of.h>
+#include <linux/of_gpio.h>
+
+#include <linux/sys_config.h>
+#include <linux/pinctrl/pinconf-sunxi.h>
 
 
 static const struct i2c_device_id pcf857x_id[] = {
@@ -49,6 +54,29 @@ static const struct i2c_device_id pcf857x_id[] = {
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, pcf857x_id);
+
+#ifdef CONFIG_OF
+static const struct of_device_id pcf857x_of_table[] = {
+	{ .compatible = "nxp,pcf8574" },
+	{ .compatible = "nxp,pcf8574a" },
+	{ .compatible = "nxp,pca8574" },
+	{ .compatible = "nxp,pca9670" },
+	{ .compatible = "nxp,pca9672" },
+	{ .compatible = "nxp,pca9674" },
+	{ .compatible = "nxp,pcf8575" },
+	{ .compatible = "nxp,pca8575" },
+	{ .compatible = "nxp,pca9671" },
+	{ .compatible = "nxp,pca9673" },
+	{ .compatible = "nxp,pca9675" },
+	{ .compatible = "maxim,max7328" },
+	{ .compatible = "maxim,max7329" },
+	{ .compatible = "ti,tca9554" },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(of, pcf857x_of_table);
+#endif
+
 
 /*
  * The pcf857x, pca857x, and pca967x chips only expose one read and one
@@ -174,12 +202,15 @@ static void pcf857x_irq_demux_work(struct work_struct *work)
 					       struct pcf857x,
 					       work);
 	unsigned long change, i, status, flags;
-
 	status = gpio->read(gpio->client);
 
 	spin_lock_irqsave(&gpio->slock, flags);
 
 	change = gpio->status ^ status;
+#ifdef IO_EXPAND_DEBUG
+	pr_info("[%s] line=%d status=0x%x,gpio->status=0x%x, change=0x%x\n",
+			__func__, __LINE__, status, gpio->status, change);
+#endif
 	for_each_set_bit(i, &change, gpio->chip.ngpio)
 		generic_handle_irq(irq_find_mapping(gpio->irq_domain, i));
 	gpio->status = status;
@@ -236,8 +267,10 @@ static int pcf857x_irq_domain_init(struct pcf857x *gpio,
 		goto fail;
 
 	/* enable real irq */
-	status = request_irq(client->irq, pcf857x_irq_demux, 0,
-			     dev_name(&client->dev), gpio);
+
+	status = request_irq(client->irq, pcf857x_irq_demux,
+				IRQF_TRIGGER_FALLING | IRQF_SHARED,
+				dev_name(&client->dev), gpio);
 	if (status)
 		goto fail;
 
@@ -253,7 +286,72 @@ fail:
 	return -EINVAL;
 }
 
+static struct pcf857x_platform_data *of_gpio_pcf857x(struct i2c_client *client)
+{
+	struct device_node *node = client->dev.of_node;
+	struct pcf857x_platform_data *info;
+	struct gpio_config pin_cfg;
+
+	info = devm_kzalloc(&client->dev, sizeof(*info), GFP_KERNEL);
+	if (!info)
+		return NULL;
+
+	if (of_property_read_u32(node, "gpio_base", &info->gpio_base))
+		info->gpio_base = 1500;
+	memset(&pin_cfg, 0, sizeof(pin_cfg));
+	of_get_named_gpio_flags(node, "int-gpio", 0,
+				(enum of_gpio_flags *)&pin_cfg);
+	pr_info("gpio=%d,mul_sel=%d,pull=%d,drv_level=%d,data=%d\n",
+		pin_cfg.gpio, pin_cfg.mul_sel, pin_cfg.pull,
+		pin_cfg.drv_level, pin_cfg.data);
+	if (pin_cfg.gpio) {
+		char pin_name[32];
+		u32 config;
+		client->irq = gpio_to_irq(pin_cfg.gpio);
+		sunxi_gpio_to_name(pin_cfg.gpio, pin_name);
+
+		if (pin_cfg.pull != GPIO_PULL_DEFAULT) {
+			config = SUNXI_PINCFG_PACK(SUNXI_PINCFG_TYPE_PUD,
+								pin_cfg.pull);
+			pin_config_set(SUNXI_PINCTRL, pin_name, config);
+		}
+	}
+
+	return info;
+}
+
 /*-------------------------------------------------------------------------*/
+#ifdef IO_EXPAND_DEBUG
+irq_handler_t gpio_test_handler()
+{
+	pr_info("[%s] line=%d\n", __func__, __LINE__);
+	return IRQ_HANDLED;
+}
+
+static ssize_t gpio_test_show(struct device  *dev,
+				struct device_attribute *attr, char *buf)
+{
+	int gpio = 2041;
+	int ret, irq;
+	int flags = IRQF_TRIGGER_FALLING | IRQF_SHARED;
+
+	ret = gpio_request(gpio, "gpio_test");
+	pr_info("gpio_request return %d\n", ret);
+
+	gpio_direction_input(gpio);
+	pr_info("gpio_direction_input return %d\n", ret);
+
+	irq = gpio_to_irq(gpio);
+	pr_info("gpio to irq:%d\n", irq);
+
+	ret = request_irq(irq, gpio_test_handler, flags, dev_name(dev), dev);
+	pr_info("request irq return%d\n", ret);
+
+	return 0;
+}
+
+static DEVICE_ATTR(gpio_test, 0444, gpio_test_show, NULL);
+#endif
 
 static int pcf857x_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
@@ -265,6 +363,7 @@ static int pcf857x_probe(struct i2c_client *client,
 	pdata = client->dev.platform_data;
 	if (!pdata) {
 		dev_dbg(&client->dev, "no platform data\n");
+		pdata = of_gpio_pcf857x(client);
 	}
 
 	/* Allocate, initialize, and register this gpio_chip. */
@@ -285,14 +384,7 @@ static int pcf857x_probe(struct i2c_client *client,
 	gpio->chip.direction_output	= pcf857x_output;
 	gpio->chip.ngpio		= id->driver_data;
 
-	/* enable gpio_to_irq() if platform has settings */
-	if (pdata && client->irq) {
-		status = pcf857x_irq_domain_init(gpio, pdata, client);
-		if (status < 0) {
-			dev_err(&client->dev, "irq_domain init failed\n");
-			goto fail;
-		}
-	}
+
 
 	/* NOTE:  the OnSemi jlc1562b is also largely compatible with
 	 * these parts, notably for output.  It has a low-resolution
@@ -314,8 +406,17 @@ static int pcf857x_probe(struct i2c_client *client,
 			status = -EIO;
 
 		/* fail if there's no chip present */
-		else
+		else {
+			int count = 7;
+retry:
 			status = i2c_smbus_read_byte(client);
+			if (status < 0 && count > 0) {
+				dev_info(&client->dev,
+					"retry commucation.%d\n", count);
+				count--;
+				goto retry;
+			}
+		}
 
 	/* '75/'75c addresses are 0x20..0x27, just like the '74;
 	 * the '75c doesn't have a current source pulling high.
@@ -380,6 +481,19 @@ static int pcf857x_probe(struct i2c_client *client,
 			dev_warn(&client->dev, "setup --> %d\n", status);
 	}
 
+	/* enable gpio_to_irq() if platform has settings */
+	if (pdata && client->irq) {
+		status = pcf857x_irq_domain_init(gpio, pdata, client);
+		if (status < 0) {
+			dev_err(&client->dev, "irq_domain init failed\n");
+			goto fail;
+		}
+	}
+
+#ifdef IO_EXPAND_DEBUG
+	device_create_file(&client->dev, &dev_attr_gpio_test);
+#endif
+
 	dev_info(&client->dev, "probed\n");
 
 	return 0;
@@ -424,6 +538,7 @@ static struct i2c_driver pcf857x_driver = {
 	.driver = {
 		.name	= "pcf857x",
 		.owner	= THIS_MODULE,
+		.of_match_table = of_match_ptr(pcf857x_of_table),
 	},
 	.probe	= pcf857x_probe,
 	.remove	= pcf857x_remove,

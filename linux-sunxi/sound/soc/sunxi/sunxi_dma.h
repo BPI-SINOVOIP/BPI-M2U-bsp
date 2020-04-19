@@ -28,4 +28,5 @@ struct sunxi_hdmi_priv {
 
 extern int asoc_dma_platform_register(struct device *dev,unsigned int flags);
 extern void asoc_dma_platform_unregister(struct device *dev);
+extern int sunxi_ahub_get_rawflag(void);
 #endif

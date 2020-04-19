@@ -550,6 +550,9 @@ static void ipi_cpu_stop(unsigned int cpu)
 
 	local_fiq_disable();
 	local_irq_disable();
+#if defined(CONFIG_SUNXI_DUMP)
+	flush_cache_all();
+#endif
 
 	while (1)
 		cpu_relax();

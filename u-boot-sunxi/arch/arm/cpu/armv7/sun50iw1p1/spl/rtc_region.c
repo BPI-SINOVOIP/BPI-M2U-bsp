@@ -92,6 +92,19 @@ void rtc_region_clear_fel_flag(void)
 	while(flag != 0);
 }
 
+void rtc_region_set_fel_flag(int flag)
+{
+	volatile int val;
+	do
+	{
+		writel(flag, RTC_DATA_HOLD_REG_FEL);
+		__usdelay(10);
+		asm volatile("ISB SY");
+		asm volatile("DMB SY");
+		val  = readl(RTC_DATA_HOLD_REG_FEL);
+	}
+	while(val != flag);
+}
 
 
 

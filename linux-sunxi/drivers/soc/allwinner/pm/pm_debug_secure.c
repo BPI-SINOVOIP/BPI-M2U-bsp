@@ -9,7 +9,9 @@
 #include "pm_debug.h"
 #include "mem_hwspinlock.h"
 
-#if defined(CONFIG_ARCH_SUN8IW6P1) || defined(CONFIG_ARCH_SUN9IW1P1)
+#if defined(CONFIG_ARCH_SUN8IW6P1) || \
+	defined(CONFIG_ARCH_SUN9IW1P1) || \
+	defined(CONFIG_ARCH_SUN3IW1P1)
 static volatile __r_prcm_pio_pad_hold *pm_secure_status_reg;
 static volatile __r_prcm_pio_pad_hold *pm_secure_status_reg_pa;
 #ifndef CONFIG_SUNXI_TRUSTZONE
@@ -189,8 +191,11 @@ void save_pm_secure_mem_status_nommu(volatile __u32 val)
 	defined(CONFIG_ARCH_SUN8IW8P1) || \
 	defined(CONFIG_ARCH_SUN8IW10P1) || \
 	defined(CONFIG_ARCH_SUN8IW11P1) || \
+	defined(CONFIG_ARCH_SUN8IW17P1) || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1)
 
 void pm_secure_mem_status_init(char *name)
 {

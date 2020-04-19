@@ -113,7 +113,7 @@ int mmc_clk_io_onoff(int sdc_no, int onoff, const normal_gpio_cfg *gpio_info, in
 	}
 	else // if(sdc_no == 2)
 	{
-		boot_set_gpio((void *)(gpio_info + offset), 10, 1);
+		boot_set_gpio((void *)(gpio_info + offset), 12, 1);
 	}
 	
 	/* config ahb clock */

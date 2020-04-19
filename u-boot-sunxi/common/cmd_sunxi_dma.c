@@ -15,6 +15,7 @@ static int do_sunxi_dma_test(cmd_tbl_t * cmdtp, int flag, int argc, char * const
 	unsigned int src_addr = 0, dst_addr= 0, len = 512;
 	sunxi_dma_setting_t cfg;
 	uint hdma;
+	u32 timeout = 0xfffff;
 
 	printf("make sure dma contorller has inited\n");
 	//dma
@@ -57,8 +58,10 @@ static int do_sunxi_dma_test(cmd_tbl_t * cmdtp, int flag, int argc, char * const
 	sunxi_dma_setting(hdma,&cfg);
 	sunxi_dma_start(hdma,src_addr,dst_addr,len);
 
-	while(sunxi_dma_request()){
-	
+	while((timeout-- > 0)&&sunxi_dma_querystatus(hdma));
+	if (timeout <= 0) {
+		printf("wait dma timeout!\n");
+		return -1;
 	}
 	return 0;
 }

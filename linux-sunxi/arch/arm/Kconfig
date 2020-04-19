@@ -1615,6 +1615,42 @@ config SCHED_HMP_LITTLE_PACKING
 	  packing_limit: runqueue load ratio where a RQ is considered
 	    to be full. Default is NICE_0_LOAD * 9/8.
 
+config SCHED_DCMP
+	bool "Dual Cluster symmetric support"
+	depends on ARCH_SUN8IW6 || ARCH_SUN8IW9 || ARCH_SUN8IW17
+	default n
+	help
+	  Allows the Dual cluster symmetric
+
+config SCHED_HMP_DCMP
+	bool "(EXPERIMENTAL) Heterogenous multiprocessor scheduling for DCMP"
+	depends on SCHED_HMP && SCHED_DCMP
+	help
+	  Experimental scheduler optimizations for heterogeneous platforms
+	  for DCMP
+
+config SCHED_SMP_DCMP
+	bool "(EXPERIMENTAL) SMP scheduling for DCMP"
+	depends on !SCHED_HMP && SCHED_DCMP
+	help
+	  Experimental SMP scheduling for DCMP
+
+config CLUSTER0_CPU_MASK
+	string "Cluster0 mask for Dual Cluster"
+	depends on SCHED_SMP_DCMP
+	help
+	  Leave empty to use device tree information.
+	  Specify the cpuids of the fast CPUs in the system as a list string,
+	  e.g. cpuid 0+1 should be specified as 0-1.
+
+config CLUSTER1_CPU_MASK
+	string "Cluster1 mask for Dual Cluster"
+	depends on SCHED_SMP_DCMP
+	help
+	  Leave empty to use device tree information.
+	  Specify the cpuids of the fast CPUs in the system as a list string,
+	  e.g. cpuid 0+1 should be specified as 0-1.
+
 config HAVE_ARM_SCU
 	bool
 	help

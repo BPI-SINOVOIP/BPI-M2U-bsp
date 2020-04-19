@@ -35,6 +35,7 @@
 
 static LIST_HEAD(csi_drv_list);
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 #ifdef VFE_CLK
 static char * clk_name[CSI_CLK_NUM] = {
 	"csi_core_clk",
@@ -43,6 +44,13 @@ static char * clk_name[CSI_CLK_NUM] = {
 	"csi_core_clk_src",
 	"csi_master_clk_24M_src",
 	"csi_master_clk_pll_src",
+};
+#endif
+#else
+static char *clk_name[CSI_CLK_NUM] = {
+	"csi_master_clk",
+	"csi_master_clk_pll_src",
+	"csi_master_clk_24M_src",
 };
 #endif
 
@@ -64,6 +72,7 @@ static int csi_clk_get(struct csi_dev *dev)
 		}
 	}
 	
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	if(dev->clock[CSI_CORE_CLK] && dev->clock[CSI_CORE_CLK_SRC]) {
 		if (clk_set_parent(dev->clock[CSI_CORE_CLK], dev->clock[CSI_CORE_CLK_SRC])) {
 			vfe_err("sclk src Name:%s, csi core clock set parent failed \n",dev->clock[CSI_CORE_CLK_SRC]->name);
@@ -78,6 +87,7 @@ static int csi_clk_get(struct csi_dev *dev)
 		return -1;
 	}
 	vfe_dbg(0,"csi core clk = %ld\n",clk_get_rate(dev->clock[CSI_CORE_CLK]));
+#endif
 #endif
 	return 0;
 }
@@ -339,8 +349,13 @@ static int sunxi_csi_s_mbus_config(struct v4l2_subdev *sd,
 
 static int sunxi_csi_get_frmsize(struct csi_dev *csi, unsigned int *arg)
 {
-	*arg = csi->frame_info.frm_byte_size;
-	printk("csi->frame_info.frm_byte_size = %d\n",csi->frame_info.frm_byte_size);
+#if defined(CH_OUTPUT_IN_DIFFERENT_VIDEO)
+	*arg = csi->frame_info.frm_byte_size[0];
+#else
+	*arg = csi->frame_info.frm_byte_size[0] * csi->bus_info.ch_total_num;
+#endif
+	vfe_print("csi->frame_info.frm_byte_size = %d\n",
+		csi->frame_info.frm_byte_size[0]);
 	return 0;
 }
 

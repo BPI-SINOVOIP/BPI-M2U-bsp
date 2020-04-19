@@ -770,6 +770,53 @@ static int axp81X_probe_dcdc6(void)
     }
 }
 
+static int axp81X_set_dcdc7(int set_vol, int onoff)
+{
+	u8   reg_value;
+
+	if (set_vol > 0) {
+		if (set_vol < 600)
+			set_vol = 600;
+		else if (set_vol > 1520)
+			set_vol = 1520;
+
+		if (axp_i2c_read(AXP81X_ADDR,
+			BOOT_POWER81X_DC6OUT_VOL, &reg_value))
+			return -1;
+		reg_value &= (~0x7f);
+
+		/*dcdc7 0.6v-1.1v  10mv/step   1.12v-1.52v  20mv/step*/
+		if (set_vol > 1100)
+			reg_value |= (50+(set_vol - 1100)/20);
+		else
+			reg_value |= (set_vol - 600)/10;
+
+		if (axp_i2c_write(AXP81X_ADDR,
+			BOOT_POWER81X_DC6OUT_VOL, reg_value))
+			return -1;
+	}
+
+	if (onoff < 0)
+		return 0;
+
+	if (axp_i2c_read(AXP81X_ADDR,
+		BOOT_POWER81X_OUTPUT_CTL1, &reg_value))
+		return -1;
+
+	if (onoff == 0)
+		reg_value &= ~(1 << 6);
+	else
+		reg_value |=  (1 << 6);
+
+	if (axp_i2c_write(AXP81X_ADDR,
+		BOOT_POWER81X_OUTPUT_CTL1, reg_value)) {
+		return -1;
+	}
+
+	return 0;
+}
+
+
 /*
 ************************************************************************************************************
 *
@@ -1860,6 +1907,31 @@ static int axp81X_set_fldo2(int set_vol, int onoff)
 
 	return 0;
 }
+
+static int axp81X_set_fldo3(int set_vol, int onoff)
+{
+	u8 reg_value;
+
+	/*FLDO2/FLDO3 use the same reg:1D*/
+	if (axp_i2c_read(AXP81X_ADDR,
+		BOOT_POWER81X_ALDO_CTL, &reg_value))
+		return -1;
+
+	if (onoff == 0)
+		reg_value &= ~(1 << 4);
+	else
+		reg_value |=  (1 << 4);
+
+	if (axp_i2c_write(AXP81X_ADDR,
+		BOOT_POWER81X_ALDO_CTL, reg_value)){
+		printf("pmu: unable to onoff fldo3\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+
 static int axp81X_probe_fldo2(void)
 {
     u8  reg_value;
@@ -2272,6 +2344,8 @@ static int axp81X_set_dcdc_output(int sppply_index, int vol_value, int onoff)
 			return axp81X_set_dcdc5(vol_value, onoff);
         case 6:
 			return axp81X_set_dcdc6(vol_value, onoff);
+		case 7:
+			return axp81X_set_dcdc7(vol_value, onoff);
 	}
 
 	return -1;
@@ -2332,6 +2406,8 @@ static int axp81X_set_fldo_output(int sppply_index, int vol_value, int onoff)
 			return axp81X_set_fldo1(vol_value, onoff);
 		case 2:
 			return axp81X_set_fldo2(vol_value, onoff);
+		case 3:
+			return axp81X_set_fldo3(vol_value, onoff);
 	}
 
 	return -1;

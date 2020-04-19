@@ -11,8 +11,12 @@
 #include <asm/io.h>
 #include <private_toc.h>
 #include <boot0_helper.h>
+#include <private_boot0.h>
+#include <sunxi_cfg.h>
 
+#define HEADER_OFFSET     (0x4000)
 
+extern const boot0_file_head_t BT0_head;
 
 /*
 ************************************************************************************************************
@@ -101,15 +105,15 @@ int sunxi_deassert_arisc(void)
 	return 0;
 }
 
-	
 int load_fip(int *use_monitor)
 {
 	int i;
 	//int len;
-	
+#ifdef CONFIG_SUNXI_ARISC_EXIST
+	void *dram_para_addr = (void *)BT0_head.prvt_head.dram_para;
+#endif
 	struct sbrom_toc1_head_info  *toc1_head = NULL;
 	struct sbrom_toc1_item_info  *item_head = NULL;
-	
 	struct sbrom_toc1_item_info  *toc1_item = NULL;
 
 	toc1_head = (struct sbrom_toc1_head_info *)CONFIG_BOOTPKG_STORE_IN_DRAM_BASE;
@@ -157,20 +161,48 @@ int load_fip(int *use_monitor)
 			toc1_flash_read(toc1_item->data_offset/512, (toc1_item->data_len+511)/512, (void *)BL31_BASE);
 			*use_monitor = 1;
 		}
+#ifdef CONFIG_SUNXI_ARISC_EXIST
 		else if(strncmp(toc1_item->name, ITEM_SCP_NAME, sizeof(ITEM_SCP_NAME)) == 0)
 		{
 			toc1_flash_read(toc1_item->data_offset/512, CONFIG_SYS_SRAMA2_SIZE/512, (void *)SCP_SRAM_BASE);
 			toc1_flash_read((toc1_item->data_offset+0x18000)/512, SCP_DRAM_SIZE/512, (void *)SCP_DRAM_BASE);
+			memcpy((void *)(SCP_SRAM_BASE+HEADER_OFFSET+SCP_DRAM_PARA_OFFSET),dram_para_addr,SCP_DARM_PARA_NUM * sizeof(int));
 			sunxi_deassert_arisc();
 		}
-
+#endif
+		else if(strncmp(toc1_item->name, ITEM_LOGO_NAME, sizeof(ITEM_LOGO_NAME)) == 0) {
+			*(uint *)(SUNXI_LOGO_COMPRESSED_LOGO_SIZE_ADDR) = toc1_item->data_len;
+			toc1_flash_read(toc1_item->data_offset/512, (toc1_item->data_len+511)/512, (void *)SUNXI_LOGO_COMPRESSED_LOGO_BUFF);
+		}
+		else if(strncmp(toc1_item->name, ITEM_SHUTDOWNCHARGE_LOGO_NAME, sizeof(ITEM_SHUTDOWNCHARGE_LOGO_NAME)) == 0) {
+			*(uint *)(SUNXI_SHUTDOWN_CHARGE_COMPRESSED_LOGO_SIZE_ADDR) = toc1_item->data_len;
+			toc1_flash_read(toc1_item->data_offset/512, (toc1_item->data_len+511)/512, (void *)SUNXI_SHUTDOWN_CHARGE_COMPRESSED_LOGO_BUFF);
+		}
+		else if(strncmp(toc1_item->name, ITEM_ANDROIDCHARGE_LOGO_NAME, sizeof(ITEM_ANDROIDCHARGE_LOGO_NAME)) == 0) {
+			*(uint *)(SUNXI_ANDROID_CHARGE_COMPRESSED_LOGO_SIZE_ADDR) = toc1_item->data_len;
+			toc1_flash_read(toc1_item->data_offset/512, (toc1_item->data_len+511)/512, (void *)SUNXI_ANDROID_CHARGE_COMPRESSED_LOGO_BUFF);
+		}
+		else if(strncmp(toc1_item->name, ITEM_DTB_NAME, sizeof(ITEM_DTB_NAME)) == 0)
+		{
+			toc1_flash_read(toc1_item->data_offset/512, (toc1_item->data_len+511)/512, (void *)CONFIG_DTB_STORE_IN_DRAM_BASE);
+		}
+		else if(strncmp(toc1_item->name, ITEM_SOCCFG_NAME, sizeof(ITEM_SOCCFG_NAME)) == 0)
+		{
+			toc1_flash_read(toc1_item->data_offset/512, (toc1_item->data_len+511)/512, (void *)CONFIG_SOCCFG_STORE_IN_DRAM_BASE);
+		}
+#ifdef USE_BOARD_CONFIG
+		else if(strncmp(toc1_item->name, ITEM_BDCFG_NAME, sizeof(ITEM_BDCFG_NAME)) == 0)
+		{
+			toc1_flash_read(toc1_item->data_offset/512, (toc1_item->data_len+511)/512, (void *)CONFIG_BDCFG_STORE_IN_DRAM_BASE);
+		}
+#endif
 	}
 	if(*use_monitor)
 	{
 		struct spare_boot_head_t* header;
 		/* Obtain a reference to the image by querying the platform layer */
 		header = (struct spare_boot_head_t* )CONFIG_SYS_TEXT_BASE;
-		header->boot_data.secureos_exist = 1;
+		header->boot_data.monitor_exist = 1;
 	}
 	return 0;
 }

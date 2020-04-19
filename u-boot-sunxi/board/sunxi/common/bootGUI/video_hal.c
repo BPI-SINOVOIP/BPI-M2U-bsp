@@ -1,18 +1,14 @@
-#include "video_hal.h"
 #include <common.h>
 #include <malloc.h>
-#include <sys_config.h>
-#include <fdt_support.h>
-#include "hdmi_manage.h"
 #include "boot_gui_config.h"
+#include "video_hal.h"
+#include "video_misc_hal.h"
 
 #if defined(CONFIG_VIDEO_SUNXI_V3)
 #include "de_drv_v3.h"
 #else
 #error "please CONFIG_VIDEO_SUNXI_Vx\n"
 #endif
-
-#define DISPLAY_RSL_FILENAME "disp_rsl.fex"
 
 enum {
 	DISP_DEV_OPENED = 0x00000001,
@@ -38,207 +34,10 @@ static hal_fb_dev_t *get_fb_dev(unsigned int fb_id)
 	}
 }
 
-static int get_disp_fdt_node(void)
-{
-	static int fdt_node = -1;
-
-	if (0 <= fdt_node)
-		return fdt_node;
-	/* notice: make sure we use the only one nodt "disp". */
-	fdt_node = fdt_path_offset(working_fdt, "disp");
-	assert(fdt_node >= 0);
-	return fdt_node;
-}
-
-int hal_save_int_to_kernel(char *name, int value)
-{
-	int ret = -1;
-	int node = get_disp_fdt_node();
-
-	ret = fdt_setprop_u32(working_fdt, node, name, (uint32_t)value);
-	printf("fdt_setprop_u32 %s.%s(0x%x) code:%s\n",
-		"disp", name, value, fdt_strerror(ret));
-	return ret;
-}
-
-int hal_save_string_to_kernel(char *name, char *str)
-{
-	int ret = -1;
-	int node = get_disp_fdt_node();
-
-	ret = fdt_setprop_string(working_fdt, node, name, str);
-	printf("fdt_setprop_string %s.%s(%s). ret-code:%s\n",
-		"disp", name, str, fdt_strerror(ret));
-	return ret;
-}
-
-static void disp_getprop_by_name(int node, const char *name, uint32_t *value, uint32_t defval)
-{
-	if (fdt_getprop_u32(working_fdt, node, name, value) < 0) {
-		printf("fetch script data disp.%s fail. using defval=%d\n", name, defval);
-		*value = defval;
-	}
-}
-
-static int get_display_resolution(const int type, char *buf, int num)
-{
-	int format = 0;
-	char *p = buf;
-
-	while (num > 0) {
-		while ((*p != '\n') && (*p != '\0'))
-			p++;
-		*p++ = '\0';
-		format = simple_strtoul(buf, NULL, 16);
-		if (type == ((format >> 8) & 0xFF)) {
-			printf("get format[%x] for type[%d]\n", format, type);
-			return format & 0xff;
-		}
-		num -= (p - buf);
-		buf = p;
-	}
-	return -1;
-}
-
-inline int hal_fat_fsload(char *part_name, char *file_name, char *load_addr, ulong length)
-{
-#ifdef HAS_FAT_FSLOAD
-	return aw_fat_fsload(part_name, file_name, load_addr, length);
-#else
-	return 0;
-#endif
-}
-
-static disp_device_t *hpd_detect(disp_device_t **devices, int dev_num)
-{
-	int i;
-	unsigned int count = HPD_DETECT_COUNT0;
-	disp_device_t *device = NULL;
-
-	device = devices[0];
-	while (count--) {
-		device->hpd_state = hal_get_hpd_state(
-			devices[0]->screen_id, device->type);
-		if (device->hpd_state) {
-			printf("main-hpd:count=%d,sel=%d,type=%d\n",
-				HPD_DETECT_COUNT0 - count,
-				device->screen_id, device->type);
-			return device;
-		}
-	}
-	count = HPD_DETECT_COUNT1;
-	while (count--) {
-		for (i = 0; i < dev_num; ++i) {
-			device = devices[i];
-			device->hpd_state = hal_get_hpd_state(
-				device->screen_id, device->type);
-			if (device->hpd_state) {
-				printf("ext-hpd:count=%d,sel=%d,type=%d\n",
-					HPD_DETECT_COUNT1 - count,
-					device->screen_id, device->type);
-				return device;
-			}
-		}
-	}
-	return NULL;
-}
-
-disp_device_t *hal_get_disp_devices(disp_device_t *disp_dev_list, int *dev_num)
-{
-	int num = 0;
-	int node = 0;
-	char prop[32] = {'\n'};
-	int read_bytes = 0;
-	char buf[256] = {0};
-	disp_device_t *disp_dev = NULL;
-	uint32_t value = 0;
-	int mode = -1;
-
-	disp_device_t *hpd_dev[DISP_DEV_NUM];
-	int hpd_dev_num = 0;
-
-	node = get_disp_fdt_node();
-
-	read_bytes = hal_fat_fsload(DISPLAY_PARTITION_NAME,
-		DISPLAY_RSL_FILENAME, buf, sizeof(buf));
-
-	disp_dev = disp_dev_list;
-	for (num = 0; num < *dev_num; ++num, ++disp_dev) {
-		sprintf(prop, "dev%d_output_type", num);
-		disp_getprop_by_name(node, prop, &value, 0);
-		if (0 == value)
-			break;
-		memset((void *)disp_dev, 0, sizeof(*disp_dev));
-		disp_dev->type = value;
-		sprintf(prop, "dev%d_screen_id", num);
-		disp_getprop_by_name(node, prop, (uint32_t *)&disp_dev->screen_id, 0);
-		sprintf(prop, "dev%d_do_hpd", num);
-		disp_getprop_by_name(node, prop, (uint32_t *)&disp_dev->do_hpd, 0);
-		if (0 < read_bytes) {
-			mode = get_display_resolution(disp_dev->type, buf, read_bytes);
-			if (-1 != mode)
-				disp_dev->mode = mode;
-		}
-		if ((0 >= read_bytes) || (-1 == mode)) {
-			sprintf(prop, "dev%d_output_mode", num);
-			disp_getprop_by_name(node, prop, (uint32_t *)&disp_dev->mode, 0);
-		}
-		if (disp_dev->do_hpd) {
-			hpd_dev[hpd_dev_num] = disp_dev;
-			++hpd_dev_num;
-		}
-	}
-
-	if (0 < num) {
-		*dev_num = num;
-	} else {
-		printf("no found any device of disp. num=%d\n", num);
-		memset((void *)disp_dev_list, 0, sizeof(*disp_dev_list));
-		disp_dev_list->type = DISP_OUTPUT_TYPE_LCD;
-		*dev_num = 1;
-	}
-	num = 0;
-
-	if (hpd_dev_num) {
-		disp_dev = hpd_detect(hpd_dev, hpd_dev_num);
-		if (NULL != disp_dev) {
-			return disp_dev;
-		}
-	}
-	if (1 < *dev_num) {
-		disp_getprop_by_name(node, "def_output_dev", (uint32_t *)&num, 0);
-		printf("hpd_dev_num=%d, id of def_output_dev is %d\n", hpd_dev_num, num);
-	}
-
-	return &(disp_dev_list[num]);
-}
-
-int hal_get_mode_check(int type, int def_check)
-{
-	if (DISP_OUTPUT_TYPE_HDMI == type) {
-		disp_getprop_by_name(get_disp_fdt_node(), "hdmi_mode_check",
-			(uint32_t *)&def_check, def_check);
-	}
-	return def_check;
-}
-
 int hal_switch_device(disp_device_t *device, unsigned int fb_id)
 {
-	int disp_para = 0;
-	hal_fb_dev_t *fb_dev = NULL;
-
-	if (DISP_OUTPUT_TYPE_HDMI == device->type) {
-		if (0 == device->hpd_state) {
-			printf("hdmi hpd out, force open?\n");
-			/* Todo: force open hdmi device */
-			return 0;
-		} else {
-			int vendor_id;
-			device->mode = hdmi_verify_mode(
-				device->screen_id, device->mode, &vendor_id,
-				hal_get_mode_check(DISP_OUTPUT_TYPE_HDMI, 1));
-		}
-	}
+	int disp_para;
+	hal_fb_dev_t *fb_dev;
 
 	if (0 != _switch_device(device->screen_id, device->type, device->mode)) {
 		printf("switch device failed: sel=%d, type=%d, mode=%d\n",
@@ -285,33 +84,16 @@ int hal_get_hdmi_edid(int sel, unsigned char *edid_buf, int length)
 	return _get_hdmi_edid(sel, edid_buf, length);
 }
 
-
 /* -------------------------------------------------------------------- */
-
-
 
 void hal_get_screen_size(int sel, unsigned int *width, unsigned int *height)
 {
 	_get_screen_size(sel, width, height);
 }
 
-int hal_get_fb_configs(fb_config_t *fb_cfgs, int *fb_num)
+void hal_get_fb_format_config(int fmt_cfg, int *bpp)
 {
-	int num = 0;
-	int node = get_disp_fdt_node();
-	char prop[32] = {0};
-
-	for (num = 0; num < *fb_num; ++num, ++fb_cfgs) {
-		memset((void *)fb_cfgs, 0, sizeof(*fb_cfgs));
-		sprintf(prop, "fb%d_format", num);
-		disp_getprop_by_name(node, prop, (uint32_t *)&fb_cfgs->format_cfg, -1);
-		_get_fb_format_config(fb_cfgs->format_cfg, &fb_cfgs->bpp);
-		sprintf(prop, "fb%d_width", num);
-		disp_getprop_by_name(node, prop, (uint32_t *)&fb_cfgs->width, 0);
-		sprintf(prop, "fb%d_height", num);
-		disp_getprop_by_name(node, prop, (uint32_t *)&fb_cfgs->height, 0);
-	}
-	return 0;
+	_get_fb_format_config(fmt_cfg, bpp);
 }
 
 void *hal_request_layer(unsigned int fb_id)
@@ -323,7 +105,7 @@ void *hal_request_layer(unsigned int fb_id)
 	}
 
 	fb_dev->state &= ~(FB_REQ_LAYER | FB_SHOW_LAYER);
-	fb_dev->layer_config = (void *)malloc(sizeof(private_data));
+	fb_dev->layer_config = (void *)calloc(sizeof(private_data), 1);
 	if (NULL == fb_dev->layer_config) {
 		printf("%s: malloc for private_data failed.\n", __func__);
 		return NULL;
@@ -370,12 +152,25 @@ int hal_set_layer_addr(void *handle, void *addr)
 	return 0;
 }
 
-int hal_set_layer_geometry(void *handle,
-	int width, int height, int bpp, int byte_align)
+int hal_set_layer_alpha_mode(void *handle,
+	unsigned char alpha_mode, unsigned char alpha_value)
 {
 	hal_fb_dev_t *fb_dev = (hal_fb_dev_t *)handle;
 
-	_set_layer_geometry(fb_dev->layer_config, width, height, bpp, byte_align);
+	_set_layer_alpha_mode(fb_dev->layer_config, alpha_mode, alpha_value);
+
+	if (fb_dev->state & FB_SHOW_LAYER)
+		hal_show_layer((void *)fb_dev, 1);
+
+	return 0;
+}
+
+int hal_set_layer_geometry(void *handle,
+	int width, int height, int bpp, int stride)
+{
+	hal_fb_dev_t *fb_dev = (hal_fb_dev_t *)handle;
+
+	_set_layer_geometry(fb_dev->layer_config, width, height, bpp, stride);
 
 	if (fb_dev->state & FB_SHOW_LAYER)
 		hal_show_layer((void *)fb_dev, 1);

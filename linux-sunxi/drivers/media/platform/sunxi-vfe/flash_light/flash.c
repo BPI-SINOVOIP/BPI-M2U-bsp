@@ -186,7 +186,12 @@ int sunxi_flash_check_to_start(struct v4l2_subdev *sd, enum sunxi_flash_ctrl ctr
 
 int sunxi_flash_stop(struct v4l2_subdev *sd)
 {
-	if(!flash_gbl->flash_used)
+	if (flash_gbl == NULL) {
+		vfe_err("not register flash platform!\n");
+		return -1;
+	}
+
+	if (!flash_gbl->flash_used)
 		return 0;
 
 	if (NULL == sd) {

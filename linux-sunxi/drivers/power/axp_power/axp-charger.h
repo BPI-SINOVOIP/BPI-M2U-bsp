@@ -17,6 +17,7 @@
 #define INTCHGCSTTIME   480         /* set initial pre-charging time */
 #define BATMAXVOL       4200000     /* set battery max design volatge */
 #define BATMINVOL       3500000     /* set battery min design volatge */
+#define UPDATEMINTIME   30          /* set bat percent update min time */
 
 #define OCVREG0         0x00        /* 2.99V */
 #define OCVREG1         0x00        /* 3.13V */
@@ -87,6 +88,8 @@ struct axp_config_info {
 	u32 pmu_batt_cap_correct;
 	u32 pmu_chg_end_on_en;
 	u32 ocv_coulumb_100;
+	u32 pmu_discharge_ltf;
+	u32 pmu_discharge_htf;
 
 	u32 pmu_bat_para1;
 	u32 pmu_bat_para2;
@@ -150,6 +153,9 @@ struct axp_config_info {
 	u32 power_start;
 	u32 pmu_as_slave;
 	u32 pmu_bat_unused;
+	u32 pmu_ocv_en;
+	u32 pmu_cou_en;
+	u32 pmu_update_min_time;
 
 	u32 pmu_bat_temp_enable;
 	u32 pmu_bat_charge_ltf;
@@ -315,4 +321,16 @@ int axp_charger_dt_parse(struct device_node *node,
 					struct axp_config_info *axp_config);
 
 extern int axp_debug;
-#endif /* AXP_ChARGER_H */
+
+extern irqreturn_t axp_usb_in_isr(int irq, void *data);
+extern irqreturn_t axp_usb_out_isr(int irq, void *data);
+extern irqreturn_t axp_ac_in_isr(int irq, void *data);
+extern irqreturn_t axp_ac_out_isr(int irq, void *data);
+extern irqreturn_t axp_capchange_isr(int irq, void *data);
+extern irqreturn_t axp_change_isr(int irq, void *data);
+extern irqreturn_t axp_low_warning1_isr(int irq, void *data);
+extern irqreturn_t axp_low_warning2_isr(int irq, void *data);
+extern int axp_charger_vts_to_temp(int data,
+		struct axp_config_info *axp_config);
+
+#endif /* AXP_CHARGER_H */

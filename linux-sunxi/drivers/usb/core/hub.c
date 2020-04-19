@@ -113,6 +113,9 @@ EXPORT_SYMBOL_GPL(ehci_cf_port_reset_rwsem);
 #define HUB_DEBOUNCE_STEP	  25
 #define HUB_DEBOUNCE_STABLE	 100
 
+/* Be set in xhci_sunxi.c */
+atomic_t g_sunxi_xhci_standby_flag;
+
 static void hub_release(struct kref *kref);
 static int usb_reset_and_verify_device(struct usb_device *udev);
 
@@ -3341,7 +3344,12 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 
 	clear_bit(port1, hub->busy_bits);
 
-	if (udev->persist_enabled && hub_is_superspeed(hub->hdev))
+	/* FIXME: wait_for_ss_port_enable() takes about 3 seconds
+	 * during resume in the worst condition. So we try to skip
+	 * waiting when we are in super standby.
+	 */
+	if (udev->persist_enabled && hub_is_superspeed(hub->hdev)
+			&& !atomic_read(&g_sunxi_xhci_standby_flag))
 		status = wait_for_ss_port_enable(udev, hub, &port1, &portchange,
 				&portstatus);
 

@@ -137,7 +137,7 @@
 #define FEL_BASE                         0xffff0020
 #define SUNXI_RUN_EFEX_FLAG              (0x5AA5A55A)
 
-
+#define CONFIG_NORMAL_DEBUG_BASE         (CONFIG_SYS_SRAMA3_BASE)
 
 #define SUNXI_RUN_EFEX_ADDR              (SUNXI_RTC_BASE + 0x108)
 #define DRAM_PARA_STORE_ADDR             (CONFIG_SYS_SDRAM_BASE + 0x00800000)
@@ -456,7 +456,7 @@
 #define CONFIG_SUNXI_SPINOR
 #define CONFIG_SPINOR_LOGICAL_OFFSET        ((512 - 16) * 1024/512)
 #define UBOOT_START_SECTOR_IN_SPINOR        (24*1024/512)
-#define SPINOR_STORE_BUFFER_SIZE            (16<<20)
+#define SPINOR_STORE_BUFFER_SIZE            (2<<20)
 #define CONFIG_STORAGE_MEDIA_SPINOR
 #define ALIGN_SIZE_8K
 
@@ -485,32 +485,6 @@
 #define BPI_M2_ULTRA_ID	1		/* BPI */
 #define BPI_M2_BERRY_ID	2		/* BPI */
 
-/* net support */
-#define CONFIG_SUNXI_GMAC	/* BPI */
-#define CONFIG_CMD_DHCP		/* BPI */
-#define CONFIG_CMD_NET		/* BPI */
-#define CONFIG_CMD_PING		/* BPI */
-
-
-#ifdef CONFIG_SUNXI_GMAC
-#define CONFIG_DESIGNWARE_ETH		/* GMAC can use designware driver */
-#define CONFIG_DW_AUTONEG
-#define CONFIG_PHY_GIGE			/* GMAC can use gigabit PHY	*/
-#define CONFIG_PHY_ADDR		1
-#define CONFIG_MII			/* MII PHY management		*/
-#define CONFIG_PHYLIB
-#endif
-
-#ifdef CONFIG_CMD_NET
-#define CONFIG_CMD_NFS
-#define CONFIG_CMD_DNS
-#define CONFIG_NETCONSOLE
-#define CONFIG_BOOTP_DNS2
-#define CONFIG_BOOTP_SEND_HOSTNAME
-#endif
-
-
-
 //#define CONFIG_USB_ETHER
 #ifdef CONFIG_USB_ETHER
 #define CONFIG_USB_ETH_RNDIS
@@ -526,5 +500,19 @@
 #endif
 
 //#define CONFIG_SYS_DCACHE_OFF
+
+/* net support */
+//#define CONFIG_SUNXI_GETH
+#ifdef CONFIG_SUNXI_GETH
+#define CONFIG_SUNXI_EXT_PHY
+#define CONFIG_CMD_NET
+#define CONFIG_CMD_PING
+#define CONFIG_CMD_MII
+//#define CONFIG_ETHADDR 	72:D6:05:4F:B9:3B
+//#define CONFIG_IPADDR   	192.168.200.254
+//#define CONFIG_SERVERIP      	192.168.200.20
+//#define CONFIG_NETMASK       	255.255.255.0
+//#define CONFIG_GATEWAYIP     	192.168.200.1
+#endif
 
 #endif /* __CONFIG_H */

@@ -32,6 +32,17 @@ s32 sunxi_lcd_delay_us(u32 us);
  */
 void sunxi_lcd_tcon_enable(u32 screen_id);
 
+/**
+ * sunxi_lcd_dsi_close - stop dsi transition
+ * @screen_id: The index of screen.
+ */
+void sunxi_lcd_dsi_close(u32 screen_id);
+
+/**
+ * sunxi_lcd_dsi_open - start dsi transition
+ * @screen_id: The index of screen.
+ */
+void sunxi_lcd_dsi_open(u32 screen_id);
 
 /**
  * sunxi_lcd_tcon_disable - disable timing controller.
@@ -130,6 +141,8 @@ s32 sunxi_lcd_dsi_dcs_write_2para(u32 scree_id, u8 command, u8 para1, u8 para2);
 s32 sunxi_lcd_dsi_dcs_write_3para(u32 scree_id, u8 command, u8 para1, u8 para2, u8 para3);
 s32 sunxi_lcd_dsi_dcs_write_4para(u32 scree_id, u8 command, u8 para1, u8 para2, u8 para3, u8 para4);
 s32 sunxi_lcd_dsi_dcs_write_5para(u32 scree_id, u8 command, u8 para1, u8 para2, u8 para3, u8 para4, u8 para5);
+s32 sunxi_lcd_dsi_dcs_write_6para(u32 screen_id, u8 command, u8 para1, u8 para2,
+				  u8 para3, u8 para4, u8 para5, u8 para6);
 
 /**
  * sunxi_lcd_dsi_gen_write - write command and para to mipi panel(GEN type).

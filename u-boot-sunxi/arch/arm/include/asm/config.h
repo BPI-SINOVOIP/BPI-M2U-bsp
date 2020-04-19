@@ -21,4 +21,7 @@
 #include <asm/arch-fsl-lsch3/config.h>
 #endif
 
+#define SPINLOCK_LOCK       1
+#define SPINLOCK_UNLOCK     0
+
 #endif

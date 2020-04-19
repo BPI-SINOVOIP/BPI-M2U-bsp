@@ -177,6 +177,24 @@ config RTC_DRV_DS1307
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-ds1307.
 
+config RTC_DRV_SUNXI_DS1307
+        tristate "SUNXI Dallas/Maxim DS1307/37/38/39/40, ST M41T00, EPSON RX-8025"
+        help
+          If you say yes here you get support for various compatible RTC
+          chips (often with battery backup) connected with I2C. This driver
+          should handle DS1307, DS1337, DS1338, DS1339, DS1340, ST M41T00,
+          EPSON RX-8025 and probably other chips. In some cases the RTC
+          must already have been initialized (by manufacturing or a
+          bootloader).
+
+          The first seven registers on these chips hold an RTC, and other
+          registers may add features such as NVRAM, a trickle charger for
+          the RTC/NVRAM backup power, and alarms. NVRAM is visible in
+          sysfs, but other chip features may not be available.
+
+          This driver can also be built as a module. If so, the module
+          will be called rtc-ds1307.
+
 config RTC_DRV_DS1374
 	tristate "Dallas/Maxim DS1374"
 	depends on I2C
@@ -1251,6 +1269,16 @@ config RTC_DRV_SNVS
 
 	   This driver can also be built as a module, if so, the module
 	   will be called "rtc-snvs".
+
+config SUNXI_BOOTUP_EXTEND
+	depends on RTC_DRV_SUNXI
+	bool "Sunxi rtc reboot Feature"
+	help
+	  Support sunxi rtc reboot, which can save state in rtc reg
+	  according to the reboot arg.
+	  This feature need support of reboot program in the userspace,
+	  such as android reboot. Busybox reboot doesn't support this
+	  feature.
 
 comment "HID Sensor RTC drivers"
 

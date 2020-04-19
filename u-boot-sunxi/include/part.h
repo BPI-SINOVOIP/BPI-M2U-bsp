@@ -28,16 +28,16 @@ typedef struct block_dev_desc {
 	char		product[20+1];	/* IDE Serial no, SCSI product */
 	char		revision[8+1];	/* firmware revision */
 	unsigned long	(*block_read)(int dev,
-				      lbaint_t start,
-				      lbaint_t blkcnt,
-				      void *buffer);
+					lbaint_t start,
+					lbaint_t blkcnt,
+					void *buffer);
 	unsigned long	(*block_write)(int dev,
-				       lbaint_t start,
-				       lbaint_t blkcnt,
-				       const void *buffer);
+					lbaint_t start,
+					lbaint_t blkcnt,
+					const void *buffer);
 	unsigned long   (*block_erase)(int dev,
-				       lbaint_t start,
-				       lbaint_t blkcnt);
+					lbaint_t start,
+					lbaint_t blkcnt);
 
 	int (*block_secure_wipe)(int dev,
 						unsigned int start,
@@ -62,13 +62,37 @@ typedef struct block_dev_desc {
 						unsigned int start,
 						unsigned int blkcnt);
 	unsigned long	 (*block_read_mass_pro)(int dev,
-				      unsigned long start,
-				      lbaint_t blkcnt,
-				      void *buffer);
+						unsigned long start,
+						lbaint_t blkcnt,
+						void *buffer);
 	unsigned long	(*block_write_mass_pro)(int dev,
-				       unsigned long start,
-				       lbaint_t blkcnt,
-				       const void *buffer);
+						unsigned long start,
+						lbaint_t blkcnt,
+						const void *buffer);
+	int				(*block_enable_bootop)(int dev,
+					int part_nu,
+					int enable);
+	unsigned long	(*block_write_emmc_bootp)(int dev,
+						lbaint_t start,
+						lbaint_t blkcnt,
+						int part_nu,
+						const void *buffer);
+	unsigned long	(*block_read_emmc_bootp)(int dev,
+						lbaint_t start,
+						lbaint_t blkcnt,
+						int part_nu,
+						void *buffer);
+	u64	(*block_get_boot_cap)(int dev);
+
+	int (*block_mmc_user_write_protect)(int dev_num,
+					unsigned wp_type,
+					unsigned start,
+					unsigned blkcnt);
+	int (*block_mmc_user_get_wp_grp_size)(int dev_num,
+				unsigned int *wp_grp_size);
+	int (*block_mmc_clr_tem_wp)(int dev_num,
+				unsigned start, unsigned blkcnt);
+
 	int	(*block_read_secure)(s32 dev_num,
 						u32 item,u8 *buf ,
 						lbaint_t blkcnt);

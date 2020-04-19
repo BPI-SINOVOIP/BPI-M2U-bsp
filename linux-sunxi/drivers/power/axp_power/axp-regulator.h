@@ -63,7 +63,7 @@ struct axp_consumer_supply {
 
 #define AXP_DCDC(_pmic, _id, min, max, step1, vreg, shift, nbits, ereg,\
 	emask, enval, disval, switch_vol, step2, new_level,\
-	mode_addr, mode_bit, freq_addr, dvm_ereg, dvm_ebit, dvm_flag)\
+	mode_addr, _mode_mask, freq_addr, dvm_ereg, dvm_ebit, dvm_flag)\
 {                                                      \
 	.desc   = {                                        \
 		.name   = #_pmic"_DCDC" #_id,                  \
@@ -91,7 +91,7 @@ struct axp_consumer_supply {
 	.step2_uv   = (step2)*1000,                        \
 	.new_level_uv   = (new_level)*1000,                \
 	.mode_reg   = mode_addr,                           \
-	.mode_mask  = mode_bit,                            \
+	.mode_mask  = _mode_mask,                          \
 	.freq_reg   = freq_addr,                           \
 	.dvm_enable_reg = dvm_ereg,                        \
 	.dvm_enable_bit = dvm_ebit,                        \
@@ -165,7 +165,7 @@ struct axp_consumer_supply {
 
 #define AXP_DCDC_SEL(_pmic, _id, min, max, vreg, shift, nbits, ereg,\
 	emask, enval, disval, table_name,\
-	mode_addr, mode_bit, freq_addr, dvm_ereg, dvm_ebit, dvm_flag)\
+	mode_addr, _mode_mask, freq_addr, dvm_ereg, dvm_ebit, dvm_flag)\
 {                                                      \
 	.desc   = {                                        \
 		.name   = #_pmic"_DCDC" #_id,                  \
@@ -184,7 +184,7 @@ struct axp_consumer_supply {
 	.vol_shift  = (shift),                             \
 	.vol_nbits  = (nbits),                             \
 	.mode_reg   = mode_addr,                           \
-	.mode_mask  = mode_bit,                            \
+	.mode_mask  = _mode_mask,                          \
 	.freq_reg   = freq_addr,                           \
 	.dvm_enable_reg = dvm_ereg,                        \
 	.dvm_enable_bit = dvm_ebit,                        \

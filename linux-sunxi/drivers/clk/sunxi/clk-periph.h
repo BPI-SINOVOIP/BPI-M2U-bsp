@@ -89,10 +89,10 @@ struct sunxi_clk_periph_mux {
 
 struct sunxi_clk_comgate {
 	const u8        *name;
-	u8              val;
-	u8              mask;
-	u8              share;
-	u8              res;
+	u32              val;
+	u32              mask;
+	u32              share;
+	u32              res;
 };
 
 #define BUS_GATE_SHARE  0x01
@@ -148,7 +148,7 @@ static inline u32 periph_readl(struct sunxi_clk_periph * periph, void __iomem * 
 
 static inline void periph_writel(struct sunxi_clk_periph * periph, unsigned int val, void __iomem * reg)
 {
-	(((unsigned long)periph->priv_regops)?periph->priv_regops->reg_writel(val,reg):writel(val,reg));
+	(((unsigned long)periph->priv_regops) ? periph->priv_regops->reg_writel(val, reg) : writel(val, reg));
 }
 
 struct clk *sunxi_clk_register_periph(struct periph_init_data *pd,

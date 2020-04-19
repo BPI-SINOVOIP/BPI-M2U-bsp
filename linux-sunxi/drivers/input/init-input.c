@@ -24,6 +24,10 @@
 #include <linux/of_gpio.h>
 #include <linux/platform_device.h>
 
+#ifdef CONFIG_IO_EXPAND
+u32 g_ctp_board_sel;
+EXPORT_SYMBOL(g_ctp_board_sel);
+#endif
 
 /*********************************CTP*******************************************/
 
@@ -76,11 +80,29 @@ static int ctp_fetch_sysconfig_para(enum input_sensor_type *ctp_type)
 
 	data->ctp_power_io.gpio = of_get_named_gpio_flags(np, "ctp_power_io", 0, (enum of_gpio_flags *)(&(data->ctp_power_io)));
 	if (!gpio_is_valid(data->ctp_power_io.gpio))
-		pr_err("%s: ctp_power_io is invalid. \n",__func__ );
+		pr_err("%s: ctp_power_io is invalid.\n", __func__);
 
-	data->wakeup_gpio.gpio = of_get_named_gpio_flags(np, "ctp_wakeup", 0, (enum of_gpio_flags *)(&(data->wakeup_gpio)));
+#ifdef CONFIG_IO_EXPAND
+	of_property_read_u32(np, "ctp_board_sel", &g_ctp_board_sel);
+	if (!g_ctp_board_sel) {
+		ret = of_property_read_u32(np, "ctp_wakeup",
+						&data->wakeup_gpio.gpio);
+		if (ret)
+			pr_err("get ctp_wakeup is fail, %d\n", ret);
+	} else {
+		data->wakeup_gpio.gpio =
+			of_get_named_gpio_flags(np, "ctp_wakeup", 0,
+				(enum of_gpio_flags *)(&(data->wakeup_gpio)));
+		if (!gpio_is_valid(data->wakeup_gpio.gpio))
+			pr_err("%s: wakeup_gpio is invalid.\n", __func__);
+	}
+#else
+	data->wakeup_gpio.gpio =
+		of_get_named_gpio_flags(np, "ctp_wakeup", 0,
+				(enum of_gpio_flags *)(&(data->wakeup_gpio)));
 	if (!gpio_is_valid(data->wakeup_gpio.gpio))
-			pr_err("%s: wakeup_gpio is invalid. \n",__func__ );
+			pr_err("%s: wakeup_gpio is invalid.\n", __func__);
+#endif
 
 	ret = of_property_read_u32(np, "ctp_screen_max_x", &data->screen_max_x);
 	if (ret) {
@@ -109,12 +131,31 @@ static int ctp_fetch_sysconfig_para(enum input_sensor_type *ctp_type)
 		 pr_err("get ctp_exchange_x_y_flag is fail, %d\n", ret);
 	}
 
+#ifdef CONFIG_IO_EXPAND
+	if (!g_ctp_board_sel) {
+		ret = of_property_read_u32(np, "ctp_int_port",
+						&data->irq_gpio.gpio);
+		if (ret)
+			pr_err("get ctp_int_port is fail, %d\n", ret);
+		else
+			data->int_number = data->irq_gpio.gpio;
+	} else {
+		data->irq_gpio.gpio =
+			of_get_named_gpio_flags(np, "ctp_int_port", 0,
+				(enum of_gpio_flags *)(&(data->irq_gpio)));
+		if (!gpio_is_valid(data->irq_gpio.gpio))
+			pr_err("%s: irq_gpio is invalid.\n", __func__);
+		else
+			data->int_number = data->irq_gpio.gpio;
+	}
+
+#else
 	data->irq_gpio.gpio = of_get_named_gpio_flags(np, "ctp_int_port", 0, (enum of_gpio_flags *)(&(data->irq_gpio)));
 	if (!gpio_is_valid(data->irq_gpio.gpio))
-			pr_err("%s: irq_gpio is invalid. \n",__func__ );
+		pr_err("%s: irq_gpio is invalid.\n", __func__);
 	else
 		data->int_number = data->irq_gpio.gpio;
-
+#endif
         
 #ifdef TOUCH_KEY_LIGHT_SUPPORT 
 

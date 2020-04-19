@@ -60,13 +60,23 @@
 #define DPHY_CLK (150*1000*1000)
 #endif
 
-#if defined CONFIG_ARCH_SUN50IW1P1
+#if defined CONFIG_ARCH_SUN3IW1P1
+#include "platform/sun3iw1p1_vfe_cfg.h"
+#define SUNXI_PLATFORM_ID ISP_PLATFORM_NUM
+#elif defined CONFIG_ARCH_SUN50IW1P1
 #include "platform/sun50iw1p1_vfe_cfg.h"
 #define SUNXI_PLATFORM_ID ISP_PLATFORM_SUN50IW1P1
+#elif defined CONFIG_ARCH_SUN8IW5P1
+#include "platform/sun8iw5p1_vfe_cfg.h"
+#define SUNXI_PLATFORM_ID ISP_PLATFORM_SUN8IW5P1
+#elif defined CONFIG_ARCH_SUN8IW6P1
+#include "platform/sun8iw6p1_vfe_cfg.h"
+#define SUNXI_PLATFORM_ID ISP_PLATFORM_SUN8IW6P1
 #elif defined CONFIG_ARCH_SUN8IW10P1
 #include "platform/sun8iw10p1_vfe_cfg.h"
 #define SUNXI_PLATFORM_ID ISP_PLATFORM_NUM
 #elif defined CONFIG_ARCH_SUN8IW11P1
+/*#define CH_OUTPUT_IN_DIFFERENT_VIDEO*/
 #include "platform/sun8iw11p1_vfe_cfg.h"
 #define SUNXI_PLATFORM_ID ISP_PLATFORM_NUM
 #elif defined CONFIG_ARCH_SUN50IW2P1

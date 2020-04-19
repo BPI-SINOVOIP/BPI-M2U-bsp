@@ -22,6 +22,9 @@
 #include "mmc_ops.h"
 
 #define MMC_OPS_TIMEOUT_MS	(10 * 60 * 1000) /* 10 minute timeout */
+#if defined(CONFIG_ARCH_SUN8IW5) || defined(CONFIG_ARCH_SUN8IW6)
+#define MMC_OPS_MIN_TIMEOUT_MS	(500) /* 500 ms min timeout*/
+#endif
 
 static inline int __mmc_send_status(struct mmc_card *card, u32 *status,
 				    bool ignore_crc)
@@ -502,6 +505,11 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 	/* We have an unspecified cmd timeout, use the fallback value. */
 	if (!timeout_ms)
 		timeout_ms = MMC_OPS_TIMEOUT_MS;
+	/* avoid ext_csd[199] value small to cmd6 RTO*/
+#if defined(CONFIG_ARCH_SUN8IW5) || defined(CONFIG_ARCH_SUN8IW6)
+	if (timeout_ms < MMC_OPS_MIN_TIMEOUT_MS)
+		timeout_ms = MMC_OPS_MIN_TIMEOUT_MS;
+#endif
 
 #if 0
 	/*Here we limit timemout over 1 minute for that we will used mmc_set_clock to reset timing before send status*/
@@ -526,8 +534,28 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 			if (err)
 				return err;
 		}
-		if ((host->caps & MMC_CAP_WAIT_WHILE_BUSY) && use_r1b_resp)
-			break;
+		if ((host->caps & MMC_CAP_WAIT_WHILE_BUSY) && use_r1b_resp) {
+#if defined(CONFIG_ARCH_SUN8IW5) || defined(CONFIG_ARCH_SUN8IW6)
+			/*avoid sunxi host dat0 busy state is not consistent
+			 * with cmd13 prg state
+			 * */
+			if (R1_CURRENT_STATE(status) == R1_STATE_PRG) {
+				/*Timeout if the device never
+				 * leaves the prg state.
+				 * */
+				if (time_after(jiffies, timeout)) {
+					pr_err("%s: Card stuck in prg state! %s\n",
+							mmc_hostname(host),
+							__func__);
+				return -ETIMEDOUT;
+				}
+				pr_warn_ratelimited("%s: wait card out prg state",
+						mmc_hostname(host));
+				continue;
+			}
+#endif
+				break;
+		}
 		if (mmc_host_is_spi(host))
 			break;
 

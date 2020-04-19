@@ -68,6 +68,9 @@ static int axp80_init_chip(struct axp_dev *axp80)
 		pr_info("[%s] chip id not detect 0x%x !\n",
 				axp_name[axp80_pmu_num], chip_id);
 
+	/* enable DVM on when wakeup */
+	axp_regmap_set_bits(axp80->regmap, AXP80_DCDC_DVM_CTRL, 0x08);
+
 	/*init irq wakeup en*/
 	if (axp80_config.pmu_irq_wakeup)
 		axp_regmap_set_bits(axp80->regmap,

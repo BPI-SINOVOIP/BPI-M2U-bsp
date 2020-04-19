@@ -132,5 +132,8 @@
 #define RVBARADDR3_L		             (SUNXI_CPUX_CFG_BASE_A32+0xB8)
 #define RVBARADDR3_H		             (SUNXI_CPUX_CFG_BASE_A32+0xBC)
 
+/*dram_para_offset is the numbers of u32 before dram data sturcture(dram_para) in struct arisc_para*/
+#define SCP_DRAM_PARA_OFFSET                 (sizeof(u32) * 13 + sizeof(u32) + sizeof(u32) * 2 * 64)
+#define SCP_DARM_PARA_NUM	             (24)
 
 #endif

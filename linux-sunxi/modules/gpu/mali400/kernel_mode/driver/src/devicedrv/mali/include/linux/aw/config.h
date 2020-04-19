@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2015-2016 Allwinner Technology Limited. All rights reserved.
+ * Copyright (C) 2015-2017 Allwinner Technology Limited. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,15 +16,19 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-#if defined CONFIG_ARCH_SUN8IW3P1
+#if defined(CONFIG_ARCH_SUN7I)
+#include "sun7i/sun7i.h"
+#elif defined(CONFIG_ARCH_SUN8IW3P1)
 #include "sun8i/sun8iw3p1.h"
-#elif defined CONFIG_ARCH_SUN8IW5P1
+#elif defined(CONFIG_ARCH_SUN8IW5P1)
 #include "sun8i/sun8iw5p1.h"
-#elif defined CONFIG_ARCH_SUN8IW7P1
+#elif defined(CONFIG_ARCH_SUN8IW7P1)
 #include "sun8i/sun8iw7p1.h"
-#elif defined CONFIG_ARCH_SUN8IW11P1
+#elif defined(CONFIG_ARCH_SUN8IW11P1)
 #include "sun8i/sun8iw11p1.h"
-#elif defined CONFIG_ARCH_SUN50IW1P1
+#elif defined(CONFIG_ARCH_SUN8IW17P1)
+#include "sun8i/sun8iw17p1.h"
+#elif defined(CONFIG_ARCH_SUN50IW1P1)
 #include "sun50i/sun50iw1p1.h"
 #else
 #error "please select a platform\n"

@@ -387,5 +387,6 @@ config CRYPTO_DEV_ATMEL_SHA
 	  will be called atmel-sha.
 
 source drivers/crypto/sunxi/Kconfig
+source drivers/crypto/sunxi-emce/Kconfig
 
 endif # CRYPTO_HW

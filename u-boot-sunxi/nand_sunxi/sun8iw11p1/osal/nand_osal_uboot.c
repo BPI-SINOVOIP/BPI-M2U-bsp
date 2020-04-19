@@ -29,11 +29,9 @@
 #include <smc.h>
 #include <fdt_support.h>
 
-//#define get_wvalue(addr)	(*((volatile unsigned long  *)(addr)))
-//#define put_wvalue(addr, v)	(*((volatile unsigned long  *)(addr)) = (unsigned long)(v))
 #define  NAND_DRV_VERSION_0		0x03
-#define  NAND_DRV_VERSION_1		0x5001
-#define  NAND_DRV_DATE			0x20160510
+#define  NAND_DRV_VERSION_1		0x5003
+#define  NAND_DRV_DATE			0x20160830
 #define  NAND_DRV_TIME			0x1716
 
 
@@ -53,7 +51,6 @@ void * NAND_Malloc(unsigned int Size);
 void NAND_Free(void *pAddr, unsigned int Size);
 int NAND_Get_Version(void);
 static __u32 boot_mode;
-//static __u32 gpio_hdl;
 static int nand_nodeoffset;
 
 int NAND_set_boot_mode(__u32 boot)
@@ -61,7 +58,6 @@ int NAND_set_boot_mode(__u32 boot)
 	boot_mode = boot;
 	return 0;
 }
-
 
 int NAND_Print(const char * str, ...)
 {

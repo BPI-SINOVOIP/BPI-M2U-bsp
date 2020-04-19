@@ -57,4 +57,6 @@ obj-$(CONFIG_KEYBOARD_TWL4030)		+= twl4030_keypad.o
 obj-$(CONFIG_KEYBOARD_XTKBD)		+= xtkbd.o
 obj-$(CONFIG_KEYBOARD_W90P910)		+= w90p910_keypad.o
 obj-$(CONFIG_KEYBOARD_SUNXI)		+= sunxi-keyboard.o
-obj-$(CONFIG_KEYPAD_SUNXI)			+= sunxi-keypad.o
+obj-$(CONFIG_KEYPAD_SUNXI)		+= sunxi-keypad.o
+obj-$(CONFIG_SUNXI_GPIOKEY)		+= sunxi-gpiokey.o
+obj-$(CONFIG_TP_KEY) 			+= tp-key.o

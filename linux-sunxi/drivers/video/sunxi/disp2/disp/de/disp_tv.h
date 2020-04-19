@@ -13,7 +13,7 @@ struct disp_device_private_data {
 	u32 enabled;
 	bool suspended;
 
-	enum disp_output_type tv_mode;
+	enum disp_tv_mode tv_mode;
 
 	struct disp_tv_func tv_func;
 

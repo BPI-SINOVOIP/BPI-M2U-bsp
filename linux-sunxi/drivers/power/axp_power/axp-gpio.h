@@ -11,6 +11,7 @@
  */
 
 #define AXP_PIN_NAME_MAX_LEN    (8)
+#define SECONDARY_PMU_OFFSET    (0x4)
 
 struct axp_desc_function {
 	const char *name;
@@ -97,7 +98,8 @@ struct axp_gpio_irqchip {
 struct axp_pinctrl *axp_pinctrl_register(struct device *dev,
 			struct axp_dev *axp_dev,
 			struct axp_pinctrl_desc *desc,
-			struct axp_gpio_ops *ops);
+			struct axp_gpio_ops *ops,
+			int pmu_num);
 int axp_pinctrl_unregister(struct axp_pinctrl *pctl);
 void axp_gpio_irq_ops_set(int pmu_num, struct axp_gpio_irq_ops *ops);
 int axp_gpio_irq_valid(struct axp_pinctrl_desc *desc, int gpio_no);

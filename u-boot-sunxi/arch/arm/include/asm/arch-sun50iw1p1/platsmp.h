@@ -48,7 +48,7 @@ static inline void sunxi_set_wfi_mode(int cpu)
 
 static inline int sunxi_probe_wfi_mode(int cpu)
 {
-	return readl(SUNXI_CPUX_CFG_BASE + SUNXI_CLUSTER_CPU_STATUS(0)) & (1<<(16 + cpu));
+	return readl(SUNXI_CLUSTER_CPU_STATUS(0)) & (1<<(16 + cpu));
 }
 
 static inline int sunxi_probe_cpu_power_status(int cpu)

@@ -18,6 +18,7 @@
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/sunxi-smc.h>
+#include <linux/sunxi-sid.h>
 
 #ifdef CONFIG_ARM
 /*cmd to call ATF service*/
@@ -38,14 +39,17 @@ int sunxi_smc_readl(phys_addr_t addr)
 {
 	return invoke_smc_fn(ARM_SVC_READ_SEC_REG, addr, 0, 0);
 }
+EXPORT_SYMBOL_GPL(sunxi_smc_readl);
 
 int sunxi_smc_writel(u32 value, phys_addr_t addr)
 {
 	return invoke_smc_fn(ARM_SVC_WRITE_SEC_REG, addr, value, 0);
 }
+EXPORT_SYMBOL_GPL(sunxi_smc_writel);
 
 int sunxi_smc_probe_secure(void)
 {
 	return invoke_smc_fn(ARM_SVC_EFUSE_PROBE_SECURE_ENABLE,
 			0, 0, 0);
 }
+

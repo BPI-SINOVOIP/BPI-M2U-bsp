@@ -44,6 +44,7 @@
 MODULE_AUTHOR("Zhang Rui");
 MODULE_DESCRIPTION("Generic thermal management sysfs support");
 MODULE_LICENSE("GPL v2");
+#define INT_MAX		((int)(~0U>>1))
 
 static DEFINE_IDR(thermal_tz_idr);
 static DEFINE_IDR(thermal_cdev_idr);
@@ -348,7 +349,7 @@ static void handle_non_critical_trips(struct thermal_zone_device *tz,
 static void handle_critical_trips(struct thermal_zone_device *tz,
 				int trip, enum thermal_trip_type trip_type)
 {
-	long trip_temp;
+	int trip_temp;
 
 	tz->ops->get_trip_temp(tz, trip, &trip_temp);
 
@@ -394,12 +395,12 @@ static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
  *
  * Return: On success returns 0, an error code otherwise
  */
-int thermal_zone_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
+int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 {
 	int ret = -EINVAL;
 #ifdef CONFIG_THERMAL_EMULATION
 	int count;
-	unsigned long crit_temp = -1UL;
+	int crit_temp = INT_MAX;
 	enum thermal_trip_type type;
 #endif
 
@@ -436,7 +437,7 @@ EXPORT_SYMBOL_GPL(thermal_zone_get_temp);
 
 static void update_temperature(struct thermal_zone_device *tz)
 {
-	long temp;
+	int temp = 0;
 	int ret;
 
 	ret = thermal_zone_get_temp(tz, &temp);
@@ -494,7 +495,7 @@ static ssize_t
 temp_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct thermal_zone_device *tz = to_thermal_zone(dev);
-	long temperature;
+	int temperature = 0;
 	int ret;
 
 	ret = thermal_zone_get_temp(tz, &temperature);
@@ -502,7 +503,7 @@ temp_show(struct device *dev, struct device_attribute *attr, char *buf)
 	if (ret)
 		return ret;
 
-	return sprintf(buf, "%ld\n", temperature);
+	return sprintf(buf, "%d\n", temperature);
 }
 
 static ssize_t
@@ -606,7 +607,7 @@ trip_point_temp_show(struct device *dev, struct device_attribute *attr,
 {
 	struct thermal_zone_device *tz = to_thermal_zone(dev);
 	int trip, ret;
-	long temperature;
+	int temperature;
 
 	if (!tz->ops->get_trip_temp)
 		return -EPERM;
@@ -619,7 +620,7 @@ trip_point_temp_show(struct device *dev, struct device_attribute *attr,
 	if (ret)
 		return ret;
 
-	return sprintf(buf, "%ld\n", temperature);
+	return sprintf(buf, "%d\n", temperature);
 }
 
 static ssize_t
@@ -628,7 +629,7 @@ trip_point_hyst_store(struct device *dev, struct device_attribute *attr,
 {
 	struct thermal_zone_device *tz = to_thermal_zone(dev);
 	int trip, ret;
-	unsigned long temperature;
+	int temperature;
 
 	if (!tz->ops->set_trip_hyst)
 		return -EPERM;
@@ -636,7 +637,7 @@ trip_point_hyst_store(struct device *dev, struct device_attribute *attr,
 	if (!sscanf(attr->attr.name, "trip_point_%d_hyst", &trip))
 		return -EINVAL;
 
-	if (kstrtoul(buf, 10, &temperature))
+	if (kstrtoint(buf, 10, &temperature))
 		return -EINVAL;
 
 	/*
@@ -655,7 +656,7 @@ trip_point_hyst_show(struct device *dev, struct device_attribute *attr,
 {
 	struct thermal_zone_device *tz = to_thermal_zone(dev);
 	int trip, ret;
-	unsigned long temperature;
+	int temperature;
 
 	if (!tz->ops->get_trip_hyst)
 		return -EPERM;
@@ -665,7 +666,7 @@ trip_point_hyst_show(struct device *dev, struct device_attribute *attr,
 
 	ret = tz->ops->get_trip_hyst(tz, trip, &temperature);
 
-	return ret ? ret : sprintf(buf, "%ld\n", temperature);
+	return ret ? ret : sprintf(buf, "%d\n", temperature);
 }
 
 static ssize_t
@@ -764,9 +765,9 @@ emul_temp_store(struct device *dev, struct device_attribute *attr,
 {
 	struct thermal_zone_device *tz = to_thermal_zone(dev);
 	int ret = 0;
-	unsigned long temperature;
+	int temperature;
 
-	if (kstrtoul(buf, 10, &temperature))
+	if (kstrtoint(buf, 10, &temperature))
 		return -EINVAL;
 
 	if (!tz->ops->set_emul_temp) {
@@ -815,7 +816,7 @@ thermal_cooling_device_max_state_show(struct device *dev,
 	ret = cdev->ops->get_max_state(cdev, &state);
 	if (ret)
 		return ret;
-	return sprintf(buf, "%ld\n", state);
+	return sprintf(buf, "%lu\n", state);
 }
 
 static ssize_t
@@ -829,7 +830,7 @@ thermal_cooling_device_cur_state_show(struct device *dev,
 	ret = cdev->ops->get_cur_state(cdev, &state);
 	if (ret)
 		return ret;
-	return sprintf(buf, "%ld\n", state);
+	return sprintf(buf, "%lu\n", state);
 }
 
 static ssize_t
@@ -841,7 +842,7 @@ thermal_cooling_device_cur_state_store(struct device *dev,
 	unsigned long state;
 	int result;
 
-	if (!sscanf(buf, "%ld\n", &state))
+	if (!sscanf(buf, "%lu\n", &state))
 		return -EINVAL;
 
 	if ((long)state < 0)

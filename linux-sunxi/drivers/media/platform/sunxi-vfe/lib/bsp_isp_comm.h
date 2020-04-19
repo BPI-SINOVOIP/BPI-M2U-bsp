@@ -22,8 +22,12 @@
 #define ALIGN_32B(x) (((x) + (31)) & ~(31))
 #define ALIGN_16B(x) (((x) + (15)) & ~(15))
 
-enum isp_platform 
+enum isp_platform
 {
+	ISP_PLATFORM_SUN8IW1P1 =  0,
+	ISP_PLATFORM_SUN8IW3P1,
+	ISP_PLATFORM_SUN9IW1P1,
+	ISP_PLATFORM_SUN8IW5P1,
 	ISP_PLATFORM_SUN8IW6P1,
 	ISP_PLATFORM_SUN8IW7P1 ,
 	ISP_PLATFORM_SUN8IW8P1 ,
@@ -33,7 +37,7 @@ enum isp_platform
 /*
  *  update table
  */
-#define LUT_UPDATE            (1 << 3)  
+#define LUT_UPDATE            (1 << 3)
 #define LINEAR_UPDATE            (1 << 3)  //for sun8iw8p1 is means LINEAR TBL
 #define LENS_UPDATE           (1 << 4)
 #define GAMMA_UPDATE          (1 << 5)

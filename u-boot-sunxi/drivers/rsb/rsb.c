@@ -28,6 +28,7 @@
 #include <asm/arch/platform.h>
 #include <sunxi_board.h>
 
+#if 0
 struct sunxi_rsb_slave_set
 {
 	u8 *m_slave_name;
@@ -651,5 +652,68 @@ int axp_i2c_write(unsigned char chip, unsigned char addr, unsigned char data)
 	return sunxi_rsb_write(chip, addr, &data, 1);
 
 }
+#endif
+
+static s32 sunxi_rsb_io_null(u32 slave_id, u32 daddr, u8 *data, u32 len)
+{
+	return -1;
+}
+
+s32 (* sunxi_rsb_read_pt)(u32 slave_id, u32 daddr, u8 *data, u32 len) = sunxi_rsb_io_null;
+s32 (* sunxi_rsb_write_pt)(u32 slave_id, u32 daddr, u8 *data, u32 len) = sunxi_rsb_io_null;
+
+
+
+
+static s32 sunxi_rsb_read_secos(u32 slave_id, u32 daddr, u8 *data, u32 len)
+{
+	int ret = 0;
+	ret = (u8)(arm_svc_arisc_read_pmu((ulong)daddr));
+	if(ret < 0 )
+	{
+		return -1;
+	}
+	*data = ret&0xff;
+	return 0;
+}
+
+static s32 sunxi_rsb_write_secos(u32 slave_id, u32 daddr, u8 *data, u32 len)
+{
+	return arm_svc_arisc_write_pmu((ulong)daddr,(u32)(*data));
+}
+
+
+
+int sunxi_rsb_read(u32 slave_id, u32 daddr, u8 *data, u32 len)
+{
+	return sunxi_rsb_read_pt(slave_id, daddr, data, len);
+}
+
+int sunxi_rsb_write(u32 slave_id, u32 daddr, u8 *data, u32 len)
+{
+	return sunxi_rsb_write_pt(slave_id, daddr, data, len);
+}
+
+int sunxi_rsb_config(u32 slave_id, u32 rsb_addr)
+{
+	return 0;
+}
+
+
+s32 sunxi_rsb_init(u32 slave_id)
+{
+	if(sunxi_probe_secure_monitor())
+	{
+		printf("rsb: secure monitor exist\n");
+		sunxi_rsb_read_pt  = sunxi_rsb_read_secos;
+		sunxi_rsb_write_pt = sunxi_rsb_write_secos;
+	}
+	else
+	{
+		printf("without secure monitor\n");
+	}
+	return 0;
+}
+
 
 

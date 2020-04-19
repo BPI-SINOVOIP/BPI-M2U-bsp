@@ -43,6 +43,24 @@ config PINCTRL_SUN8I_A23_R
 	depends on RESET_CONTROLLER
 	select PINCTRL_SUNXI_COMMON
 
+config PINCTRL_SUN8IW5P1
+	def_bool ARCH_SUN8IW5P1
+	depends on ARCH_SUN8IW5P1
+	bool "Pinctrl sun8iw5p1 PIO controller"
+	select PINCTRL_SUNXI_COMMON
+
+config PINCTRL_SUN8IW5P1_R
+	def_bool ARCH_SUN8IW5P1
+	depends on ARCH_SUN8IW5P1
+	bool "Pinctrl sun8iw5p1 R_PIO controller"
+	select PINCTRL_SUNXI_COMMON
+
+config PINCTRL_SUN8IW8P1
+	def_bool ARCH_SUN8IW8
+	depends on ARCH_SUN8IW8
+	bool "Pinctrl sun8iw8p1 PIO controller"
+	select PINCTRL_SUNXI_COMMON
+
 config PINCTRL_SUN8IW10P1
 	def_bool ARCH_SUN8IW10
 	depends on ARCH_SUN8IW10
@@ -53,6 +71,18 @@ config PINCTRL_SUN8IW11P1
 	def_bool ARCH_SUN8IW11
 	depends on ARCH_SUN8IW11
 	bool "Pinctrl sun8iw11p1 PIO controller"
+	select PINCTRL_SUNXI_COMMON
+
+config PINCTRL_SUN8IW17P1
+	def_bool ARCH_SUN8IW17
+	depends on ARCH_SUN8IW17
+	bool "Pinctrl sun8iw17p1 PIO controller"
+	select PINCTRL_SUNXI_COMMON
+
+config PINCTRL_SUN8IW17P1_R
+	def_bool ARCH_SUN8IW17
+	depends on ARCH_SUN8IW17
+	bool "Pinctrl sun8iw17p1 R_PIO controller"
 	select PINCTRL_SUNXI_COMMON
 
 config PINCTRL_SUN50IW1P1
@@ -91,6 +121,13 @@ config PINCTRL_SUN50IW3P1_R
 	bool "Pinctrl sun50iw3p1 R_PIO controller"
 	select PINCTRL_SUNXI_COMMON
 
+config SUNXI_CPUX_NOT_USE_PL_IRQ
+	bool "sunxi cpux not use pl pin irq"
+	depends on PINCTRL_SUN50IW3P1_R
+	help
+	  Choose Y here if sunxi cpux not use pin pl irqs,
+	  otherwise just do NOT enable it.
+
 config PINCTRL_SUN50IW6P1
 	def_bool ARCH_SUN50IW6P1
 	depends on ARCH_SUN50IW6P1
@@ -101,6 +138,12 @@ config PINCTRL_SUN50IW6P1_R
 	def_bool ARCH_SUN50IW6P1
 	depends on ARCH_SUN50IW6P1
 	bool "Pinctrl sun50iw6p1 R_PIO controller"
+	select PINCTRL_SUNXI_COMMON
+
+config PINCTRL_SUN3IW1P1
+	def_bool ARCH_SUN3IW1P1
+	depends on ARCH_SUN3IW1P1
+	bool "Pinctrl sun3iw1p1 PIO controller"
 	select PINCTRL_SUNXI_COMMON
 
 endmenu

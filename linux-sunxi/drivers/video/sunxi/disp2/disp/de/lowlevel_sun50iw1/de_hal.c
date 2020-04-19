@@ -193,6 +193,27 @@ static int de_calc_overlay_scaler_para(unsigned int screen_id, unsigned char chn
 	return 0;
 }
 
+static de_color_space __cs_transform(enum disp_color_space cs)
+{
+	de_color_space cs_inner;
+
+	switch (cs) {
+	case DISP_BT709:
+	case DISP_BT709_F:
+		cs_inner = DE_BT709;
+		break;
+	case DISP_BT601:
+	case DISP_BT601_F:
+		cs_inner = DE_BT601;
+		break;
+	default:
+		cs_inner = DE_BT601;
+		break;
+	}
+
+	return cs_inner;
+}
+
 int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data, unsigned int layer_num, u32 device_output_type)
 {
 	unsigned char i,j,k,chn,vi_chn,layno;
@@ -203,9 +224,10 @@ int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 	de_rect layer[CHN_NUM][LAYER_MAX_NUM_PER_CHN],bld_rect[CHN_NUM];
 	de_rect crop[CHN_NUM][LAYER_MAX_NUM_PER_CHN];
 	static scaler_para ovl_para[CHN_NUM],ovl_cpara[VI_CHN_NUM];
-	bool chn_used[CHN_NUM] = {false}, chn_zorder_cfg[CHN_NUM] = {false};
+	bool chn_used[CHN_NUM] = {false}, chn_zorder_cfg[CHN_NUM] = {false},
+	     chn_dirty[CHN_NUM] = { false };
 	bool chn_is_yuv[CHN_NUM] = {false};
-	enum disp_color_space cs[CHN_NUM];
+	de_color_space cs[CHN_NUM];
 	unsigned char layer_zorder[CHN_NUM] = {0}, chn_index;
 	unsigned char pipe_used[CHN_NUM]={0};
 	unsigned int pipe_sel[CHN_NUM]={0};
@@ -231,13 +253,25 @@ int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 			chn_used[data1->config.channel] = true;
 			if (data1->config.info.fb.format >= DISP_FORMAT_YUV444_I_AYUV) {
 				chn_is_yuv[data1->config.channel] = true;
-				cs[data1->config.channel] = data1->config.info.fb.color_space;
+				cs[data1->config.channel] = __cs_transform(
+				    data1->config.info.fb.color_space);
 			}
+
+			if (data1->flag)
+				chn_dirty[data1->config.channel] = true;
 
 			layer_zorder[data1->config.channel] = data1->config.info.zorder;
 		}
 		data1 ++;
 	}
+
+	data1 = data;
+	for (i = 0; i < layer_num; i++) {
+		if (chn_dirty[data1->config.channel])
+			data1->flag = LAYER_ALL_DIRTY;
+		data1++;
+	}
+
 	chn_index = 0;
 	for (i=0; i<chn; i++) {
 		u32 min_zorder = 255, min_zorder_chn = 0;
@@ -280,7 +314,9 @@ int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 		format[j] = 0;
 		for (i=0;i<layno;i++)
 		{
-			if (data[k].config.info.fb.format>= DISP_FORMAT_YUV422_I_YVYU)
+			if ((data[k].config.enable == 1) &&
+			    (data[k].config.info.fb.format >=
+			     DISP_FORMAT_YUV422_I_YVYU))
 				format[j] = data[k].config.info.fb.format;
 			k++;
 		}
@@ -301,14 +337,14 @@ int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 				//printk("<5>ccsc self config DE_RGB.11111111111111111\n");
 				csc_cfg.in_fmt = DE_YUV;
 				csc_cfg.out_fmt = DE_YUV;
-				csc_cfg.out_mode = DISP_BT601;
+				csc_cfg.out_mode = DE_BT601;
 				csc_cfg.in_mode = csc_cfg.out_mode;
 			}
 			else {
 				csc_cfg.in_fmt = (chn_is_yuv[j])?DE_YUV:DE_RGB;
 				csc_cfg.out_fmt = DE_RGB;
 				csc_cfg.in_mode = cs[j];
-				csc_cfg.out_mode = DISP_BT601;
+				csc_cfg.out_mode = DE_BT601;
 			}
 
 			csc_cfg.out_color_range = DISP_COLOR_RANGE_0_255;
@@ -325,7 +361,7 @@ int de_al_lyr_apply(unsigned int screen_id, struct disp_layer_config_data *data,
 				de_dcsc_get_config(screen_id, &csc_cfg_temp);
 				csc_cfg_mgr.enhance_mode = csc_cfg_temp.enhance_mode;
 				csc_cfg_mgr.in_fmt = DISP_CSC_TYPE_RGB;
-				csc_cfg_mgr.in_mode = DISP_BT601;
+				csc_cfg_mgr.in_mode = DE_BT601;
 				if(0 == isStraightYuv) {
 					__inf("<5>close down DCSC\n");
 					csc_cfg_mgr.out_fmt = DE_RGB;
@@ -508,14 +544,14 @@ int de_al_mgr_apply(unsigned int screen_id, struct disp_manager_data *data)
 		de_dcsc_get_config(screen_id, &csc_cfg_temp);
 		csc_cfg.enhance_mode = csc_cfg_temp.enhance_mode;
 		csc_cfg.in_fmt = DISP_CSC_TYPE_RGB;
-		csc_cfg.in_mode = DISP_BT601;
+		csc_cfg.in_mode = DE_BT601;
 		if (screen_id == 1) 	/*cvbs's de channel*/
 			s_csc_type = data->config.cs;
 		csc_cfg.out_fmt = (DISP_CSC_TYPE_RGB == data->config.cs)?DE_RGB:DE_YUV;
 		if ((data->config.size.width < 1280) && (data->config.size.height < 720))
-		  csc_cfg.out_mode = DISP_BT601;
+			csc_cfg.out_mode = DE_BT601;
 		else
-		  csc_cfg.out_mode = DISP_BT709;
+			csc_cfg.out_mode = DE_BT709;
 		csc_cfg.out_color_range = data->config.color_range;
 		csc_cfg.brightness = 50;
 		csc_cfg.contrast = 50;

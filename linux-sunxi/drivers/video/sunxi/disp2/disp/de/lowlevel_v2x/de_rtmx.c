@@ -548,6 +548,12 @@ int de_rtmx_set_lay_cfg(unsigned int sel, unsigned int chno, unsigned int layno,
 		de200_rtmx[sel].vi_ovl[chno]->vi_lay_cfg[layno].lay_attr.bits.
 		    lay_en = cfg->en;
 		de200_rtmx[sel].vi_ovl[chno]->vi_lay_cfg[layno].lay_attr.bits.
+		    alpmode = cfg->alpha_mode;
+		de200_rtmx[sel].vi_ovl[chno]->vi_lay_cfg[layno].lay_attr.bits.
+		    alpctl = cfg->premul_ctl;
+		de200_rtmx[sel].vi_ovl[chno]->vi_lay_cfg[layno].lay_attr.bits.
+		    alpha = cfg->alpha;
+		de200_rtmx[sel].vi_ovl[chno]->vi_lay_cfg[layno].lay_attr.bits.
 		    lay_fcolor_en = cfg->fcolor_en;
 		de200_rtmx[sel].vi_ovl[chno]->vi_lay_cfg[layno].lay_attr.bits.
 		    lay_fmt = fmt;
@@ -1201,10 +1207,11 @@ int de_rtmx_set_overlay_size(unsigned int sel, unsigned int chno,
 	return 0;
 }
 
-static int de_rtmx_get_coarse_fac(unsigned int sel, unsigned int ovl_w,
-				  unsigned int ovl_h, unsigned int vsu_outw,
-				  unsigned int vsu_outh, unsigned int fmt,
-				  unsigned int lcd_fps, unsigned int lcd_height,
+static int de_rtmx_get_coarse_fac(unsigned int sel, unsigned int chno,
+				  unsigned int ovl_w, unsigned int ovl_h,
+				  unsigned int vsu_outw, unsigned int vsu_outh,
+				  unsigned int fmt, unsigned int lcd_fps,
+				  unsigned int lcd_height,
 				  unsigned int de_freq_mhz, unsigned int *yhm,
 				  unsigned int *yhn, unsigned int *yvm,
 				  unsigned int *yvn, unsigned int *chm,
@@ -1271,7 +1278,7 @@ static int de_rtmx_get_coarse_fac(unsigned int sel, unsigned int ovl_w,
 	*midyw = ovl_w;
 	*midcw = ovl_w >> wshift;
 
-	linebuf = de_feat_get_scale_linebuf(sel);
+	linebuf = de_feat_get_scale_linebuf_for_yuv(sel, chno);
 	if ((ovl_w > linebuf)
 	    && (ovl_w > 8 * vsu_outw)) {
 		tmpyhn = (linebuf < (8 * vsu_outw)) ?
@@ -1399,10 +1406,10 @@ int de_rtmx_set_coarse_fac(unsigned int sel, unsigned char chno,
 	int status;
 
 	status =
-	    de_rtmx_get_coarse_fac(sel, ovl_w, ovl_h, vsu_outw, vsu_outh, fmt,
-				   lcd_fps, lcd_height, de_freq_mhz, &yhm, &yhn,
-				   &yvm, &yvn, &chm, &chn, &cvm, &cvn, midyw,
-				   midyh, midcw, midch);
+	    de_rtmx_get_coarse_fac(sel, chno, ovl_w, ovl_h, vsu_outw, vsu_outh,
+				   fmt, lcd_fps, lcd_height, de_freq_mhz, &yhm,
+				   &yhn, &yvm, &yvn, &chm, &chn, &cvm, &cvn,
+				   midyw, midyh, midcw, midch);
 
 	de200_rtmx[sel].vi_ovl[chno]->vi_hori_ds[0].bits.m = yhm;
 	de200_rtmx[sel].vi_ovl[chno]->vi_hori_ds[0].bits.n = yhn;

@@ -2399,11 +2399,11 @@ void gsl_DataInit(unsigned int * conf_in)
 			multi_y_array[i] = conf[251+i];
 		diagonal = conf[255];
 		for(i=0;i<256;i++)
-			multi_group[0][i] = conf[256+i];
+			*(multi_group[0]+i) = conf[256+i];
 		for(i=0;i<32;i++)
 		{
-			ps_coe[0][i] = conf[256 + 64*3 + i];
-			pr_coe[0][i] = conf[256 + 64*3 + i + 32];
+			*(ps_coe[0]+i) = conf[256 + 64*3 + i];
+			*(pr_coe[0]+i) = conf[256 + 64*3 + i + 32];
 		}
 		//-----------------------
 		near_set[0] = 0;
@@ -2485,7 +2485,8 @@ void gsl_DataInit(unsigned int * conf_in)
 		}	
 		for(i=0;i<256;i++)
 		{
-			multi_group[0][i] = (conf[0x109+64/4*2+i/4]>>(i%4*8)) & 0xff;
+			*(multi_group[0]+i) =
+				(conf[0x109+64/4*2+i/4]>>(i%4*8)) & 0xff;
 		}
 
 		filter_able = conf[0x180];
@@ -2495,8 +2496,8 @@ void gsl_DataInit(unsigned int * conf_in)
 			median_dis[i] = conf[0x185+i];
 		for(i=0;i<32;i++)
 		{
-			ps_coe[0][i] = conf[0x189 + i];
-			pr_coe[0][i] = conf[0x189 + i + 32];
+			*(ps_coe[0]+i) = conf[0x189 + i];
+			*(pr_coe[0]+i) = conf[0x189 + i + 32];
 		}
 #ifdef GESTURE_LICH
 		GestureSet(&conf[0x189 + 64]);

@@ -60,33 +60,33 @@ typedef  signed int     SINT32;
 
 //for simplie(boot0)
 struct _nand_super_block{
-    unsigned short  Block_NO;
-    unsigned short  Chip_NO;
+	unsigned short  Block_NO;
+	unsigned short  Chip_NO;
 };
 
 struct _nand_info{
 	unsigned short                  type;
-    unsigned short                  SectorNumsPerPage;
-    unsigned short                  BytesUserData;
-    unsigned short                  PageNumsPerBlk;
+	unsigned short                  SectorNumsPerPage;
+	unsigned short                  BytesUserData;
+	unsigned short                  PageNumsPerBlk;
 	unsigned short                  BlkPerChip;
-    unsigned short                  ChipNum;
+	unsigned short                  ChipNum;
 	__u64                           FullBitmap;
 	struct _nand_super_block        bad_block_addr;
 	struct _nand_super_block        mbr_block_addr;
 	struct _nand_super_block        no_used_block_addr;
-    struct _nand_super_block*       factory_bad_block;
-    unsigned char*                  mbr_data;
+	struct _nand_super_block*       factory_bad_block;
+	unsigned char*                  mbr_data;
 	void*                           phy_partition_head;
 };
 
 struct _physic_nand_info{
 	unsigned short                  type;
-    unsigned short                  SectorNumsPerPage;
-    unsigned short                  BytesUserData;
-    unsigned short                  PageNumsPerBlk;
+	unsigned short                  SectorNumsPerPage;
+	unsigned short                  BytesUserData;
+	unsigned short                  PageNumsPerBlk;
 	unsigned short                  BlkPerChip;
-    unsigned short                  ChipNum;
+	unsigned short                  ChipNum;
 	__int64                         FullBitmap;
 };
 
@@ -94,21 +94,21 @@ typedef struct
 {
 	__u32		ChannelCnt;
 	__u32        ChipCnt;                            //the count of the total nand flash chips are currently connecting on the CE pin
-    __u32       ChipConnectInfo;                    //chip connect information, bit == 1 means there is a chip connecting on the CE pin
+	__u32       ChipConnectInfo;                    //chip connect information, bit == 1 means there is a chip connecting on the CE pin
 	__u32		RbCnt;
 	__u32		RbConnectInfo;						//the connect  information of the all rb  chips are connected
-    __u32        RbConnectMode;						//the rb connect  mode
+	__u32        RbConnectMode;						//the rb connect  mode
 	__u32        BankCntPerChip;                     //the count of the banks in one nand chip, multiple banks can support Inter-Leave
-    __u32        DieCntPerChip;                      //the count of the dies in one nand chip, block management is based on Die
-    __u32        PlaneCntPerDie;                     //the count of planes in one die, multiple planes can support multi-plane operation
-    __u32        SectorCntPerPage;                   //the count of sectors in one single physic page, one sector is 0.5k
-    __u32       PageCntPerPhyBlk;                   //the count of physic pages in one physic block
-    __u32       BlkCntPerDie;                       //the count of the physic blocks in one die, include valid block and invalid block
-    __u32       OperationOpt;                       //the mask of the operation types which current nand flash can support support
-    __u32        FrequencePar;                       //the parameter of the hardware access clock, based on 'MHz'
-    __u32        EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32
-    __u8        NandChipId[8];                      //the nand chip id of current connecting nand chip
-    __u32       ValidBlkRatio;                      //the ratio of the valid physical blocks, based on 1024
+	__u32        DieCntPerChip;                      //the count of the dies in one nand chip, block management is based on Die
+	__u32        PlaneCntPerDie;                     //the count of planes in one die, multiple planes can support multi-plane operation
+	__u32        SectorCntPerPage;                   //the count of sectors in one single physic page, one sector is 0.5k
+	__u32       PageCntPerPhyBlk;                   //the count of physic pages in one physic block
+	__u32       BlkCntPerDie;                       //the count of the physic blocks in one die, include valid block and invalid block
+	__u32       OperationOpt;                       //the mask of the operation types which current nand flash can support support
+	__u32        FrequencePar;                       //the parameter of the hardware access clock, based on 'MHz'
+	__u32        EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32
+	__u8        NandChipId[8];                      //the nand chip id of current connecting nand chip
+	__u32       ValidBlkRatio;                      //the ratio of the valid physical blocks, based on 1024
 	__u32 		good_block_ratio;					//good block ratio get from hwscan
 	__u32		ReadRetryType;						//the read retry type
 	__u32       DDRType;
@@ -133,47 +133,11 @@ struct boot_physical_param{
 	void   *oobbuf; //oob buf
 };
 
-//extern __s32 PHY_SimpleErase(struct boot_physical_param * eraseop);
-//extern __s32 PHY_SimpleErase_2CH(struct boot_physical_param * eraseop);
-
-//extern __s32 PHY_SimpleRead(struct boot_physical_param * readop);
 extern int nand_physic_read_page(unsigned int chip,unsigned int block,unsigned int page,unsigned int bitmap,unsigned char*mbuf,unsigned char*sbuf);
-//extern __s32 PHY_SimpleRead_2CH (struct boot_physical_param *readop);
-//extern __s32 PHY_SimpleWrite(struct boot_physical_param * writeop);
 
-//extern __s32 PHY_SimpleWrite_1K(struct boot_physical_param * writeop);
-//extern __s32 PHY_SimpleWrite_1KCurCH(struct boot_physical_param * writeop);
-//extern __s32 PHY_SimpleWrite_Seq(struct boot_physical_param * writeop);
-//extern __s32 PHY_SimpleRead_Seq(struct boot_physical_param * readop);
-
-//
-//extern __s32 NFC_LSBEnable(__u32 chip, __u32 read_retry_type);
-//extern __s32 NFC_LSBDisable(__u32 chip, __u32 read_retry_type);
-//extern __s32 NFC_LSBInit(__u32 read_retry_type);
-//extern __s32 NFC_LSBExit(__u32 read_retry_type);
-//extern __u32 NAND_GetChannelCnt(void);
-
-//extern void ClearNandStruct( void );
-
-//for param get&set
-//extern __u32 NAND_GetFrequencePar(void);
-//extern __s32 NAND_SetFrequencePar(__u32 FrequencePar);
 extern __u32 nand_get_nand_version(void);
 extern __s32 nand_get_param(boot_nand_para_t * nand_param);
 extern __s32 NAND_GetFlashInfo(boot_flash_info_t *info);
-//extern __s32 NAND_GetBlkCntOfDie(void);
-//extern __s32 NAND_GetDieSkipFlag(void);
-
-
-//extern __u32 NAND_GetPageSize(void);
-//extern __u32 NAND_GetPageCntPerBlk(void);
-//extern __u32 NAND_GetBlkCntPerChip(void);
-//extern __u32 NAND_GetChipCnt(void);
-//extern __u32 NAND_GetChipConnect(void);
-//extern __u32 NAND_GetBadBlockFlagPos(void);
-//extern __u32 NAND_GetValidBlkRatio(void);
-//extern void  NAND_GetVersion(unsigned char *oob_buf);
-
 
 extern  int show_spare(int flag);
 extern  int nand_write_nboot_data(unsigned char *buf,unsigned int len);
@@ -189,13 +153,12 @@ extern  int nand_physic_erase_block(unsigned int chip,unsigned int block);
 extern  int nand_is_blank(void);
 extern int nand_get_param_for_uboottail(boot_nand_para_t *nand_param);
 
-struct _nand_info* NandHwInit(void);
-__s32 NandHwExit(void);
+extern struct _nand_info* NandHwInit(void);
+extern __s32 NandHwExit(void);
 
 //extern void div_test(void);
 
 //for NFTL
-//extern int nftl_initialize(struct _nftl_blk *nftl_blk,int no);
 extern int nftl_build_one(struct _nand_info*, int no);
 extern int nand_info_init(struct _nand_info* nand_info,unsigned char chip,uint16 start_block,unsigned char* mbr_data);
 extern int nftl_build_all(struct _nand_info*nand_info);
@@ -206,6 +169,7 @@ extern unsigned int get_phy_partition_num(struct _nand_info*nand_info);
 extern unsigned int nftl_read(unsigned int start_sector,unsigned int len,unsigned char *buf);
 extern unsigned int nftl_write(unsigned int start_sector,unsigned int len,unsigned char *buf);
 extern unsigned int nftl_flush_write_cache(void);
+extern unsigned int nftl_write_end(void);
 extern void set_capacity_level(struct _nand_info*nand_info,unsigned short capacity_level);
 
 

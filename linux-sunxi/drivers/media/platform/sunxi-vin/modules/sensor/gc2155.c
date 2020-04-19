@@ -1,7 +1,17 @@
+
 /*
- * A V4L2 driver for GalaxyCore gc2155 cameras.
+ * A V4L2 driver for gc155 YUV cameras.
  *
+ * Copyright (c) 2017 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
+ *
+ * Authors:  Zhao Wei <zhaowei@allwinnertech.com>
+ *    Yang Feng <yangfeng@allwinnertech.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -36,20 +46,11 @@ MODULE_LICENSE("GPL");
 #define I2C_ADDR   0x78
 #define SENSOR_NAME "gc2155"
 
-/*
- * Information we maintain about a known sensor.
- */
-struct sensor_format_struct;	/* coming later */
-
 struct cfg_array {		/* coming later */
 	struct regval_list *regs;
 	int size;
 };
 
-static inline struct sensor_info *to_state(struct v4l2_subdev *sd)
-{
-	return container_of(sd, struct sensor_info, sd);
-}
 
 /*
  * The default register settings
@@ -2192,33 +2193,6 @@ static void sensor_g_flash_flag(struct v4l2_subdev *sd,
 		*flash_flag = 0;
 }
 
-static void sensor_cfg_req(struct v4l2_subdev *sd,
-						struct sensor_config *cfg)
-{
-	struct sensor_info *info = to_state(sd);
-	if (info == NULL) {
-		sensor_err("sensor is not initialized.\n");
-		return;
-	}
-	if (info->current_wins == NULL) {
-		sensor_err("sensor format is not initialized.\n");
-		return;
-	}
-
-	cfg->width = info->current_wins->width;
-	cfg->height = info->current_wins->height;
-	cfg->hoffset = info->current_wins->hoffset;
-	cfg->voffset = info->current_wins->voffset;
-	cfg->hts = info->current_wins->hts;
-	cfg->vts = info->current_wins->vts;
-	cfg->pclk = info->current_wins->pclk;
-	cfg->bin_factor = info->current_wins->bin_factor;
-	cfg->intg_min = info->current_wins->intg_min;
-	cfg->intg_max = info->current_wins->intg_max;
-	cfg->gain_min = info->current_wins->gain_min;
-	cfg->gain_max = info->current_wins->gain_max;
-}
-
 static long sensor_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	int ret = 0;
@@ -2240,13 +2214,7 @@ static long sensor_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 /*
  * Store information about the video data format.
  */
-static struct sensor_format_struct {
-	__u8 *desc;
-	enum v4l2_mbus_pixelcode mbus_code;
-	struct regval_list *regs;
-	int regs_size;
-	int bpp;		/* Bytes per pixel */
-} sensor_formats[] = {
+static struct sensor_format_struct sensor_formats[] = {
 	{
 		.desc = "YUYV 4:2:2",
 		.mbus_code = V4L2_MBUS_FMT_YUYV8_2X8,
@@ -2370,6 +2338,9 @@ static int sensor_reg_init(struct sensor_info *info)
 	sensor_s_hflip(sd, info->hflip);
 	sensor_s_vflip(sd, info->vflip);
 
+	info->width = wsize->width;
+	info->height = wsize->height;
+
 	return 0;
 }
 
@@ -2380,9 +2351,13 @@ static int sensor_s_stream(struct v4l2_subdev *sd, int enable)
 		  info->current_wins->width,
 		  info->current_wins->height, info->fmt->mbus_code);
 
-	if (!enable)
+	if (enable) {
+		info->is_stream = 1;
+		return sensor_reg_init(info);
+	} else {
+		info->is_stream = 0;
 		return 0;
-	return sensor_reg_init(info);
+	}
 }
 
 static int sensor_g_mbus_config(struct v4l2_subdev *sd,
@@ -2391,36 +2366,6 @@ static int sensor_g_mbus_config(struct v4l2_subdev *sd,
 	cfg->type = V4L2_MBUS_PARALLEL;
 	cfg->flags = V4L2_MBUS_MASTER | VREF_POL | HREF_POL | CLK_POL;
 
-	return 0;
-}
-
-/*
- * Implement G/S_PARM.  There is a "high quality" mode we could try
- * to do someday; for now, we just do the frame rate tweak.
- */
-static int sensor_g_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *parms)
-{
-	struct v4l2_captureparm *cp = &parms->parm.capture;
-	struct sensor_info *info = to_state(sd);
-
-	if (parms->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
-		return -EINVAL;
-
-	memset(cp, 0, sizeof(struct v4l2_captureparm));
-	cp->capability = V4L2_CAP_TIMEPERFRAME;
-	cp->timeperframe.numerator = 1;
-
-	if (info->width > SVGA_WIDTH && info->height > SVGA_HEIGHT) {
-		cp->timeperframe.denominator = SENSOR_FRAME_RATE / 2;
-	} else {
-		cp->timeperframe.denominator = SENSOR_FRAME_RATE;
-	}
-
-	return 0;
-}
-
-static int sensor_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *parms)
-{
 	return 0;
 }
 
@@ -2436,7 +2381,6 @@ static int sensor_queryctrl(struct v4l2_subdev *sd, struct v4l2_queryctrl *qc)
 {
 	/* Fill in min, max, step and default value for these controls. */
 	/* see include/linux/videodev2.h for details */
-	/* see sensor_s_parm and sensor_g_parm for the meaning of value */
 
 	switch (qc->id) {
 	case V4L2_CID_VFLIP:
@@ -2570,6 +2514,9 @@ static const struct v4l2_subdev_core_ops sensor_core_ops = {
 	.init = sensor_init,
 	.s_power = sensor_power,
 	.ioctl = sensor_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = sensor_compat_ioctl32,
+#endif
 };
 
 static const struct v4l2_subdev_video_ops sensor_video_ops = {
@@ -2578,25 +2525,6 @@ static const struct v4l2_subdev_video_ops sensor_video_ops = {
 	.s_stream = sensor_s_stream,
 	.g_mbus_config = sensor_g_mbus_config,
 };
-
-static void sensor_fill_mbus_fmt(struct v4l2_mbus_framefmt *mf,
-				 const struct sensor_win_size *ws, u32 code)
-{
-	mf->width = ws->width;
-	mf->height = ws->height;
-	mf->code = code;
-	mf->colorspace = V4L2_COLORSPACE_JPEG;
-	mf->field = V4L2_FIELD_NONE;
-}
-
-
-SENSOR_ENUM_MBUS_CODE;
-SENSOR_ENUM_FRAME_SIZE;
-SENSOR_FIND_MBUS_CODE;
-SENSOR_FIND_FRAME_SIZE;
-SENSOR_TRY_FORMAT;
-SENSOR_GET_FMT;
-SENSOR_SET_FMT;
 
 static const struct v4l2_subdev_pad_ops sensor_pad_ops = {
 	.enum_mbus_code = sensor_enum_mbus_code,
@@ -2636,6 +2564,11 @@ static int sensor_probe(struct i2c_client *client,
 		client->addr = 0x78 >> 1;
 	}
 	info->fmt = &sensor_formats[0];
+	info->fmt_pt = &sensor_formats[0];
+	info->win_pt = &sensor_win_sizes[0];
+	info->fmt_num = N_FMTS;
+	info->win_size_num = N_WIN_SIZES;
+	info->sensor_field = V4L2_FIELD_NONE;
 	info->brightness = 0;
 	info->contrast = 0;
 	info->saturation = 0;

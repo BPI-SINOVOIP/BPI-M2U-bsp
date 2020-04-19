@@ -1,0 +1,60 @@
+/*
+ * Allwinner Technology CO., Ltd. sun3iw1p1 evb board.
+ *
+ * evb board support.
+ */
+
+/dts-v1/;
+#include "sun3iw1p1.dtsi"
+
+/ {
+
+  memory@80000000 {
+		reg = <0x00000000 0x80000000 0x00000000 0x2000000>;
+	};
+
+	soc: soc {
+	  spi0: spi@01c05000 {
+			interrupts = <10>;
+			status = "okay";
+
+			nor_flash@0 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				compatible = "st,m25p64";
+				spi-max-frequency = <10000000>;
+				reg = <0>;	/* Chip select 0 */
+			};
+		};
+
+		twi0: twi@0x01c27000{
+			clock-frequency = <100000>;
+			status = "okay";
+
+			rtc@0x51 {
+				compatible = "nxp,pcf8563";
+				i2c-max-frequency = <100000>;
+				reg = <0x51>;
+			};
+
+			io_expand@0x20 {
+				compatible = "ti,pcf8574a";
+				i2c-max-frequency = <100000>;
+				reg = <0x20>;
+			};
+
+			sensor_ov5640@0x78{
+				compatible = "allwinner,sensor_ov5640";
+				i2c-max-frequency = <100000>;
+				reg = <0x78>;
+				status = "okay";
+			};
+		};
+
+		twi1: twi@0x01c27400{
+			interrupts = <8>;
+			status = "okay";
+		};
+	};
+
+};

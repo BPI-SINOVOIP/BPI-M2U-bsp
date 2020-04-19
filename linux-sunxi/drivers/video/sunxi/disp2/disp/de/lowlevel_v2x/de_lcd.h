@@ -110,6 +110,7 @@ s32 tcon1_set_tv_mode(u32 sel, enum disp_output_type mode);
 s32 hmdi_src_sel(u32 sel);
 s32 tcon1_hdmi_color_remap(u32 sel, u32 onoff);
 s32 tcon1_yuv_range(u32 sel, u32 onoff);
+u32 tcon0_get_cpu_tri2_start_delay(u32 sel);
 
 #if defined(SUPPORT_DSI)
 extern __u32 dsi_pixel_bits[4];

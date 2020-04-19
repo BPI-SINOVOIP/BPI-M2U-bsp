@@ -144,7 +144,7 @@ __s32 NF_read( __u32 sector_num, void *buffer, __u32 N )
 	residue = g_mod( N, scts_per_page, &page_nr );
 
 	page_index = 0;
-	
+
 	for( i = 0; i < page_cnt_per_blk; i++ )
 	{
 		if(page_nr==0)
@@ -231,10 +231,10 @@ __u32 load_uboot_in_one_block_judge(__u32 length)
 {
 	__u32 lsb_page_type;
 	__u32 lsb_blk_size;
-	
+
 	lsb_page_type = NAND_Getlsbpage_type();
 	lsb_blk_size = NAND_GetLsbblksize();
-	
+
 	if((( length <=  NF_BLOCK_SIZE )&&(lsb_page_type==0))||(( length <=  lsb_blk_size )&&(lsb_page_type!=0)))
 		return 1;
 	else

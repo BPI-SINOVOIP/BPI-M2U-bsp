@@ -21,6 +21,7 @@ static bool boot_hdmi = false;
 #if defined(CONFIG_COMMON_CLK)
 static struct clk *hdmi_clk = NULL;
 static struct clk *hdmi_ddc_clk = NULL;
+static struct clk *hdmi_clk_parent;
 #endif
 static u32 power_enable_count = 0;
 static u32 clk_enable_count = 0;
@@ -134,16 +135,91 @@ static int hdmi_clk_disable(void)
 	return 0;
 }
 
+static bool hdmi_is_divide_by(unsigned long dividend,
+			       unsigned long divisor)
+{
+	bool divide = false;
+	unsigned long temp;
+
+	if (divisor == 0)
+		goto exit;
+
+	temp = dividend / divisor;
+	if (dividend == (temp * divisor))
+		divide = true;
+
+exit:
+	return divide;
+}
+
 static int hdmi_clk_config(u32 vic)
 {
 	int index = 0;
+	unsigned long rate = 0, rate_set = 0;
+	unsigned long rate_round, rate_parent;
+	int i;
 
 	index = hdmi_core_get_video_info(vic);
-	if (hdmi_clk)
-		clk_set_rate(hdmi_clk, video_timing[index].pixel_clk);
+	rate = video_timing[index].pixel_clk *
+		(video_timing[index].pixel_repeat + 1);
+	rate_parent = clk_get_rate(hdmi_clk_parent);
+	if (!hdmi_is_divide_by(rate_parent, rate)) {
+		if (hdmi_is_divide_by(297000000, rate))
+				clk_set_rate(hdmi_clk_parent, 297000000);
+		else if (hdmi_is_divide_by(594000000, rate))
+				clk_set_rate(hdmi_clk_parent, 594000000);
+	}
+
+	if (hdmi_clk) {
+		clk_set_rate(hdmi_clk, rate);
+		rate_set = clk_get_rate(hdmi_clk);
+	}
+
+	if (hdmi_clk && (rate_set != rate)) {
+		for (i = 1; i < 10; i++) {
+			rate_parent = rate * i;
+			rate_round = clk_round_rate(hdmi_clk_parent,
+							rate_parent);
+			if (rate_round == rate_parent) {
+				clk_set_rate(hdmi_clk_parent, rate_parent);
+				clk_set_rate(hdmi_clk, rate);
+				break;
+			}
+		}
+		if (i == 10)
+			pr_warn("clk_set_rate fail.we need %ldhz,but get %ldhz\n",
+				rate, rate_set);
+	}
+
 
 	return 0;
 }
+
+
+unsigned int hdmi_clk_get_div(void)
+{
+	unsigned long rate = 1, rate_parent = 1;
+	unsigned int div = 4;
+
+	if (!hdmi_clk || !hdmi_clk_parent) {
+		pr_warn("%s, get clk div fail\n", __func__);
+		goto exit;
+	}
+
+	if (hdmi_clk)
+		rate = clk_get_rate(hdmi_clk);
+	if (hdmi_clk_parent)
+		rate_parent = clk_get_rate(hdmi_clk_parent);
+
+	if (rate != 0)
+		div = rate_parent / rate;
+	else
+		pr_warn("%s, hdmi clk rate is ZERO!\n", __func__);
+
+exit:
+	return div;
+}
+
 #else
 static int hdmi_clk_enable(void){}
 static int hdmi_clk_disable(void){}
@@ -284,6 +360,12 @@ static struct disp_hdmi_mode hdmi_mode_tbl[] = {
 	{DISP_TV_MOD_720P_60HZ_3D_FP,     HDMI720P_60_3D_FP, },
 	{DISP_TV_MOD_3840_2160P_30HZ,     HDMI3840_2160P_30, },
 	{DISP_TV_MOD_3840_2160P_25HZ,     HDMI3840_2160P_25, },
+	{DISP_TV_MOD_3840_2160P_24HZ,     HDMI3840_2160P_24, },
+	{DISP_TV_MOD_4096_2160P_24HZ,     HDMI4096_2160P_24, },
+	{DISP_TV_MOD_1280_1024P_60HZ,     HDMI1280_1024,     },
+	{DISP_TV_MOD_1024_768P_60HZ,      HDMI1024_768,      },
+	{DISP_TV_MOD_900_540P_60HZ,       HDMI900_540,       },
+	{DISP_TV_MOD_1920_720P_60HZ,      HDMI1920_720,      },
 };
 
 static u32 hdmi_get_vic(u32 mode)
@@ -364,6 +446,13 @@ static s32 hdmi_mode_support(u32 mode)
 			find = true;
 			break;
 		}
+	}
+
+	if (find && (mode == DISP_TV_MOD_1280_1024P_60HZ
+		|| mode == DISP_TV_MOD_1024_768P_60HZ
+		|| mode == DISP_TV_MOD_900_540P_60HZ
+		|| mode == DISP_TV_MOD_1920_720P_60HZ)) {
+		return 1;
 	}
 
 	if (find) {
@@ -687,6 +776,7 @@ s32 hdmi_init(struct platform_device *pdev)
 		goto err_clk_get;
 	}
 
+	hdmi_clk_parent = clk_get_parent(hdmi_clk);
 	/* parse io config */
 	hdmi_parse_io_config();
 	mutex_init(&mlock);

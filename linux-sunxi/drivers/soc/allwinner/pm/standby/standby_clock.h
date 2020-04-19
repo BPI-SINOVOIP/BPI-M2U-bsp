@@ -33,6 +33,12 @@ struct standby_clk_div_t {
 #define PLL_CTRL_REG0_OFFSET	(0x40)
 #define PLL_CTRL_REG1_OFFSET	(0x44)
 
+#ifdef CONFIG_ARCH_SUN3I
+#define PLL_CTRL_REG1 (0x01c000a4)
+#elif CONFIG_ARCH_SUN8I
+#define PLL_CTRL_REG1 (0x01c000f4)
+#endif
+
 __s32 standby_clk_init(void);
 __s32 standby_clk_exit(void);
 void standby_clk_set_keyfield(void);
@@ -50,8 +56,10 @@ __s32 standby_clk_set_pll_factor(struct pll_factor_t *pll_factor);
 __s32 standby_clk_get_pll_factor(struct pll_factor_t *pll_factor);
 __s32 standby_clk_apbinit(void);
 __s32 standby_clk_apbexit(void);
+#ifndef CONFIG_ARCH_SUN3IW1P1
 __s32 standby_clk_apb2losc(void);
 __s32 standby_clk_apb2hosc(void);
+#endif
 __s32 standby_clk_bus_src_backup(void);
 __s32 standby_clk_bus_src_set(void);
 __s32 standby_clk_bus_src_restore(void);

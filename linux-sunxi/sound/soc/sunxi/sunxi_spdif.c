@@ -461,7 +461,7 @@ static int sunxi_spdif_trigger(struct snd_pcm_substream *substream,
 	return ret;
 }
 
-#ifdef CONFIG_ARCH_SUN8IW10
+#if defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN50IW6)
 static bool spdif_loop_en = false;
 module_param_named(spdif_loop_en, spdif_loop_en, bool, S_IRUGO | S_IWUSR);
 #endif
@@ -477,7 +477,7 @@ static int sunxi_spdif_prepare(struct snd_pcm_substream *substream, struct snd_s
 			(1 << CTL_GEN_EN), (0 << CTL_GEN_EN));
 
 	if(substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-#ifdef	CONFIG_ARCH_SUN8IW10
+#if defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN50IW6)
 		regmap_update_bits(sunxi_spdif->regmap, SUNXI_SPDIF_CTL,
 					(1<<CTL_LOOP_EN), (spdif_loop_en<<CTL_LOOP_EN));
 #endif

@@ -45,6 +45,9 @@ int nand_register(int devnum);
 extern int board_nand_init(struct nand_chip *nand);
 #endif
 
+/* sunxi mtd function */
+extern int sunxi_nand_mtd_init(void);
+
 typedef struct mtd_info nand_info_t;
 
 extern int nand_curr_device;

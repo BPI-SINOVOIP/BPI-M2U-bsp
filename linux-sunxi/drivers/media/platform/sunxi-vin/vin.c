@@ -1,18 +1,15 @@
 
 /*
- ******************************************************************************
+ * vin.c for all v4l2 subdev manage
  *
- * vin.c
+ * Copyright (c) 2017 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
  *
- * Hawkview ISP - vin.c module
+ * Authors:  Zhao Wei <zhaowei@allwinnertech.com>
+ *	Yang Feng <yangfeng@allwinnertech.com>
  *
- * Copyright (c) 2015 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
- *
- * Version		  Author         Date		    Description
- *
- *   3.0		  Yang Feng   	2015/12/01	ISP Tuning Tools Support
- *
- ******************************************************************************
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 
 #include <linux/module.h>
@@ -44,16 +41,32 @@
 #include <linux/regulator/consumer.h>
 
 #include "utility/bsp_common.h"
-#include "vin-isp/bsp_isp_algo.h"
 #include "vin-cci/bsp_cci.h"
 #include "vin-cci/cci_helper.h"
 #include "utility/config.h"
 #include "modules/sensor/camera_cfg.h"
 #include "utility/sensor_info.h"
 #include "utility/vin_io.h"
+#include "top_reg.h"
 #include "vin.h"
 
 #define VIN_MODULE_NAME "sunxi-vin-media"
+
+char ccm[I2C_NAME_SIZE] = "";
+uint i2c_addr = 0xff;
+
+char act_name[I2C_NAME_SIZE] = "";
+uint act_slave = 0xff;
+uint use_sensor_list = 0xff;
+uint vin_i2c_dbg;
+
+module_param_string(ccm, ccm, sizeof(ccm), S_IRUGO | S_IWUSR);
+module_param(i2c_addr, uint, S_IRUGO | S_IWUSR);
+
+module_param_string(act_name, act_name, sizeof(act_name), S_IRUGO | S_IWUSR);
+module_param(act_slave, uint, S_IRUGO | S_IWUSR);
+module_param(use_sensor_list, uint, S_IRUGO | S_IWUSR);
+module_param(vin_i2c_dbg, uint, S_IRUGO | S_IWUSR);
 
 static void vin_md_prepare_pipeline(struct vin_pipeline *p,
 				  struct media_entity *me)
@@ -84,6 +97,7 @@ static void vin_md_prepare_pipeline(struct vin_pipeline *p,
 		sd = media_entity_to_v4l2_subdev(pad->entity);
 		vin_log(VIN_LOG_MD, "%s entity is %s, group id is 0x%x\n",
 			__func__, pad->entity->name, sd->grp_id);
+
 		switch (sd->grp_id) {
 		case VIN_GRP_ID_SENSOR:
 			p->sd[VIN_IND_SENSOR] = sd;
@@ -100,6 +114,9 @@ static void vin_md_prepare_pipeline(struct vin_pipeline *p,
 		case VIN_GRP_ID_SCALER:
 			p->sd[VIN_IND_SCALER] = sd;
 			break;
+		case VIN_GRP_ID_CAPTURE:
+			p->sd[VIN_IND_CAPTURE] = sd;
+			break;
 		default:
 			break;
 		}
@@ -107,6 +124,293 @@ static void vin_md_prepare_pipeline(struct vin_pipeline *p,
 		if (me->num_pads == 1)
 			break;
 	}
+}
+
+static int vin_mclk_pin_release(struct vin_md *vind)
+{
+#ifndef FPGA_VER
+	int i;
+
+	for (i = 0; i < VIN_MAX_CCI; i++) {
+		if (!IS_ERR_OR_NULL(vind->mclk[i].pin))
+			devm_pinctrl_put(vind->mclk[i].pin);
+	}
+#endif
+	return 0;
+}
+
+static int vin_md_get_clocks(struct vin_md *vind)
+{
+#ifndef FPGA_VER
+	struct device_node *np = vind->pdev->dev.of_node;
+	unsigned int core_clk;
+	int i;
+
+	vind->clk[VIN_TOP_CLK].clock = of_clk_get(np, 0);
+	if (IS_ERR_OR_NULL(vind->clk[VIN_TOP_CLK].clock)) {
+		vin_err("Get top clk failed!\n");
+		vind->clk[VIN_TOP_CLK].clock = NULL;
+		return 0;
+	}
+
+	vind->clk[VIN_TOP_CLK_SRC].clock = of_clk_get(np, 1);
+	if (IS_ERR_OR_NULL(vind->clk[VIN_TOP_CLK_SRC].clock)) {
+		vin_err("Get top clk source failed!\n");
+		vind->clk[VIN_TOP_CLK_SRC].clock = NULL;
+		return 0;
+	}
+
+	for (i = 0; i < VIN_MAX_CCI; i++) {
+		vind->mclk[i].mclk = of_clk_get(np, 3 * i + 2);
+		if (IS_ERR_OR_NULL(vind->mclk[i].mclk)) {
+			vin_err("Get mclk%d failed!\n", i);
+			vind->mclk[i].mclk = NULL;
+			break;
+		}
+		vind->mclk[i].clk_24m = of_clk_get(np, 3 * i + 3);
+		if (IS_ERR_OR_NULL(vind->mclk[i].clk_24m)) {
+			vin_err("Get mclk%d_24m failed!\n", i);
+			vind->mclk[i].clk_24m = NULL;
+			break;
+		}
+		vind->mclk[i].clk_pll = of_clk_get(np, 3 * i + 4);
+		if (IS_ERR_OR_NULL(vind->mclk[i].clk_pll)) {
+			vin_err("Get mclk%d_pll failed!\n", i);
+			vind->mclk[i].clk_pll = NULL;
+			break;
+		}
+	}
+
+	vind->isp_clk.clock = of_clk_get(np, 3 * i + 2);
+	if (IS_ERR_OR_NULL(vind->isp_clk.clock)) {
+		vin_warn("Get isp clk failed!\n");
+		vind->isp_clk.clock = NULL;
+	}
+
+	vind->mipi_clk[VIN_MIPI_CLK].clock = of_clk_get(np, 0);
+	if (IS_ERR_OR_NULL(vind->mipi_clk[VIN_MIPI_CLK].clock)) {
+		vin_warn("Get mipi clk failed!\n");
+		vind->mipi_clk[VIN_MIPI_CLK].clock = NULL;
+	}
+
+	vind->mipi_clk[VIN_MIPI_CLK_SRC].clock = of_clk_get(np, 1);
+	if (IS_ERR_OR_NULL(vind->mipi_clk[VIN_MIPI_CLK_SRC].clock)) {
+		vin_warn("Get mipi clk source failed!\n");
+		vind->mipi_clk[VIN_MIPI_CLK_SRC].clock = NULL;
+	}
+
+	if (vind->mipi_clk[VIN_MIPI_CLK].clock &&
+	    vind->mipi_clk[VIN_MIPI_CLK_SRC].clock) {
+		if (clk_set_parent(vind->mipi_clk[VIN_MIPI_CLK].clock,
+		    vind->mipi_clk[VIN_MIPI_CLK_SRC].clock)) {
+			vin_err("set vin mipi clock source failed\n");
+			return -1;
+		}
+		if (clk_set_rate(vind->mipi_clk[VIN_MIPI_CLK].clock, DPHY_CLK)) {
+			vin_err("set mipi clock rate error\n");
+			return -1;
+		}
+	}
+
+	if (clk_set_parent(vind->clk[VIN_TOP_CLK].clock, vind->clk[VIN_TOP_CLK_SRC].clock)) {
+		vin_err("vin top clock set parent failed \n");
+		return -1;
+	}
+
+	if (of_property_read_u32(np, "vind0_clk", &core_clk)) {
+		vin_err("vin failed to get core clk\n");
+		vind->clk[VIN_TOP_CLK].frequency = VIN_CLK_RATE;
+	} else {
+		vin_log(VIN_LOG_MD, "vin get core clk = %d\n", core_clk);
+		vind->clk[VIN_TOP_CLK].frequency = core_clk;
+	}
+
+#endif
+	return 0;
+}
+
+static void vin_md_put_clocks(struct vin_md *vind)
+{
+#ifndef FPGA_VER
+	int i;
+	for (i = 0; i < VIN_MAX_CLK; i++) {
+		if (vind->clk[i].clock)
+			clk_put(vind->clk[i].clock);
+	}
+
+	for (i = 0; i < VIN_MAX_CCI; i++) {
+		if (vind->mclk[i].mclk)
+			clk_put(vind->mclk[i].mclk);
+		if (vind->mclk[i].clk_24m)
+			clk_put(vind->mclk[i].clk_24m);
+		if (vind->mclk[i].clk_pll)
+			clk_put(vind->mclk[i].clk_pll);
+	}
+
+	if (vind->isp_clk.clock)
+		clk_put(vind->isp_clk.clock);
+
+	for (i = 0; i < VIN_MIPI_MAX_CLK; i++) {
+		if (vind->mipi_clk[i].clock)
+			clk_put(vind->mipi_clk[i].clock);
+	}
+#endif
+}
+
+static int __vin_set_top_clk_rate(struct vin_md *vind, unsigned int rate)
+{
+	if (rate >= 300)
+		vind->clk[VIN_TOP_CLK_SRC].frequency = rate;
+	else if (rate >= 150)
+		vind->clk[VIN_TOP_CLK_SRC].frequency = rate * 2;
+	else if (rate >= 75)
+		vind->clk[VIN_TOP_CLK_SRC].frequency = rate * 4;
+	else
+		vind->clk[VIN_TOP_CLK_SRC].frequency = VIN_CLK_RATE;
+
+	if (clk_set_rate(vind->clk[VIN_TOP_CLK_SRC].clock,
+	    vind->clk[VIN_TOP_CLK_SRC].frequency)) {
+		vin_err("set vin top clock source rate error\n");
+		return -1;
+	}
+
+	if (clk_set_rate(vind->clk[VIN_TOP_CLK].clock, rate)) {
+		vin_err("set vin top clock rate error\n");
+		return -1;
+	}
+	vin_log(VIN_LOG_MD, "vin top clk get rate = %ld\n",
+		clk_get_rate(vind->clk[VIN_TOP_CLK].clock));
+
+	return 0;
+}
+
+static int vin_md_clk_enable(struct vin_md *vind)
+{
+#ifndef FPGA_VER
+	if (vind->clk[VIN_TOP_CLK].clock) {
+		__vin_set_top_clk_rate(vind, vind->clk[VIN_TOP_CLK].frequency);
+		clk_prepare_enable(vind->clk[VIN_TOP_CLK].clock);
+		sunxi_periph_reset_deassert(vind->clk[VIN_TOP_CLK].clock);
+	}
+
+	if (vind->isp_clk.clock) {
+		clk_prepare_enable(vind->isp_clk.clock);
+		sunxi_periph_reset_deassert(vind->isp_clk.clock);
+	}
+
+	if (vind->mipi_clk[VIN_MIPI_CLK].clock)
+		clk_prepare_enable(vind->mipi_clk[VIN_MIPI_CLK].clock);
+#else
+	void __iomem *clk_base;
+	void __iomem *gpio_base;
+
+	vin_log(VIN_LOG_MD, "directly write pin and clk config @ FPGA\n");
+
+	clk_base = ioremap(0x03001000, 0xf00);
+	if (!clk_base) {
+		vin_print("clk base ioremap failed\n");
+		return -EIO;
+	}
+	writel(0xffffffff, (clk_base + 0x804));/*mbus gating*/
+	writel(0xffffffff, (clk_base + 0xc2c));/*csi gating reset*/
+	writel(0xffffffff, (clk_base + 0xc00));/*misc clk*/
+	writel(0x80000000, (clk_base + 0xc04));/*top clk*/
+	writel(0x80000000, (clk_base + 0xc08));/*master0 clk*/
+	writel(0x80000000, (clk_base + 0xc0c));/*master1 clk*/
+	writel(0x80000000, (clk_base + 0xc10));/*master2 clk*/
+	writel(0x80000000, (clk_base + 0xc14));/*master3 clk*/
+
+	gpio_base = ioremap(0x0300b000, 0x120);
+	if (!gpio_base) {
+		vin_print("gpio base ioremap failed\n");
+		return -EIO;
+	}
+	writel(0x00330000, (gpio_base + 0x24));/*PB SDA SCL*/
+	writel(0x33333333, (gpio_base + 0x90));/*PE CSI DATA*/
+	writel(0x33333333, (gpio_base + 0x94));
+	writel(0x33333333, (gpio_base + 0x98));
+#endif
+	return 0;
+}
+
+static void vin_md_clk_disable(struct vin_md *vind)
+{
+#ifndef FPGA_VER
+	if (vind->clk[VIN_TOP_CLK].clock) {
+		clk_disable_unprepare(vind->clk[VIN_TOP_CLK].clock);
+		sunxi_periph_reset_assert(vind->clk[VIN_TOP_CLK].clock);
+	}
+
+	if (vind->isp_clk.clock) {
+		clk_disable_unprepare(vind->isp_clk.clock);
+		sunxi_periph_reset_assert(vind->isp_clk.clock);
+	}
+
+	if (vind->mipi_clk[VIN_MIPI_CLK].clock)
+		clk_disable_unprepare(vind->mipi_clk[VIN_MIPI_CLK].clock);
+#endif
+}
+
+static void vin_md_set_power(struct vin_md *vind, int on)
+{
+	if (on && (vind->use_count)++ > 0)
+		return;
+	else if (!on && (vind->use_count == 0 || --(vind->use_count) > 0))
+		return;
+
+	if (on) {
+		vin_md_clk_enable(vind);
+		usleep_range(100, 120);
+		csic_top_enable(vind->id);
+	} else {
+		csic_top_disable(vind->id);
+		vin_md_clk_disable(vind);
+	}
+}
+
+static int vin_gpio_request(struct vin_md *vind)
+{
+#ifndef FPGA_VER
+	unsigned int i, num;
+	struct gpio_config *gc = NULL;
+	struct sensor_list *sl = NULL;
+
+	for (num = 0; num < VIN_MAX_DEV; num++) {
+		sl = &vind->modules[num].sensors;
+
+		for (i = 0; i < MAX_GPIO_NUM; i++) {
+			gc = &sl->gpio[i];
+			if (gc == NULL || gc->gpio == GPIO_INDEX_INVALID)
+				continue;
+
+			if (gpio_request(gc->gpio, NULL) < 0) {
+				vin_log(VIN_LOG_MD, "gpio%d request failed!\n", gc->gpio);
+				continue;
+			}
+			vin_log(VIN_LOG_MD, "gpio%d request success!\n", gc->gpio);
+		}
+	}
+#endif
+	return 0;
+}
+
+static void vin_gpio_release(struct vin_md *vind)
+{
+#ifndef FPGA_VER
+	unsigned int i, num;
+	struct gpio_config *gc = NULL;
+	struct sensor_list *sl = NULL;
+
+	for (num = 0; num < VIN_MAX_DEV; num++) {
+		sl = &vind->modules[num].sensors;
+
+		for (i = 0; i < MAX_GPIO_NUM; i++) {
+			gc = &sl->gpio[i];
+			if (gc->gpio != GPIO_INDEX_INVALID)
+				gpio_free(gc->gpio);
+		}
+	}
+#endif
 }
 
 static int __vin_subdev_set_power(struct v4l2_subdev *sd, int on)
@@ -123,7 +427,12 @@ static int __vin_subdev_set_power(struct v4l2_subdev *sd, int on)
 	else if (!on && (*use_count == 0 || --(*use_count) > 0))
 		return 0;
 	ret = v4l2_subdev_call(sd, core, s_power, on);
-
+#if 0
+	if (ret == 0 || ret == -ENOIOCTLCMD) {
+		if (on || sd->grp_id != VIN_GRP_ID_SENSOR)
+			ret = v4l2_subdev_call(sd, core, init, on);
+	}
+#endif
 	return ret != -ENOIOCTLCMD ? ret : 0;
 }
 
@@ -131,9 +440,9 @@ static int vin_pipeline_s_power(struct vin_pipeline *p, bool on)
 {
 	static const u8 seq[2][VIN_IND_MAX] = {
 		{ VIN_IND_ISP, VIN_IND_SENSOR, VIN_IND_CSI, VIN_IND_MIPI,
-					VIN_IND_SCALER },
-		{ VIN_IND_MIPI, VIN_IND_CSI, VIN_IND_SENSOR, VIN_IND_ISP,
-					VIN_IND_SCALER},
+			VIN_IND_SCALER, VIN_IND_CAPTURE  },
+		{ VIN_IND_CAPTURE, VIN_IND_MIPI, VIN_IND_CSI, VIN_IND_SENSOR,
+			VIN_IND_ISP, VIN_IND_SCALER},
 	};
 	int i, ret = 0;
 
@@ -142,13 +451,11 @@ static int vin_pipeline_s_power(struct vin_pipeline *p, bool on)
 
 	for (i = 0; i < VIN_IND_MAX; i++) {
 		unsigned int idx = seq[on][i];
-
 		if (NULL == p->sd[idx])
 			continue;
-
+		mutex_lock(&p->sd[idx]->entity.parent->graph_mutex);
 		ret = __vin_subdev_set_power(p->sd[idx], on);
-
-
+		mutex_unlock(&p->sd[idx]->entity.parent->graph_mutex);
 		if (ret < 0 && ret != -ENXIO)
 			goto error;
 	}
@@ -156,11 +463,11 @@ static int vin_pipeline_s_power(struct vin_pipeline *p, bool on)
 error:
 	for (; i >= 0; i--) {
 		unsigned int idx = seq[on][i];
-
 		if (NULL == p->sd[idx])
 			continue;
-
+		mutex_lock(&p->sd[idx]->entity.parent->graph_mutex);
 		__vin_subdev_set_power(p->sd[idx], !on);
+		mutex_unlock(&p->sd[idx]->entity.parent->graph_mutex);
 	}
 	return ret;
 }
@@ -168,7 +475,9 @@ error:
 static int __vin_pipeline_open(struct vin_pipeline *p,
 				struct media_entity *me, bool prepare)
 {
+	struct vin_md *vind;
 	struct v4l2_subdev *sd;
+	struct sensor_item sensor;
 	int ret;
 
 	if (WARN_ON(p == NULL || me == NULL))
@@ -180,6 +489,14 @@ static int __vin_pipeline_open(struct vin_pipeline *p,
 	sd = p->sd[VIN_IND_SENSOR];
 	if (sd == NULL)
 		return -EINVAL;
+
+	vind = entity_to_vin_mdev(me);
+	if (vind) {
+		/*set vin core clk rate for each sensor!*/
+		if (get_sensor_info(sd->name, &sensor) == 0)
+			vind->clk[VIN_TOP_CLK].frequency = sensor.core_clk;
+		vin_md_set_power(vind, 1);
+	}
 
 	ret = vin_pipeline_s_power(p, 1);
 	if (!ret)
@@ -201,42 +518,99 @@ static int __vin_pipeline_close(struct vin_pipeline *p)
 	}
 
 	vind = entity_to_vin_mdev(&sd->entity);
+	if (vind)
+		vin_md_set_power(vind, 0);
 
 	return ret == -ENXIO ? 0 : ret;
 }
 
-static int __vin_pipeline_s_stream(struct vin_pipeline *p, bool on)
+static int __vin_subdev_set_stream(struct v4l2_subdev *sd, int on)
 {
+	int *stream_count;
+	int ret;
 
-	static const u8 seq[2][VIN_IND_MAX] = {
-		{ VIN_IND_ISP, VIN_IND_SENSOR, VIN_IND_CSI, VIN_IND_MIPI,
-					VIN_IND_SCALER },
-		{ VIN_IND_MIPI, VIN_IND_SENSOR, VIN_IND_CSI, VIN_IND_ISP,
-					VIN_IND_SCALER},
+	if (sd == NULL)
+		return -ENODEV;
+
+	stream_count = &sd->entity.stream_count;
+	if (on && (*stream_count)++ > 0)
+		return 0;
+	else if (!on && (*stream_count == 0 || --(*stream_count) > 0))
+		return 0;
+	ret = v4l2_subdev_call(sd, video, s_stream, on);
+
+	return ret != -ENOIOCTLCMD ? ret : 0;
+}
+
+static int __vin_pipeline_s_stream(struct vin_pipeline *p, int on_idx)
+{
+	static const u8 seq[3][VIN_IND_MAX] = {
+		{ VIN_IND_CAPTURE, VIN_IND_ISP, VIN_IND_SENSOR, VIN_IND_CSI,
+			VIN_IND_MIPI, VIN_IND_SCALER },
+		{ VIN_IND_SENSOR, VIN_IND_MIPI, VIN_IND_ISP,
+			VIN_IND_SCALER, VIN_IND_CAPTURE, VIN_IND_CSI},
+		{ VIN_IND_MIPI, VIN_IND_SENSOR, VIN_IND_ISP,
+			VIN_IND_SCALER, VIN_IND_CAPTURE, VIN_IND_CSI},
 	};
-	int i, ret = 0;
+	struct vin_vid_cap *vin_cap = NULL;
+	struct vin_md *vind = NULL;
+	int i, on, ret = 0;
+
+	if (p == NULL) {
+		vin_err("pipeline is NULL, cannot s_stream\n");
+		return -ENODEV;
+	}
 
 	if (p->sd[VIN_IND_SENSOR] == NULL)
 		return -ENODEV;
 
-	for (i = 0; i < VIN_IND_ACTUATOR; i++) {
-		unsigned int idx = seq[on][i];
+	vind = entity_to_vin_mdev(&p->sd[VIN_IND_SENSOR]->entity);
+	if (vind == NULL) {
+		vin_err("vin media is NULL, cannot s_stream\n");
+		return -ENODEV;
+	}
 
+	vin_cap = pipe_to_vin_video(p);
+	if ((vin_cap == NULL) || (vin_cap->vinc == NULL)) {
+		vin_err("vin video is NULL, cannot s_stream\n");
+		return -ENODEV;
+	}
+	/*vin change top clk rate*/
+	if ((vin_cap->vinc->vin_clk) && (vin_cap->vinc->vin_clk != vind->clk[VIN_TOP_CLK].frequency)) {
+		__vin_set_top_clk_rate(vind, vin_cap->vinc->vin_clk);
+		vind->clk[VIN_TOP_CLK].frequency = vin_cap->vinc->vin_clk;
+	}
+
+	for (i = 0; i < vin_cap->vinc->total_rx_ch; i++)
+		csic_isp_input_select(vind->id, vin_cap->vinc->isp_sel, i,
+				vin_cap->vinc->csi_sel, i);
+
+	csic_vipp_input_select(vind->id, vin_cap->vinc->vipp_sel,
+			vin_cap->vinc->isp_sel, vin_cap->vinc->isp_tx_ch);
+
+	on = on_idx ? 1 : 0;
+	for (i = 0; i < VIN_IND_ACTUATOR; i++) {
+		unsigned int idx = seq[on_idx][i];
 		if (NULL == p->sd[idx])
 			continue;
-
-		ret = v4l2_subdev_call(p->sd[idx], video, s_stream, on);
-
-		if (ret < 0 && ret != -ENOIOCTLCMD && ret != -ENODEV) {
+		mutex_lock(&p->sd[idx]->entity.parent->graph_mutex);
+		ret = __vin_subdev_set_stream(p->sd[idx], on);
+		mutex_unlock(&p->sd[idx]->entity.parent->graph_mutex);
+		if (ret < 0 && ret != -ENODEV) {
 			vin_err("%s error!\n", __func__);
 			goto error;
 		}
+		usleep_range(100, 120);
 	}
 	return 0;
 error:
 	for (; i >= 0; i--) {
-		unsigned int idx = seq[on][i];
-		v4l2_subdev_call(p->sd[idx], video, s_stream, !on);
+		unsigned int idx = seq[on_idx][i];
+		if (NULL == p->sd[idx])
+			continue;
+		mutex_lock(&p->sd[idx]->entity.parent->graph_mutex);
+		__vin_subdev_set_stream(p->sd[idx], !on);
+		mutex_unlock(&p->sd[idx]->entity.parent->graph_mutex);
 	}
 	return ret;
 }
@@ -247,27 +621,29 @@ static const struct vin_pipeline_ops vin_pipe_ops = {
 	.set_stream	= __vin_pipeline_s_stream,
 };
 
-struct v4l2_subdev *__vin_subdev_register(struct vin_core *vinc,
-				char *name, u8 addr,
-				enum module_type type)
+static struct v4l2_subdev *__vin_subdev_register(struct vin_md *vind,
+			struct modules_config *module,
+			char *name, u8 addr, enum module_type type)
 {
-	struct v4l2_device *v4l2_dev = vinc->v4l2_dev;
-	struct modules_config *modu_cfg = &vinc->modu_cfg;
+	struct v4l2_device *v4l2_dev = &vind->v4l2_dev;
 	struct v4l2_subdev *sd = NULL;
 
 	if (type == VIN_MODULE_TYPE_CCI) {
-		sd = cci_bus_match(name, modu_cfg->bus_sel, addr);
+		sd = cci_bus_match(name, module->bus_sel, addr);
 		if (IS_ERR_OR_NULL(sd)) {
-			vin_err("registering v4l2 sd No such device!\n");
+			vin_err("registering %s, No such device!\n", name);
 			return NULL;
 		} else {
-			if (v4l2_device_register_subdev(v4l2_dev, sd))
+			if (v4l2_device_register_subdev(v4l2_dev, sd)) {
+				struct cci_driver *cd = v4l2_get_subdevdata(sd);
+				cci_bus_match_cancel(cd);
+				vin_log(VIN_LOG_MD, "%s register failed!\n", name);
 				return NULL;
-			vin_print("sd %s register OK!\n", sd->name);
+			}
+			vin_log(VIN_LOG_MD, "%s register OK!\n", name);
 		}
 	} else if (type == VIN_MODULE_TYPE_I2C) {
-		struct i2c_adapter *adapter =
-				i2c_get_adapter(modu_cfg->bus_sel);
+		struct i2c_adapter *adapter = i2c_get_adapter(module->bus_sel);
 		if (adapter == NULL) {
 			vin_err("request i2c adapter failed!\n");
 			return NULL;
@@ -275,37 +651,46 @@ struct v4l2_subdev *__vin_subdev_register(struct vin_core *vinc,
 		sd = v4l2_i2c_new_subdev(v4l2_dev, adapter, name, addr, NULL);
 		if (IS_ERR_OR_NULL(sd)) {
 			i2c_put_adapter(adapter);
-			vin_err("registering v4l2 sd No such device!\n");
+			vin_err("registering %s, No such device!\n", name);
 			return NULL;
 		} else {
-			vin_print("sd %s register OK!\n", sd->name);
+			vin_log(VIN_LOG_MD, "%s register OK!\n", name);
 		}
 	} else if (type == VIN_MODULE_TYPE_SPI) {
 #if defined(CONFIG_SPI)
 		struct spi_master *master =
-				spi_busnum_to_master(modu_cfg->bus_sel);
-		struct spi_board_info info;
+				spi_busnum_to_master(module->bus_sel);
+		/*if use struct spi_board_info info diretly, maybe leadto stack overflow!*/
+		struct spi_board_info *info = NULL;
+
 		if (master == NULL) {
 			vin_err("request spi master failed!\n");
 			return NULL;
 		}
-		strlcpy(info.modalias, name, sizeof(info.modalias));
-		info.bus_num = modu_cfg->bus_sel;
-		info.chip_select = 1;
-		sd = v4l2_spi_new_subdev(v4l2_dev, master, &info);
+
+		info = kzalloc(sizeof(struct spi_board_info), GFP_KERNEL);
+		if (info == NULL)
+			return NULL;
+		strlcpy(info->modalias, name, sizeof(info->modalias));
+		info->bus_num = module->bus_sel;
+		info->chip_select = 0;
+		info->max_speed_hz = 12000000;
+		info->mode = 0x0b; /*0x08 (little end) | 0x03*/
+		sd = v4l2_spi_new_subdev(v4l2_dev, master, info);
+		kfree(info);
 		if (IS_ERR_OR_NULL(sd)) {
 			spi_master_put(master);
-			vin_err("registering v4l2 sd No such device!\n");
+			vin_err("registering %s, No such device!\n", name);
 			return NULL;
 		} else {
-			vin_print("sd %s register OK!\n", sd->name);
+			vin_log(VIN_LOG_MD, "%s register OK!\n", name);
 		}
 #endif
 	} else if (type == VIN_MODULE_TYPE_GPIO) {
-		vin_print("Sensor type error, type = %d!\n", type);
+		vin_log(VIN_LOG_MD, "Sensor type error, type = %d!\n", type);
 		return NULL;
 	} else {
-		vin_print("Sensor type error, type = %d!\n", type);
+		vin_log(VIN_LOG_MD, "Sensor type error, type = %d!\n", type);
 		return NULL;
 	}
 
@@ -324,7 +709,7 @@ static int __vin_subdev_unregister(struct v4l2_subdev *sd,
 		struct cci_driver *cci_driv = v4l2_get_subdevdata(sd);
 		if (IS_ERR_OR_NULL(cci_driv))
 			return -ENODEV;
-		vin_print("vin sd %s unregister!\n", sd->name);
+		vin_log(VIN_LOG_MD, "vin sd %s unregister!\n", sd->name);
 		v4l2_device_unregister_subdev(sd);
 		cci_bus_match_cancel(cci_driv);
 	} else if (type == VIN_MODULE_TYPE_I2C) {
@@ -332,7 +717,7 @@ static int __vin_subdev_unregister(struct v4l2_subdev *sd,
 		struct i2c_client *client = v4l2_get_subdevdata(sd);
 		if (!client)
 			return -ENODEV;
-		vin_print("vin sd %s unregister!\n", sd->name);
+		vin_log(VIN_LOG_MD, "vin sd %s unregister!\n", sd->name);
 		v4l2_device_unregister_subdev(sd);
 		adapter = client->adapter;
 		i2c_unregister_device(client);
@@ -343,17 +728,17 @@ static int __vin_subdev_unregister(struct v4l2_subdev *sd,
 		struct spi_device *spi = v4l2_get_subdevdata(sd);
 		if (!spi)
 			return -ENODEV;
-		vin_print("vin sd %s unregister!\n", sd->name);
+		vin_log(VIN_LOG_MD, "vin sd %s unregister!\n", sd->name);
 		v4l2_device_unregister_subdev(sd);
 		master = spi->master;
 		spi_unregister_device(spi);
 		if (master)
 			spi_master_put(master);
 	} else if (type == VIN_MODULE_TYPE_GPIO) {
-		vin_print("Sensor type error, type = %d!\n", type);
+		vin_log(VIN_LOG_MD, "Sensor type error, type = %d!\n", type);
 		return -EFAULT;
 	} else {
-		vin_print("Sensor type error, type = %d!\n", type);
+		vin_log(VIN_LOG_MD, "Sensor type error, type = %d!\n", type);
 		return -EFAULT;
 	}
 
@@ -370,7 +755,7 @@ static int __vin_handle_sensor_info(struct sensor_instance *inst)
 		inst->is_isp_used = 0;
 	} else {
 		inst->is_bayer_raw = 0;
-		inst->is_isp_used = 1;
+		inst->is_isp_used = 0;
 	}
 	return 0;
 }
@@ -388,48 +773,48 @@ static void __vin_verify_sensor_info(struct sensor_instance *inst)
 			vin_warn("%s fmt is different from device_tree!\n",
 			     sensor_type_name[sensor_info.sensor_type]);
 			vin_warn("detect fmt %d replace device_tree fmt %d!\n",
-			     sensor_info.sensor_type,
-			     inst->is_bayer_raw);
+			     sensor_info.sensor_type, inst->is_bayer_raw);
 			inst->is_bayer_raw = sensor_info.sensor_type;
 		}
-		vin_print("find sensor name is %s, address is %x, type is %s\n",
+		vin_log(VIN_LOG_MD, "find sensor name is %s, address is %x, type is %s\n",
 		     sensor_info.sensor_name, sensor_info.i2c_addr,
 		     sensor_type_name[sensor_info.sensor_type]);
 	}
 
 }
 
-static int __vin_register_module(struct vin_core *vinc, int i)
+static struct v4l2_subdev *__vin_register_module(struct vin_md *vind,
+			struct modules_config *module, int i)
 {
-	struct modules_config *modu_cfg = &vinc->modu_cfg;
-	struct sensor_instance *inst = &modu_cfg->sensors.inst[i];
-	struct vin_module_info *modules = &modu_cfg->modules;
+	struct sensor_instance *inst = &module->sensors.inst[i];
+	struct vin_module_info *modules = &module->modules;
 
 	if (!strcmp(inst->cam_name, "")) {
 		vin_err("Sensor name is NULL!\n");
 		modules->sensor[i].sd = NULL;
-		return -1;
+		return modules->sensor[i].sd;
 	}
+
 	/*camera sensor register. */
-	modules->sensor[i].sd = __vin_subdev_register(vinc,
+	modules->sensor[i].sd = __vin_subdev_register(vind, module,
 						inst->cam_name,
 						inst->cam_addr >> 1,
 						modules->sensor[i].type);
-	if (!vinc->modu_cfg.act_used) {
+	if (!module->act_used) {
 		modules->act[i].sd = NULL;
-		return 0;
+		return modules->sensor[i].sd;
 	}
 	/*camera act register. */
-	modules->act[i].sd = __vin_subdev_register(vinc,
+	modules->act[i].sd = __vin_subdev_register(vind, module,
 						inst->act_name,
 						inst->act_addr >> 1,
 						modules->act[i].type);
-	return 0;
+	return modules->sensor[i].sd;
 }
 
-static void __vin_unregister_module(struct vin_core *vinc, int i)
+static void __vin_unregister_module(struct modules_config *module, int i)
 {
-	struct vin_module_info *modules = &vinc->modu_cfg.modules;
+	struct vin_module_info *modules = &module->modules;
 
 	/*camera subdev unregister */
 	__vin_subdev_unregister(modules->sensor[i].sd,
@@ -440,78 +825,6 @@ static void __vin_unregister_module(struct vin_core *vinc, int i)
 	modules->sensor[i].sd = NULL;
 	modules->act[i].sd = NULL;
 }
-
-static void __vin_register_modules(struct vin_core *vinc)
-{
-	int i, num;
-	struct sensor_list *sensors = &vinc->modu_cfg.sensors;
-
-	if (sensors->use_sensor_list == 1) {
-		num = sensors->detect_num;
-		if (sensors->detect_num == 0)
-			num = 1;
-	} else {
-		num = 1;
-	}
-
-	for (i = 0; i < num; i++) {
-		if (sensors->use_sensor_list == 1)
-			__vin_handle_sensor_info(&sensors->inst[i]);
-		__vin_verify_sensor_info(&sensors->inst[i]);
-		__vin_register_module(vinc, i);
-		if (-1 == vin_core_check_sensor_list(vinc, i))
-			__vin_unregister_module(vinc, i);
-	}
-}
-
-static void __vin_unregister_modules(struct vin_core *vinc)
-{
-	int i, num;
-	struct sensor_list *sensors = &vinc->modu_cfg.sensors;
-
-	if (sensors->use_sensor_list == 1) {
-		num = sensors->detect_num;
-		if (sensors->detect_num == 0)
-			num = 1;
-	} else {
-		num = 1;
-	}
-
-	for (i = 0; i < num; i++) {
-		__vin_unregister_module(vinc, i);
-	}
-}
-#ifdef CONFIG_OF
-static bool vin_is_node_available(struct device_node *node, char *name)
-{
-	const __be32 *list;
-	struct device_node *sub_np;
-	int i, size;
-	vin_log(VIN_LOG_MD, "%s\n", __func__);
-	list = of_get_property(node, name, &size);
-	if ((!list) || (0 == size)) {
-		vin_warn("missing isp_handle property in node %s\n",
-			 node->name);
-	} else {
-		vin_log(VIN_LOG_MD, "isp_handle value is %d len is %d\n",
-			be32_to_cpup(list), size);
-		size /= sizeof(*list);
-		for (i = 0; i < size; i++) {
-			sub_np = of_find_node_by_phandle(be32_to_cpup(list++));
-			if (!sub_np) {
-				vin_warn("%s index %d invalid phandle\n",
-					 "isp_handle", i);
-				return false;
-			} else if (of_device_is_available(sub_np)) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-#else
-#define vin_is_node_available(node, name) (false)
-#endif /* CONFIG_OF */
 
 static int vin_md_link_notify(struct media_pad *source,
 				struct media_pad *sink, u32 flags)
@@ -559,16 +872,6 @@ static ssize_t vin_md_sysfs_store(struct device *dev,
 static DEVICE_ATTR(subdev_api, S_IWUSR | S_IRUGO,
 		   vin_md_sysfs_show, vin_md_sysfs_store);
 
-static int vin_md_get_clocks(struct vin_md *vind)
-{
-	return 0;
-}
-
-static void vin_md_put_clocks(struct vin_md *vind)
-{
-
-}
-
 static int vin_md_register_core_entity(struct vin_md *vind,
 					struct vin_core *vinc)
 {
@@ -595,32 +898,61 @@ static int vin_md_register_core_entity(struct vin_md *vind,
 static int vin_md_register_entities(struct vin_md *vind,
 						struct device_node *parent)
 {
-	int i, ret;
-	struct vin_core *vinc = NULL;
+	int i, j, ret;
 
-	vin_print("%s\n", __func__);
+	vin_log(VIN_LOG_MD, "%s\n", __func__);
+
 	for (i = 0; i < VIN_MAX_DEV; i++) {
+		struct modules_config *module = NULL;
+		struct sensor_list *sensors = NULL;
+
+		module = &vind->modules[i];
+		sensors = &vind->modules[i].sensors;
+
+		sensors->valid_idx = NO_VALID_SENSOR;
+		for (j = 0; j < sensors->detect_num; j++) {
+			if (sensors->use_sensor_list == 1)
+				__vin_handle_sensor_info(&sensors->inst[j]);
+			__vin_verify_sensor_info(&sensors->inst[j]);
+
+			if (__vin_register_module(vind, module, j)) {
+				sensors->valid_idx = j;
+				break;
+			}
+		}
+		vin_log(VIN_LOG_MD, "list%d valid sensor index %d\n",
+			i, sensors->valid_idx);
+
+		if (sensors->valid_idx == NO_VALID_SENSOR || !module->flash_used)
+			continue;
+
+		/*flash subdev register */
+		module->modules.flash.sd = sunxi_flash_get_subdev(
+						module->modules.flash.id);
+
+		ret = v4l2_device_register_subdev(&vind->v4l2_dev,
+					    module->modules.flash.sd);
+		if (ret < 0)
+			vin_log(VIN_LOG_MD, "flash%d register fail!\n",
+					module->modules.flash.id);
+	}
+
+	for (i = 0; i < VIN_MAX_DEV; i++) {
+		struct modules_config *module = NULL;
+
 		/*video device register */
 		vind->vinc[i] = sunxi_vin_core_get_dev(i);
 		if (NULL == vind->vinc[i])
 			continue;
-		vinc = vind->vinc[i];
-		vinc->v4l2_dev = &vind->v4l2_dev;
-		__vin_register_modules(vinc);
-		if (-1 == vinc->modu_cfg.sensors.valid_idx) {
+		vind->vinc[i]->v4l2_dev = &vind->v4l2_dev;
+
+		module = &vind->modules[vind->vinc[i]->rear_sensor];
+
+		if (module->sensors.valid_idx == NO_VALID_SENSOR) {
 			vind->vinc[i] = NULL;
 			continue;
 		}
-		vin_md_register_core_entity(vind, vinc);
-		if (!vinc->modu_cfg.flash_used)
-			continue;
-		/*flash subdev register */
-		vinc->modu_cfg.modules.flash.id = i;
-		vinc->modu_cfg.modules.flash.sd = sunxi_flash_get_subdev(i);
-		ret = v4l2_device_register_subdev(vinc->v4l2_dev,
-					    vinc->modu_cfg.modules.flash.sd);
-		if (ret < 0)
-			vin_warn("flash%d subdev register fail!\n", i);
+		vin_md_register_core_entity(vind, vind->vinc[i]);
 	}
 
 	for (i = 0; i < VIN_MAX_CSI; i++) {
@@ -630,7 +962,7 @@ static int vin_md_register_entities(struct vin_md *vind,
 		ret = v4l2_device_register_subdev(&vind->v4l2_dev,
 							vind->csi[i].sd);
 		if (ret < 0)
-			vin_warn("csi%d subdev register fail!\n", i);
+			vin_log(VIN_LOG_MD, "csi%d register fail!\n", i);
 	}
 
 	for (i = 0; i < VIN_MAX_MIPI; i++) {
@@ -640,7 +972,7 @@ static int vin_md_register_entities(struct vin_md *vind,
 		ret = v4l2_device_register_subdev(&vind->v4l2_dev,
 							vind->mipi[i].sd);
 		if (ret < 0)
-			vin_warn("mipi%d subdev register fail!\n", i);
+			vin_log(VIN_LOG_MD, "mipi%d register fail!\n", i);
 	}
 
 	for (i = 0; i < VIN_MAX_ISP; i++) {
@@ -650,14 +982,14 @@ static int vin_md_register_entities(struct vin_md *vind,
 		ret = v4l2_device_register_subdev(&vind->v4l2_dev,
 							vind->isp[i].sd);
 		if (ret < 0)
-			vin_warn("isp%d subdev register fail!\n", i);
+			vin_log(VIN_LOG_MD, "isp%d register fail!\n", i);
 		/*Register STATISTIC BUF subdev */
 		vind->stat[i].id = i;
 		vind->stat[i].sd = sunxi_stat_get_subdev(i);
 		ret = v4l2_device_register_subdev(&vind->v4l2_dev,
 							vind->stat[i].sd);
 		if (ret < 0)
-			vin_warn("stat%d subdev register fail!\n", i);
+			vin_log(VIN_LOG_MD, "stat%d register fail!\n", i);
 	}
 
 	for (i = 0; i < VIN_MAX_SCALER; i++) {
@@ -667,7 +999,7 @@ static int vin_md_register_entities(struct vin_md *vind,
 		ret = v4l2_device_register_subdev(&vind->v4l2_dev,
 							vind->scaler[i].sd);
 		if (ret < 0)
-			vin_warn("scaler%d subdev register fail!\n", i);
+			vin_log(VIN_LOG_MD, "scaler%d register fail!\n", i);
 	}
 
 	return 0;
@@ -675,25 +1007,28 @@ static int vin_md_register_entities(struct vin_md *vind,
 
 static void vin_md_unregister_entities(struct vin_md *vind)
 {
-	struct vin_core *vinc;
-
 	int i;
-	struct vin_module_info *modules = NULL;
 
 	for (i = 0; i < VIN_MAX_DEV; i++) {
+		struct vin_module_info *modules = NULL;
+		struct sensor_list *sensors = NULL;
+
+		sensors = &vind->modules[i].sensors;
+		if (sensors->valid_idx != NO_VALID_SENSOR) {
+			__vin_unregister_module(&vind->modules[i],
+						sensors->valid_idx);
+
+			modules = &vind->modules[i].modules;
+			if (modules->flash.sd == NULL)
+				continue;
+			v4l2_device_unregister_subdev(modules->flash.sd);
+			modules->flash.sd = NULL;
+		}
+
 		if (vind->vinc[i] == NULL)
 			continue;
-		vinc = vind->vinc[i];
-		__vin_unregister_modules(vinc);
-
-		modules = &vinc->modu_cfg.modules;
-		if (modules->flash.sd == NULL)
-			continue;
-		v4l2_device_unregister_subdev(modules->flash.sd);
-		modules->flash.sd = NULL;
-
-		v4l2_device_unregister_subdev(&vinc->vid_cap.subdev);
-		vinc->pipeline_ops = NULL;
+		v4l2_device_unregister_subdev(&vind->vinc[i]->vid_cap.subdev);
+		vind->vinc[i]->pipeline_ops = NULL;
 		vind->vinc[i] = NULL;
 	}
 
@@ -727,69 +1062,64 @@ static void vin_md_unregister_entities(struct vin_md *vind)
 		vind->scaler[i].sd = NULL;
 	}
 
-	vin_print("%s\n", __func__);
+	vin_log(VIN_LOG_MD, "%s\n", __func__);
 }
 
-static int sensor_link_to_mipi_csi(struct vin_core *vinc,
+static int sensor_link_to_mipi_csi(struct modules_config *module,
 					struct v4l2_subdev *to)
 {
-	struct v4l2_subdev *sensor[MAX_DETECT_NUM];
+	struct v4l2_subdev *sensor = NULL;
 	struct media_entity *source, *sink;
-	int j, ret = 0;
+	int ret = 0;
 
-	for (j = 0; j < MAX_DETECT_NUM; j++)
-		sensor[j] = vinc->modu_cfg.modules.sensor[j].sd;
-
-	if ((!sensor[0]) && (!sensor[1]) && (!sensor[2])) {
-		vin_err("Pipe line sensor subdev is NULL!\n");
+	if (module->sensors.valid_idx == NO_VALID_SENSOR) {
+		vin_warn("Pipe line %s sensor subdev is NULL!\n",
+			module->sensors.sensor_pos);
 		return -1;
 	}
 
-	for (j = 0; j < MAX_DETECT_NUM; j++) {
-		if (sensor[j] == NULL)
-			continue;
-		source = &sensor[j]->entity;
-		sink = &to->entity;
-		ret = media_entity_create_link(source, SENSOR_PAD_SOURCE,
-					       sink, 0,
-					       /*MEDIA_LNK_FL_IMMUTABLE | */
-					       MEDIA_LNK_FL_ENABLED);
+	sensor = module->modules.sensor[module->sensors.valid_idx].sd;
+	source = &sensor->entity;
+	sink = &to->entity;
+	ret = media_entity_create_link(source, SENSOR_PAD_SOURCE, sink, 0, 0);
 
-		vin_print("created link [%s] %c> [%s]\n",
-			source->name, MEDIA_LNK_FL_ENABLED ? '=' : '-',
-			sink->name);
-	}
+	vin_log(VIN_LOG_MD, "created link [%s] %c> [%s]\n",
+		source->name, '-', sink->name);
 	return ret;
 }
 static int vin_create_media_links(struct vin_md *vind)
 {
 	struct v4l2_subdev *mipi, *csi, *isp, *stat, *scaler, *cap_sd;
 	struct media_entity *source, *sink;
+	struct modules_config *module;
 	int i, j, ret = 0;
 
 	for (i = 0; i < VIN_MAX_DEV; i++) {
 		struct vin_core *vinc = NULL;
-		struct vin_pipeline_cfg *pc = NULL;
 		vinc = vind->vinc[i];
 
 		if (NULL == vinc)
 			continue;
-		pc = &vinc->pipe_cfg;
 
 		/*MIPI*/
-		if (0xff == pc->mipi_ind)
+		if (0xff == vinc->mipi_sel)
 			mipi = NULL;
 		else
-			mipi = vind->mipi[pc->mipi_ind].sd;
+			mipi = vind->mipi[vinc->mipi_sel].sd;
 		/*CSI*/
-		if (0xff == pc->csi_ind)
+		if (0xff == vinc->csi_sel)
 			csi = NULL;
 		else
-			csi = vind->csi[pc->csi_ind].sd;
+			csi = vind->csi[vinc->csi_sel].sd;
 
 		if (NULL != mipi) {
 			/*link MIPI sensor*/
-			ret = sensor_link_to_mipi_csi(vinc, mipi);
+			module = &vind->modules[vinc->rear_sensor];
+			sensor_link_to_mipi_csi(module, mipi);
+			if (vinc->rear_sensor != vinc->front_sensor) {
+				module = &vind->modules[vinc->front_sensor];
+				sensor_link_to_mipi_csi(module, mipi);
+			}
 
 			if (NULL == csi) {
 				vin_err("MIPI Pipe line csi subdev is NULL, "
@@ -808,8 +1138,12 @@ static int vin_create_media_links(struct vin_md *vind)
 					"DevID is %d\n", i);
 				continue;
 			}
-			ret = sensor_link_to_mipi_csi(vinc, csi);
-
+			module = &vind->modules[vinc->rear_sensor];
+			sensor_link_to_mipi_csi(module, csi);
+			if (vinc->rear_sensor != vinc->front_sensor) {
+				module = &vind->modules[vinc->front_sensor];
+				sensor_link_to_mipi_csi(module, csi);
+			}
 		}
 
 		cap_sd = &vinc->vid_cap.subdev;
@@ -835,8 +1169,7 @@ static int vin_create_media_links(struct vin_md *vind)
 			break;
 
 		vin_log(VIN_LOG_MD, "created link [%s] %c> [%s]\n",
-			source->name, MEDIA_LNK_FL_ENABLED ? '=' : '-',
-			sink->name);
+			source->name, '=', sink->name);
 
 		source = &cap_sd->entity;
 		sink = &vinc->vid_cap.vdev.entity;
@@ -845,8 +1178,7 @@ static int vin_create_media_links(struct vin_md *vind)
 		if (ret)
 			break;
 		vin_log(VIN_LOG_MD, "created link [%s] %c> [%s]\n",
-			source->name, MEDIA_LNK_FL_ENABLED ? '=' : '-',
-			sink->name);
+			source->name, '=', sink->name);
 	}
 
 	for (i = 0; i < VIN_MAX_CSI; i++) {
@@ -860,11 +1192,9 @@ static int vin_create_media_links(struct vin_md *vind)
 				continue;
 			sink = &isp->entity;
 			ret = media_entity_create_link(source, CSI_PAD_SOURCE,
-						       sink, ISP_PAD_SINK,
-						       0);
+						       sink, ISP_PAD_SINK, 0);
 			vin_log(VIN_LOG_MD, "created link [%s] %c> [%s]\n",
-				source->name, 0 ? '=' : '-',
-				sink->name);
+				source->name, '-', sink->name);
 		}
 	}
 
@@ -880,19 +1210,17 @@ static int vin_create_media_links(struct vin_md *vind)
 					       MEDIA_LNK_FL_IMMUTABLE |
 					       MEDIA_LNK_FL_ENABLED);
 		vin_log(VIN_LOG_MD, "created link [%s] %c> [%s]\n",
-			source->name, MEDIA_LNK_FL_ENABLED ? '=' : '-',
-			sink->name);
+			source->name, '=', sink->name);
+
 		for (j = 0; j < VIN_MAX_SCALER; j++) {
 			scaler = vind->scaler[j].sd;
 			if (scaler == NULL)
 				continue;
 			sink = &scaler->entity;
 			ret = media_entity_create_link(source, ISP_PAD_SOURCE,
-						       sink, SCALER_PAD_SINK,
-						       0);
+						sink, SCALER_PAD_SINK, 0);
 			vin_log(VIN_LOG_MD, "created link [%s] %c> [%s]\n",
-			source->name, 0 ? '=' : '-',
-			sink->name);
+				source->name, '-', sink->name);
 		}
 	}
 	return ret;
@@ -905,39 +1233,34 @@ static int vin_setup_default_links(struct vin_md *vind)
 
 	for (i = 0; i < VIN_MAX_DEV; i++) {
 		struct vin_core *vinc = NULL;
-		struct vin_pipeline_cfg *pc = NULL;
 		struct media_link *link = NULL;
 		struct vin_pipeline *p = NULL;
 
 		vinc = vind->vinc[i];
 		if (NULL == vinc)
 			continue;
-		pc = &vinc->pipe_cfg;
 		/*CSI*/
-		if (0xff == pc->csi_ind)
+		if (0xff == vinc->csi_sel)
 			csi = NULL;
 		else
-			csi = vind->csi[pc->csi_ind].sd;
+			csi = vind->csi[vinc->csi_sel].sd;
 
 		/*ISP*/
-		if (0xff == pc->isp_ind)
+		if (0xff == vinc->isp_sel)
 			isp = NULL;
 		else
-			isp = vind->isp[pc->isp_ind].sd;
+			isp = vind->isp[vinc->isp_sel].sd;
 
 		/*SCALER*/
-		if (0xff == pc->scaler_ind)
+		if (0xff == vinc->vipp_sel)
 			scaler = NULL;
 		else
-			scaler = vind->scaler[pc->scaler_ind].sd;
+			scaler = vind->scaler[vinc->vipp_sel].sd;
 
-		if (csi && isp) {
+		if (csi && isp)
 			link = media_entity_find_link(&csi->entity.pads[CSI_PAD_SOURCE],
 						      &isp->entity.pads[ISP_PAD_SINK]);
-		} else if (csi && scaler) {
-			link = media_entity_find_link(&csi->entity.pads[CSI_PAD_SOURCE],
-						      &scaler->entity.pads[SCALER_PAD_SINK]);
-		}
+
 		if (link) {
 			vin_log(VIN_LOG_MD, "link: source %s sink %s\n",
 				link->source->entity->name,
@@ -947,6 +1270,7 @@ static int vin_setup_default_links(struct vin_md *vind)
 				vin_err("media_entity_setup_link error\n");
 		} else {
 			vin_err("media_entity_find_link null\n");
+			continue;
 		}
 
 		if (isp && scaler)
@@ -962,9 +1286,11 @@ static int vin_setup_default_links(struct vin_md *vind)
 				vin_err("media_entity_setup_link error\n");
 		} else {
 			vin_err("media_entity_find_link null\n");
+			continue;
 		}
+
 		p = &vinc->vid_cap.pipe;
-		vin_md_prepare_pipeline(p, &vinc->vid_cap.subdev.entity);
+		vin_md_prepare_pipeline(p, &vinc->vid_cap.vdev.entity);
 	}
 
 	return ret;
@@ -973,16 +1299,67 @@ static int vin_setup_default_links(struct vin_md *vind)
 static int vin_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	struct device_node *np = pdev->dev.of_node;
 	struct v4l2_device *v4l2_dev;
 	struct vin_md *vind;
-	int ret;
+	enum module_type type = VIN_MODULE_TYPE_CCI;
+	int ret, i, num;
 
 	vind = devm_kzalloc(dev, sizeof(*vind), GFP_KERNEL);
 	if (!vind)
 		return -ENOMEM;
 
 	spin_lock_init(&vind->slock);
+
+	of_property_read_u32(np, "device_id", &pdev->id);
+	if (pdev->id < 0) {
+		vin_err("vin media failed to get device id\n");
+		pdev->id = 0;
+	}
+
+	vind->id = pdev->id;
 	vind->pdev = pdev;
+
+	vind->base = of_iomap(np, 0);
+	if (!vind->base) {
+		vind->is_empty = 1;
+		vind->base = kzalloc(0x400, GFP_KERNEL);
+		if (!vind->base) {
+			ret = -EIO;
+			goto freedev;
+		}
+	}
+	csic_top_set_base_addr(vind->id, (unsigned long)vind->base);
+
+	for (num = 0; num < VIN_MAX_DEV; num++) {
+		vind->modules[num].modules.flash.type = VIN_MODULE_TYPE_GPIO;
+		vind->modules[num].sensors.inst[0].cam_addr = i2c_addr;
+		strcpy(vind->modules[num].sensors.inst[0].cam_name, ccm);
+		vind->modules[num].sensors.inst[0].act_addr = act_slave;
+		strcpy(vind->modules[num].sensors.inst[0].act_name, act_name);
+		vind->modules[num].sensors.use_sensor_list = use_sensor_list;
+		for (i = 0; i < MAX_GPIO_NUM; i++)
+			vind->modules[num].sensors.gpio[i].gpio = GPIO_INDEX_INVALID;
+	}
+
+	parse_modules_from_device_tree(vind);
+
+	for (num = 0; num < VIN_MAX_DEV; num++) {
+#if defined(CONFIG_CCI_MODULE) || defined(CONFIG_CCI)
+		type = VIN_MODULE_TYPE_CCI;
+#else
+		if (vind->modules[num].sensors.twi_cci_spi == 2)
+			type = VIN_MODULE_TYPE_SPI;
+		else
+			type = VIN_MODULE_TYPE_I2C;
+#endif
+		for (i = 0; i < MAX_DETECT_NUM; i++) {
+			vind->modules[num].modules.sensor[i].type = type;
+			vind->modules[num].modules.act[i].type = type;
+		}
+	}
+
+	vin_gpio_request(vind);
 
 	strlcpy(vind->media_dev.model, "Allwinner Vin",
 		sizeof(vind->media_dev.model));
@@ -993,12 +1370,10 @@ static int vin_probe(struct platform_device *pdev)
 	v4l2_dev->mdev = &vind->media_dev;
 	strlcpy(v4l2_dev->name, "sunxi-vin", sizeof(v4l2_dev->name));
 
-	vind->isp_used = vin_is_node_available(dev->of_node, "isp_handle");
-
 	ret = v4l2_device_register(dev, &vind->v4l2_dev);
 	if (ret < 0) {
 		vin_err("Failed to register v4l2_device: %d\n", ret);
-		return ret;
+		goto unmap;
 	}
 	ret = media_device_register(&vind->media_dev);
 	if (ret < 0) {
@@ -1018,25 +1393,25 @@ static int vin_probe(struct platform_device *pdev)
 #ifdef CONFIG_PM_RUNTIME
 	pm_runtime_enable(&pdev->dev);
 #endif
-	/* Protect the media graph while we're registering entities */
-	mutex_lock(&vind->media_dev.graph_mutex);
 
-	if (dev->of_node)
+	vin_md_clk_enable(vind);
+	if (dev->of_node) {
 		ret = vin_md_register_entities(vind, dev->of_node);
-	else {
+	} else {
 		vin_err("Device tree of_node is NULL!\n");
 		ret = -ENOSYS;
+		goto err_clk;
 	}
+	vin_md_clk_disable(vind);
 
-	if (ret)
-		goto err_unlock;
-
+	mutex_lock(&vind->media_dev.graph_mutex);
 	ret = vin_create_media_links(vind);
+	mutex_unlock(&vind->media_dev.graph_mutex);
 	if (ret) {
 		vin_err("vin_create_media_links error\n");
-		goto err_unlock;
+		goto err_clk;
 	}
-	mutex_unlock(&vind->media_dev.graph_mutex);
+
 	/*
 	 * when use media_entity_setup_link we should
 	 * pay attention to graph_mutex dead lock.
@@ -1044,29 +1419,34 @@ static int vin_probe(struct platform_device *pdev)
 	ret = vin_setup_default_links(vind);
 	if (ret) {
 		vin_err("vin_setup_default_links error\n");
-		goto err_unlock;
+		goto err_clk;
 	}
 
 	ret = v4l2_device_register_subdev_nodes(&vind->v4l2_dev);
 	if (ret)
-		goto err_unlock;
+		goto err_clk;
 
 	ret = device_create_file(&pdev->dev, &dev_attr_subdev_api);
 	if (ret)
-		goto err_unlock;
+		goto err_clk;
 
 
-	vin_print("%s ok!\n", __func__);
+	vin_log(VIN_LOG_MD, "%s ok!\n", __func__);
 	return 0;
 
-err_unlock:
-	mutex_unlock(&vind->media_dev.graph_mutex);
 err_clk:
 	vin_md_put_clocks(vind);
 	vin_md_unregister_entities(vind);
 	media_device_unregister(&vind->media_dev);
 err_md:
 	v4l2_device_unregister(&vind->v4l2_dev);
+unmap:
+	if (!vind->is_empty)
+		iounmap(vind->base);
+	else
+		kfree(vind->base);
+freedev:
+	devm_kfree(dev, vind);
 	return ret;
 }
 
@@ -1074,23 +1454,31 @@ static int vin_remove(struct platform_device *pdev)
 {
 	struct vin_md *vind = (struct vin_md *)dev_get_drvdata(&pdev->dev);
 
-	mutex_unlock(&vind->media_dev.graph_mutex);
 	device_remove_file(&pdev->dev, &dev_attr_subdev_api);
 	vin_md_put_clocks(vind);
+	vin_mclk_pin_release(vind);
+	vin_gpio_release(vind);
 	vin_md_unregister_entities(vind);
 	media_device_unregister(&vind->media_dev);
 	v4l2_device_unregister(&vind->v4l2_dev);
 #ifdef CONFIG_PM_RUNTIME
 	pm_runtime_disable(&pdev->dev);
 #endif
+	if (vind->base) {
+		if (!vind->is_empty)
+			iounmap(vind->base);
+		else
+			kfree(vind->base);
+	}
+
 	devm_kfree(&pdev->dev, vind);
-	vin_print("%s ok!\n", __func__);
+	vin_log(VIN_LOG_MD, "%s ok!\n", __func__);
 	return 0;
 }
 
 static void vin_shutdown(struct platform_device *pdev)
 {
-	vin_print("%s!\n", __func__);
+	vin_log(VIN_LOG_MD, "%s!\n", __func__);
 }
 
 #ifdef CONFIG_PM_RUNTIME
@@ -1146,7 +1534,7 @@ static struct platform_driver vin_driver = {
 static int __init vin_init(void)
 {
 	int ret;
-	vin_print("Welcome to Video Front End driver\n");
+	vin_log(VIN_LOG_MD, "Welcome to Video Input driver\n");
 	ret = sunxi_csi_platform_register();
 	if (ret) {
 		vin_err("Sunxi csi driver register failed\n");
@@ -1194,13 +1582,13 @@ static int __init vin_init(void)
 		vin_err("Sunxi vin register driver failed!\n");
 		return ret;
 	}
-	vin_print("vin init end\n");
+	vin_log(VIN_LOG_MD, "vin init end\n");
 	return ret;
 }
 
 static void __exit vin_exit(void)
 {
-	vin_print("vin_exit\n");
+	vin_log(VIN_LOG_MD, "vin_exit\n");
 	platform_driver_unregister(&vin_driver);
 	sunxi_vin_debug_unregister_driver();
 	sunxi_vin_core_unregister_driver();
@@ -1209,7 +1597,7 @@ static void __exit vin_exit(void)
 	sunxi_mipi_platform_unregister();
 	sunxi_flash_platform_unregister();
 	sunxi_scaler_platform_unregister();
-	vin_print("vin_exit end\n");
+	vin_log(VIN_LOG_MD, "vin_exit end\n");
 }
 
 module_init(vin_init);

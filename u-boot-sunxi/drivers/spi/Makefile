@@ -42,7 +42,4 @@ obj-$(CONFIG_TI_QSPI) += ti_qspi.o
 obj-$(CONFIG_XILINX_SPI) += xilinx_spi.o
 obj-$(CONFIG_ZYNQ_SPI) += zynq_spi.o
 obj-$(CONFIG_FSL_QSPI) += fsl_qspi.o
-
-ifdef CONFIG_SUNXI_SPI
-obj-$(CONFIG_ARCH_SUN8IW11P1) += spi_sun8iw11p1.o
-endif
+obj-$(CONFIG_SUNXI_SPI) += spi_sunxi_common.o

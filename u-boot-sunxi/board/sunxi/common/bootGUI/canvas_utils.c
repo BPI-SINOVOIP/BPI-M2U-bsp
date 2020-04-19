@@ -3,6 +3,25 @@
 #include <boot_gui.h>
 #include "canvas_utils.h"
 
+/*
+* Function prototype:
+* char check_coords(struct canvas *cv, point_t *const coords)
+*/
+#define check_coords(cv, coords) (((coords)->x < 0) \
+		|| ((coords)->x >= (cv)->width) \
+		|| ((coords)->y < 0) \
+		|| ((coords)->y >= (cv)->height))
+
+/*
+* Function prototype:
+* char check_rect(struct canvas *cv, rect_t *const rect)
+*/
+#define check_rect(cv, rect) (((rect)->left < 0) \
+		|| ((rect)->top < 0) \
+		|| ((rect)->right > (cv)->width) \
+		|| ((rect)->bottom > (cv)->height) \
+		|| ((rect)->left >= (rect)->right) \
+		|| ((rect)->top >= (rect)->bottom))
 
 #ifdef SURPORT_DRAW_CHARS
 
@@ -94,24 +113,6 @@ static inline void memset32(int *p, int v, unsigned int count)
 {
 	while (count--)
 		*(p++) = v;
-}
-
-static inline char check_coords(struct canvas *cv, point_t *const coords)
-{
-	return ((coords->x < 0)
-		|| (coords->x >= cv->width)
-		|| (coords->y < 0)
-		|| (coords->y >= cv->height));
-}
-
-static inline char check_rect(struct canvas *cv, rect_t *const rect)
-{
-	return ((rect->left < 0)
-		|| (rect->top < 0)
-		|| (rect->right > cv->width)
-		|| (rect->bottom > cv->height)
-		|| (rect->left >= rect->right)
-		|| (rect->top >= rect->bottom));
 }
 
 /* draw horizen line */
@@ -312,10 +313,7 @@ static int copy_block(struct canvas *cv, point_t *src, point_t *dst,
 
 #endif /* #ifdef SUPORT_DRAW_GEOMETRY */
 
-static int do_nothing(void)
-{
-	return 0;
-}
+static void do_nothing(void) {}
 
 int get_canvas_utils(struct canvas *cv)
 {
@@ -338,5 +336,6 @@ int get_canvas_utils(struct canvas *cv)
 #else
 	cv->draw_chars = (void *)do_nothing;
 #endif
+	do_nothing(); /* called for removing complie error */
 	return 0;
 }

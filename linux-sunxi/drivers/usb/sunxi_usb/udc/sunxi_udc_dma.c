@@ -103,6 +103,29 @@ int sunxi_udc_dma_release(dm_hdl_t dma_hdl)
 	return 0;
 }
 
+int sunxi_udc_dma_chan_disable(dm_hdl_t dma_hdl)
+{
+	dma_channel_t *pchan = NULL;
+	u32 reg_value = 0;
+
+	if (dma_hdl == NULL) {
+		DMSG_PANIC("[sunxi_udc_dma_chan_disable] dma_hdl is NULL\n");
+		return -1;
+	}
+
+	pchan = (dma_channel_t *)dma_hdl;
+	reg_value = USBC_Readl(USBC_REG_DMA_CHAN_CFN(pchan->reg_base,
+					pchan->channel_num));
+	reg_value &= ~(1 << 31);
+	USBC_Writel(reg_value, USBC_REG_DMA_CHAN_CFN(pchan->reg_base,
+					pchan->channel_num));
+
+	pchan->used = 0;
+	pchan->channel_num = 0;
+
+	return 0;
+}
+
 /* config dma */
 void sunxi_dma_set_config(dm_hdl_t dma_hdl, struct dma_config_t *pcfg)
 {
@@ -438,10 +461,13 @@ void sunxi_udc_dma_set_config(struct sunxi_udc_ep *ep, struct sunxi_udc_request 
 	case 3:
 		usbc_no = DRQSRC_OTG_EP3;
 		break;
+#ifndef CONFIG_ARCH_SUN3IW1
 	case 4:
 		usbc_no = DRQSRC_OTG_EP4;
 		break;
-#if defined (CONFIG_ARCH_SUN50I)
+#endif
+#if defined(CONFIG_ARCH_SUN50I) || defined(CONFIG_ARCH_SUN8IW6) \
+	|| defined(CONFIG_ARCH_SUN8IW5)
 	case 5:
 		usbc_no = DRQSRC_OTG_EP5;
 		break;
@@ -453,7 +479,7 @@ void sunxi_udc_dma_set_config(struct sunxi_udc_ep *ep, struct sunxi_udc_request 
 	sunxi_udc_dma_para.ep[ep->num] = ep;
 	if (!is_tx) { /* ep in, rx*/
 		slave_config.direction = DMA_DEV_TO_MEM;
-		slave_config.src_addr = fifo_addr;
+		slave_config.src_addr = (dma_addr_t)fifo_addr;
 		slave_config.dst_addr = buff_addr;
 		slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
 		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
@@ -464,7 +490,7 @@ void sunxi_udc_dma_set_config(struct sunxi_udc_ep *ep, struct sunxi_udc_request 
 	} else { /* ep out, tx*/
 		slave_config.direction = DMA_MEM_TO_DEV;
 		slave_config.src_addr = buff_addr;
-		slave_config.dst_addr = fifo_addr;
+		slave_config.dst_addr = (dma_addr_t)fifo_addr;
 		slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
 		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
 		slave_config.src_maxburst = 1;

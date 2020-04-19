@@ -169,7 +169,7 @@ int sprite_card_fetch_mbr(void  *img_mbr)
 	{
 		return -1;
 	}
-	debug("try to read item dl map\n");
+	debug("try to read item mbr\n");
 	if(!Img_ReadItem(imghd, imgitemhd, img_mbr, sizeof(sunxi_mbr_t) * mbr_num))
 	{
 		printf("sunxi sprite error : read mbr failed\n");
@@ -799,7 +799,14 @@ int sunxi_sprite_deal_uboot(int production_media)
 	}
 	else if(gd->bootfile_mode  == SUNXI_BOOT_FILE_PKG)
 	{
-		imgitemhd = Img_OpenItem(imghd, "12345678", "BOOTPKG-00000000");
+		if (get_boot_storage_type() != STORAGE_NOR)
+		{
+			imgitemhd = Img_OpenItem(imghd, "12345678", "BOOTPKG-00000000");
+		}
+		else
+		{
+			imgitemhd = Img_OpenItem(imghd, "12345678", "BOOTPKG-NOR00000");
+		}
 	}
 	else
 	{
@@ -1294,7 +1301,7 @@ int card_erase(int erase, void *mbr_buffer)
 	memset(erase_buffer, 0, CARD_ERASE_BLOCK_BYTES);
 
 	//erase boot0,write 0x00
-	card_download_boot0(32 * 1024, erase_buffer, uboot_spare_head.boot_data.storage_type);
+	card_download_boot0(32 * 1024, erase_buffer, get_boot_storage_type());
 	printf("erase boot0, size:32k, write 0x00\n");
 
 	for(i=1;i<mbr->PartCount;i++)

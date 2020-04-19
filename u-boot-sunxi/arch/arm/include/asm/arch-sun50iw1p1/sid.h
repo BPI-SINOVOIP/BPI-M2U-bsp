@@ -39,7 +39,7 @@
 #define SID_RF(n)               (SUNXI_SID_BASE + (n) * 4 + 0x80)
 
 #define SID_EFUSE               (SUNXI_SID_BASE + 0x200)
-
+#define SID_OP_LOCK  (0xAC)
 
 #define EFUSE_CHIPD             (0x00)
 #define EFUSE_OEM_PROGRAM       (0x10)
@@ -55,8 +55,8 @@
 #define EFUSE_SSK               (0x84)
 #define EFUSE_RSSK              (0x94)
 
-#define EFUSE_HDCP_HUSH         (0xB4)
-#define EFUSE_EK_HUSH           (0xC4)
+#define EFUSE_HDCP_HASH         (0xB4)
+#define EFUSE_EK_HASH           (0xC4)
 #define EFUSE_SN                (0xD4)
 
 #define EFUSE_BACKUP_KEY        (0xEC)

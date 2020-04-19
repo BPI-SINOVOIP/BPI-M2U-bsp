@@ -204,16 +204,14 @@ void sun8iw6p1_isp_update_table(unsigned long id, unsigned short table_update)
 	else
 		sun8iw6p1_isp_regs[id].sun8iw6p1_isp_fe_ctrl->bits.cem_update = 0;
 }
-void sun8iw6p1_isp_capture_start(unsigned long id, int vcap_read_start)
+void sun8iw6p1_isp_capture_start(unsigned long id)
 {
 	sun8iw6p1_isp_regs[id].sun8iw6p1_isp_fe_ctrl->bits.cap_en = 1;
-	sun8iw6p1_isp_regs[id].sun8iw6p1_isp_fe_ctrl->bits.vcap_read_start = vcap_read_start;
 }
 
-void sun8iw6p1_isp_capture_stop(unsigned long id, int vcap_read_start)
+void sun8iw6p1_isp_capture_stop(unsigned long id)
 {
 	sun8iw6p1_isp_regs[id].sun8iw6p1_isp_fe_ctrl->bits.cap_en = 0;
-	sun8iw6p1_isp_regs[id].sun8iw6p1_isp_fe_ctrl->bits.vcap_read_start = vcap_read_start;
 }
 
 void sun8iw6p1_isp_irq_enable(unsigned long id, unsigned int irq_flag)
@@ -329,7 +327,7 @@ static struct isp_bsp_fun_array sun8iw6p1_fun_array = {
 };
 
 struct isp_platform_drv sun8iw6p1_isp_drv = {
-	.platform_id = ISP_PLATFORM_SUN8IW7P1,
+	.platform_id = ISP_PLATFORM_SUN8IW6P1,
 	.fun_array = &sun8iw6p1_fun_array,
 };
 

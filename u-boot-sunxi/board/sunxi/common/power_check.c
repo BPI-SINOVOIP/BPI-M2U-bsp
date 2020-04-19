@@ -87,8 +87,34 @@ static void EnterNormalBootMode(void)
 
 	/* bpi, fix hdmi splash screen */
 	writel(0x00000000, (void __iomem *)0x1c73088);
-	
+
 	sunxi_bmp_display("bootlogo.bmp");
+}
+
+
+
+int ProbePreSystemMode(void)
+{
+    int  PreSysMode = 0;
+
+    PreSysMode = axp_probe_pre_sys_mode();
+    if(PreSysMode == PMU_PRE_SYS_MODE )
+    {
+        printf("pre sys mode\n");
+        return PMU_PRE_SYS_MODE;
+    }
+    else if(PreSysMode == PMU_PRE_CHARGE_MODE)
+    {
+        printf("pre charge mode\n");
+        return PMU_PRE_CHARGE_MODE;
+    }
+    else if(PreSysMode == PMU_PRE_FASTBOOT_MODE)
+    {
+        printf("pre fastboot mode\n");
+        return PMU_PRE_FASTBOOT_MODE;
+    }
+
+    return 0;
 }
 
 static int ProbeStartupCause(void)
@@ -190,7 +216,20 @@ static BOOT_POWER_STATE_E GetStateOnHighBatteryRatio(int PowerBus,int LowVoltage
 	return BootPowerState;
 }
 
-
+static void GetBatVolCap(int *BatVol, int *BatRatio)
+{
+	int count = 5;
+	*BatVol = axp_probe_battery_vol();
+	*BatRatio = GetBatteryRatio();
+	while(count > 0 && *BatRatio == 100 && *BatVol < 4000){
+	/* if ratio=100 & vol < 4v, it means a wrong ratio,detect again! */
+		printf("msdelay 300ms!\n");
+		__msdelay(300);
+		printf("detect bat ratio again!\n");
+		*BatRatio = GetBatteryRatio();
+		count--;
+	}
+}
 
 //function : PowerCheck
 //para: null
@@ -199,7 +238,6 @@ int PowerCheck(void)
 {
 	int BatExist = 0;
 	int PowerBus=0;
-	int PreSysMode = 0;
 	int BatVol=0;
 	int BatRatio=0;
 	int SafeVol =0;
@@ -257,9 +295,23 @@ int PowerCheck(void)
 		return 0;
 	}
 
+	//if android call shutdown when  charing , then boot should enter android charge mode
+	if((PMU_PRE_CHARGE_MODE == ProbePreSystemMode()))
+	{
+		if(PowerBus)
+		{
+			EnterAndroidChargeMode();
+		}
+		else
+		{
+			printf("pre system is charge mode,but without dc or ac, should be ShowDown\n");
+			EnterNormalShutDownMode();
+		}
+		return 0;
+	}
+
 	//check battery ratio
-	BatRatio = GetBatteryRatio();
-	BatVol = axp_probe_battery_vol();
+	GetBatVolCap(&BatVol, &BatRatio);
 	printf("Battery Voltage=%d, Ratio=%d\n", BatVol, BatRatio);
 
 	//PMU_SUPPLY_DCDC2 is for cpua
@@ -273,28 +325,6 @@ int PowerCheck(void)
 	LowVoltageFlag  =  (BatVol<SafeVol) ? 1:0;
 	PowerOnCause = ProbeStartupCause();
 
-	PreSysMode = axp_probe_pre_sys_mode();
-	printf("PreSysMode = 0x%x\n", PreSysMode);
-	if(PreSysMode == PMU_PRE_CHARGE_MODE) {
-		//if android call shutdown when  charing , then boot should enter android charge mode
-		printf("pre charge mode\n");
-		if(PowerBus) {
-			EnterAndroidChargeMode();
-		} else {
-			printf("pre system is charge mode,but without dc or ac, should be ShowDown\n");
-			EnterNormalShutDownMode();
-		}
-		return 0;
-	}else if(PreSysMode == PMU_PRE_SYS_MODE) {
-		//normal reboot
-		printf("pre sys mode\n");
-		if(PowerBus && !LowBatRatioFlag) {
-			EnterNormalBootMode();
-			return 0;
-		}
-	}else if(PreSysMode == PMU_PRE_FASTBOOT_MODE) {
-		printf("pre fastboot mode\n");
-	}
 
 	if(LowBatRatioFlag)
 	{

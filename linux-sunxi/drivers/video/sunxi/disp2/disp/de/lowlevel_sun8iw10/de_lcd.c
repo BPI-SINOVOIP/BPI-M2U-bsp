@@ -357,11 +357,15 @@ static s32 tcon0_cfg_mode_auto(u32 sel, disp_panel_para * panel)
   {
 	if (panel->lcd_interlace){
 		lcd_dev[sel]->tcon0_basic0.bits.y = panel->lcd_y/2 - 1;
-		lcd_dev[sel]->tcon0_basic2.bits.vt = (panel->lcd_hv_syuv_fdly == LCD_HV_SRGB_FDLY_2LINE)? 525:625;
-			start_delay = panel->lcd_vt/2-panel->lcd_y/2-10;
+		lcd_dev[sel]->tcon0_basic2.bits.vt =
+		    (panel->lcd_hv_syuv_fdly == LCD_HV_SRGB_FDLY_2LINE) ? 625
+									: 525;
+		start_delay = panel->lcd_vt / 2 - panel->lcd_y / 2 - 10;
 	  } else {
 		lcd_dev[sel]->tcon0_basic0.bits.y = panel->lcd_y - 1;
-		lcd_dev[sel]->tcon0_basic2.bits.vt = (panel->lcd_hv_syuv_fdly == LCD_HV_SRGB_FDLY_2LINE)? 1050:1250;
+		lcd_dev[sel]->tcon0_basic2.bits.vt =
+		    (panel->lcd_hv_syuv_fdly == LCD_HV_SRGB_FDLY_2LINE) ? 1250
+									: 1050;
 	  }
 
       lcd_dev[sel]->tcon0_basic1.bits.ht = (panel->lcd_ht==0)? 0:(panel->lcd_ht*2-1);
@@ -1323,4 +1327,3 @@ s32 tcon_cmap(u32 sel, u32 mode,unsigned int lcd_cmap_tbl[2][3][4])
 	}
     return 0;
 }
-

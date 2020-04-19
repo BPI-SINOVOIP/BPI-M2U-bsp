@@ -14,6 +14,13 @@
 #ifndef __SUNXI_CPUIDLE_H__
 #define __SUNXI_CPUIDLE_H__
 
+#if defined CONFIG_ARCH_SUN50IW6P1
+#define BOOT_CPU_HP_FLAG_REG		(0x1b8)
+#define CPU_SOFT_ENTRY_REG0		(0x1bc)
+#define CPUCFG_CPUIDLE_EN_REG		(0x140)
+#define CPUCFG_CORE_FLAG_REG		(0x144)
+#define CPUCFG_PWR_SWITCH_DELAY_REG	(0x150)
+#else
 #define BOOT_CPU_HP_FLAG_REG		(0xb8)
 #define CPU_SOFT_ENTRY_REG0		(0xbc)
 #define CPUCFG_CPUIDLE_EN_REG		(0x140)
@@ -21,6 +28,7 @@
 #define CPUCFG_PWR_SWITCH_DELAY_REG	(0x150)
 
 #define GIC_DIST_PBASE			(0x01C81000)
+#endif
 
 extern void sunxi_idle_cpux_flag_init(void);
 extern void sunxi_cpux_entry_judge(void);

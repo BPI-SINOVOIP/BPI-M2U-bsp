@@ -1,16 +1,14 @@
-#ifndef __SUNXI_I2S_H__
-#define __SUNXI_I2S_H__
-#include "sunxi_dma.h"
-#include "sunxi_rw_func.h"
-#if defined(CONFIG_ARCH_SUN8IW10)
+#ifndef __SUNXI_CPUDAI_H__
+#define __SUNXI_CPUDAI_H__
+
+#if defined(CONFIG_ARCH_SUN3IW1)
+#include "sun3iw1_codec.h"
+#elif defined(CONFIG_ARCH_SUN8IW10)
 #include "sun8iw10_codec.h"
 #elif defined(CONFIG_ARCH_SUN8IW11)
 #include "sun8iw11_codec.h"
+#elif defined(CONFIG_ARCH_SUN50IW2)
+#include "sun50iw2_codec.h"
 #endif
 
-struct sunxi_cpudai {
-	struct sunxi_dma_params play_dma_param;
-	struct sunxi_dma_params capture_dma_param;
-	struct snd_soc_dai_driver dai;
-};
-#endif
+#endif	/* __SUNXI_CPUDAI_H__ */

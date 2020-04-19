@@ -19,6 +19,11 @@
 
 static void cache_flush(void);
 
+void lowlevel_init(void)
+{
+    return ;
+}
+
 int cleanup_before_linux (void)
 {
 	/*

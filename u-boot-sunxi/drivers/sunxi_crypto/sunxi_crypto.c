@@ -10,24 +10,13 @@
 #include "asm/arch/ccmu.h"
 #include "asm/arch/ss.h"
 #include "asm/arch/mmu.h"
+#include "ss_op.h"
 
-static int ss_base_mode = 0;
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+#define ALG_SHA256  (0x13)
+#define ALG_RSA     (0x20)
+#define ALG_MD5		(0x10)
+#define ALG_TRANG	(0x1C)
+
 static u32 __aw_endian4(u32 data)
 {
 	u32 d1, d2, d3, d4;
@@ -38,22 +27,7 @@ static u32 __aw_endian4(u32 data)
 
 	return (d1|d2|d3|d4);
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
 static u32 __sha_padding(u32 data_size, u8* text, u32 hash_mode)
 {
 	u32 i;
@@ -146,51 +120,9 @@ static u32 __sha_padding(u32 data_size, u8* text, u32 hash_mode)
 
 	return size;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
-static void __ss_encry_decry_end(uint task_id)
-{
-	uint int_en;
 
-	int_en = readl(SS_ICR) & 0xf;
-	int_en = int_en&(0x01<<task_id);
-	if(int_en!=0)
-	{
 
-	   while((readl(SS_ISR)&(0x01<<task_id))==0) {};
-	}
-}
-//align & padding
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
 static void __rsa_padding(u8 *dst_buf, u8 *src_buf, u32 data_len, u32 group_len)
 {
 	int i = 0;
@@ -201,242 +133,316 @@ static void __rsa_padding(u8 *dst_buf, u8 *src_buf, u32 data_len, u32 group_len)
 		dst_buf[i] = src_buf[group_len - 1 - i];
 	}
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
 void sunxi_ss_open(void)
 {
-	u32  reg_val;
-
-	reg_val = readl(CCMU_CE_CLK_REG);
-
-	/*set CE src clock*/
-	reg_val &= ~(CE_CLK_SRC_MASK<<CE_CLK_SRC_SEL_BIT);
-	reg_val |= CE_CLK_SRC<<CE_CLK_SRC_SEL_BIT;
-	/*set div n*/
-	reg_val &= ~(CE_CLK_DIV_RATION_N_MASK<<CE_CLK_DIV_RATION_N_BIT);
-	reg_val |= CE_CLK_DIV_RATION_N<<CE_CLK_DIV_RATION_N_BIT;
-	/*set div m*/
-	reg_val &= ~(CE_CLK_DIV_RATION_M_MASK<<CE_CLK_DIV_RATION_M_BIT);
-	reg_val |= CE_CLK_DIV_RATION_M<<CE_CLK_DIV_RATION_M_BIT;
-	/*set src clock on*/
-	reg_val |= CE_SCLK_ON<<CE_SCLK_ONOFF_BIT;
-
-	writel(reg_val,CCMU_CE_CLK_REG);
-
-	/*open CE gating*/
-	reg_val = readl(CE_GATING_BASE);
-	reg_val |= CE_GATING_PASS<<CE_GATING_BIT;
-	writel(reg_val,CE_GATING_BASE);
-
-	/*de-assert*/
-	reg_val = readl(CE_RST_REG_BASE);
-	reg_val |= CE_DEASSERT<<CE_RST_BIT;
-	writel(reg_val,CE_RST_REG_BASE);
+	ss_open();
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
 void sunxi_ss_close(void)
 {
+	ss_close();
 }
-//src_addr		//32B 对齐
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
-int  sunxi_sha_calc(u8 *dst_addr, u32 dst_len,
-					u8 *src_addr, u32 src_len)
+
+int  sunxi_md5_calc(u8 *dst_addr, u32 dst_len, u8 *src_addr, u32 src_len)
 {
-	u32 reg_val = 0;
-	u32 word_len = 0;
-	u32 md_size = 32;
-	s32 i = 0;
-	int buffer_len = 64;
-	task_queue task0;
-	ALLOC_CACHE_ALIGN_BUFFER(u8,p_sign,buffer_len);
+	u32 word_len = 0, src_align_len = 0;
+	u32 total_bit_len = 0;
+	task_queue task0  __aligned(CACHE_LINE_SIZE) = {0};
+	/* sha256  2word, sha512 4word*/
+	ALLOC_CACHE_ALIGN_BUFFER(u32, total_package_len, 4);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_sign, CACHE_LINE_SIZE);
 
-	if(p_sign == NULL)
-	{
-		printf("%s alloc memory fail\n",__func__);
-		return -1;
+	memset(p_sign, 0, sizeof(p_sign));
+
+	if (ss_get_ver() < 2) {
+		/* CE1.0 */
+		src_align_len = __sha_padding(src_len, (u8 *)src_addr, 1);
+		word_len = src_align_len>>2;
+
+		task0.task_id = 0;
+		task0.common_ctl = (ALG_MD5)|(1U << 31);
+		task0.data_len = word_len;
+
+	} else {
+		/* CE2.0 */
+		src_align_len = ALIGN(src_len, 4);
+		word_len  = src_align_len>>2;
+
+		total_bit_len = src_len<<3;
+		total_package_len[0] = total_bit_len;
+		total_package_len[1] = 0;
+
+		task0.task_id = 0;
+		task0.common_ctl = (ALG_MD5)|(1<<15)|(1U << 31);
+		task0.key_descriptor = (u32)total_package_len;
+		task0.data_len = total_bit_len;
 	}
-	memset(p_sign, 0, buffer_len);
 
-	word_len = __sha_padding(src_len, (u8 *)src_addr, 1)/4;	//计算明文长度
-
-	task0.task_id = 0;
-	task0.common_ctl = (19)|(1U << 31);
-	task0.symmetric_ctl = 0;
-	task0.asymmetric_ctl = 0;
-	task0.key_descriptor = 0;
-	task0.iv_descriptor = 0;
-	task0.ctr_descriptor = 0;
-	task0.data_len = word_len;
-
-	//task0.source[0].addr = va2pa((uint)src_addr);
 	task0.source[0].addr = (uint)src_addr;
 	task0.source[0].length = word_len;
-
-	for(i=1;i<8;i++)
-		task0.source[i].length = 0;
-
 	task0.destination[0].addr = (uint)p_sign;
-	task0.destination[0].length = 32/4;
-	for(i=1;i<8;i++)
-		 task0.destination[i].length = 0;
+	task0.destination[0].length = dst_len>>2;
 	task0.next_descriptor = 0;
 
 	flush_cache((u32)&task0, sizeof(task0));
-	flush_cache((u32)p_sign, buffer_len);
-	flush_cache((u32)src_addr, word_len << 2);
+	flush_cache((u32)p_sign, CACHE_LINE_SIZE);
+	flush_cache((u32)src_addr, src_align_len);
+	flush_cache((u32)total_package_len, sizeof(total_package_len));
 
-	writel((uint)&task0, SS_TDQ); //descriptor address
-
-	//enable SS end interrupt
-	writel(0x1<<(task0.task_id), SS_ICR);
-	//start SS
-	writel(0x1, SS_TLR);
-	//wait end
-	__ss_encry_decry_end(task0.task_id);
-
-	invalidate_dcache_range((ulong)p_sign,(ulong)p_sign+buffer_len);
-	//copy data
-	for(i=0; i< md_size; i++)
-	{
-	    dst_addr[i] = p_sign[i];   //从目的地址读生成的消息摘要
+	ss_set_drq((u32)&task0);
+	ss_irq_enable(task0.task_id);
+	ss_ctrl_start(ALG_MD5);
+	ss_wait_finish(task0.task_id);
+	ss_pending_clear(task0.task_id);
+	ss_ctrl_stop();
+	ss_irq_disable(task0.task_id);
+	if (ss_check_err()) {
+		printf("SS %s fail 0x%x\n", __func__, ss_check_err());
 	}
-	//clear pending
-	reg_val = readl(SS_ISR);
-	if((reg_val&(0x01<<task0.task_id))==(0x01<<task0.task_id))
-	{
-	   reg_val &= ~(0x0f);
-	   reg_val |= (0x01<<task0.task_id);
-	}
-	writel(reg_val, SS_ISR);
-	//SS engie exit
-	writel(readl(SS_TLR) & (~0x1), SS_TLR);
 
+	invalidate_dcache_range((ulong)p_sign, (ulong)p_sign + CACHE_LINE_SIZE);
+	/*copy data*/
+	memcpy(dst_addr, p_sign, dst_len);
 	return 0;
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
+
+int  sunxi_sha_calc(u8 *dst_addr, u32 dst_len,
+					u8 *src_addr, u32 src_len)
+{
+	u32 word_len = 0,src_align_len = 0;
+	u32 total_bit_len = 0;
+	task_queue task0  __aligned(CACHE_LINE_SIZE) = {0};
+	/* sha256  2word, sha512 4word*/
+	ALLOC_CACHE_ALIGN_BUFFER(u32, total_package_len, 4);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_sign, CACHE_LINE_SIZE);
+
+	memset(p_sign, 0, sizeof(p_sign));
+
+	if(ss_get_ver() < 2)
+	{
+		/* CE1.0 */
+		src_align_len = __sha_padding(src_len, (u8 *)src_addr, 1);
+		word_len = src_align_len>>2;
+
+		task0.task_id = 0;
+		task0.common_ctl = (ALG_SHA256)|(1U << 31);
+		task0.data_len = word_len;
+
+	}
+	else
+	{
+		/* CE2.0 */
+		src_align_len = ALIGN(src_len,4);
+		word_len  = src_align_len>>2;
+
+		total_bit_len = src_len<<3;
+		total_package_len[0] = total_bit_len;
+		total_package_len[1] = 0;
+
+		task0.task_id = 0;
+		task0.common_ctl = (ALG_SHA256)|(1<<15)|(1U << 31);
+		task0.key_descriptor = (u32)total_package_len;
+		task0.data_len = total_bit_len;
+	}
+
+	task0.source[0].addr = (uint)src_addr;
+	task0.source[0].length = word_len;
+	task0.destination[0].addr = (uint)p_sign;
+	task0.destination[0].length = 32>>2;
+	task0.next_descriptor = 0;
+
+	flush_cache((u32)&task0, sizeof(task0));
+	flush_cache((u32)p_sign, CACHE_LINE_SIZE);
+	flush_cache((u32)src_addr, src_align_len);
+	flush_cache((u32)total_package_len, sizeof(total_package_len));
+
+	ss_set_drq((u32)&task0);
+	ss_irq_enable(task0.task_id);
+	ss_ctrl_start(ALG_SHA256);
+	ss_wait_finish(task0.task_id);
+	ss_pending_clear(task0.task_id);
+	ss_ctrl_stop();
+	ss_irq_disable(task0.task_id);
+	if(ss_check_err())
+	{
+		printf("SS %s fail 0x%x\n",__func__,ss_check_err());
+	}
+
+	invalidate_dcache_range((ulong)p_sign,(ulong)p_sign+CACHE_LINE_SIZE);
+	//copy data
+	memcpy(dst_addr, p_sign, 32);
+	return 0;
+}
+
 s32 sunxi_rsa_calc(u8 * n_addr,   u32 n_len,
 				   u8 * e_addr,   u32 e_len,
 				   u8 * dst_addr, u32 dst_len,
 				   u8 * src_addr, u32 src_len)
 {
-#define	TEMP_BUFF_LEN	((2048>>3) + 32)
-	uint   i;
-	task_queue task0;
-	u32 reg_val = 0;
-	u8	temp_n_addr[TEMP_BUFF_LEN],   *p_n;
-	u8	temp_e_addr[TEMP_BUFF_LEN],   *p_e;
-	u8	temp_src_addr[TEMP_BUFF_LEN], *p_src;
-	u8	temp_dst_addr[TEMP_BUFF_LEN], *p_dst;
+	const u32	TEMP_BUFF_LEN =	((2048>>3) + CACHE_LINE_SIZE);
+
 	u32 mod_bit_size = 2048;
-
 	u32 mod_size_len_inbytes = mod_bit_size/8;
+	u32 data_word_len = mod_size_len_inbytes/4;
 
-	p_n = (u8 *)(((u32)temp_n_addr + 31)&(~31));
-	p_e = (u8 *)(((u32)temp_e_addr + 31)&(~31));
-	p_src = (u8 *)(((u32)temp_src_addr + 31)&(~31));
-	p_dst = (u8 *)(((u32)temp_dst_addr + 31)&(~31));
+	task_queue task0		__aligned(CACHE_LINE_SIZE) = {0};
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_n, TEMP_BUFF_LEN);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_e, TEMP_BUFF_LEN);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_src, TEMP_BUFF_LEN);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_dst, TEMP_BUFF_LEN);
 
 	__rsa_padding(p_src, src_addr, src_len, mod_size_len_inbytes);
 	__rsa_padding(p_n, n_addr, n_len, mod_size_len_inbytes);
 	memset(p_e, 0, mod_size_len_inbytes);
 	memcpy(p_e, e_addr, e_len);
 
-	task0.task_id = 0;
-	task0.common_ctl = (32 | (1U<<31));      //ss method:rsa
-	task0.symmetric_ctl = 0;
-	task0.asymmetric_ctl = (2<<28);
-	task0.key_descriptor = (uint)p_e;
-	task0.iv_descriptor = (uint)p_n;
-	task0.ctr_descriptor = 0;
-	task0.data_len = mod_size_len_inbytes/4;     //word in uint
-	task0.source[0].addr= (uint)p_src;
-	task0.source[0].length = mod_size_len_inbytes/4;
-	for(i=1;i<8;i++)
-		task0.source[i].length = 0;
-	task0.destination[0].addr= (uint)p_dst;
-	task0.destination[0].length = mod_size_len_inbytes/4;
-	for(i=1;i<8;i++)
-		task0.destination[i].length = 0;
-	task0.next_descriptor = 0;
-
-	writel((uint)&task0, SS_TDQ); //descriptor address
-	//enable SS end interrupt
-	writel(0x1<<(task0.task_id), SS_ICR);
-	//start SS
-	writel(0x1, SS_TLR);
-	//wait end
-	__ss_encry_decry_end(task0.task_id);
-
-	__rsa_padding(dst_addr, p_dst, mod_bit_size/64, mod_bit_size/64);
-	//clear pending
-	reg_val = readl(SS_ISR);
-	if((reg_val&(0x01<<task0.task_id))==(0x01<<task0.task_id))
+	if(ss_get_ver() < 2)
 	{
-	   reg_val &= ~(0x0f);
-	   reg_val |= (0x01<<task0.task_id);
+		/* CE1.0 */
+		task0.task_id = 0;
+		task0.common_ctl = (ALG_RSA | (1U<<31));
+		task0.symmetric_ctl = 0;
+		task0.asymmetric_ctl = (2<<28); /* rsa2048 */
+		task0.key_descriptor = (uint)p_e;
+		task0.iv_descriptor = (uint)p_n;
+		task0.ctr_descriptor = 0;
+		task0.data_len = data_word_len;
+		task0.source[0].addr= (uint)p_src;
+		task0.source[0].length = data_word_len;
+		task0.destination[0].addr= (uint)p_dst;
+		task0.destination[0].length = data_word_len;
+		task0.next_descriptor = 0;
 	}
-	writel(reg_val, SS_ISR);
-	//SS engie exit
-	writel(readl(SS_TLR) & (~0x1), SS_TLR);
+	else
+	{
+		/* CE2.0 */
+		task0.task_id = 0;
+		task0.common_ctl = (ALG_RSA | (1U<<31));
+		task0.symmetric_ctl = 0;
+		task0.asymmetric_ctl = (2048/32); /* rsa2048 */
+		task0.ctr_descriptor = 0;
+
+		task0.source[0].addr= (uint)p_e;
+		task0.source[0].length = data_word_len;
+		task0.source[1].addr= (uint)p_n;
+		task0.source[1].length = data_word_len;
+		task0.source[2].addr= (uint)p_src;
+		task0.source[2].length = data_word_len;
+
+		task0.data_len += task0.source[0].length;
+		task0.data_len += task0.source[1].length;
+		task0.data_len += task0.source[2].length;
+		task0.data_len *= 4; /* byte len */
+
+		task0.destination[0].addr= (uint)p_dst;
+		task0.destination[0].length = data_word_len;
+	}
+
+	flush_cache((u32)&task0, sizeof(task0));
+	flush_cache((u32)p_n, mod_size_len_inbytes);
+	flush_cache((u32)p_e, mod_size_len_inbytes);
+	flush_cache((u32)p_src, mod_size_len_inbytes);
+	flush_cache((u32)p_dst, mod_size_len_inbytes);
+
+	ss_set_drq((u32)&task0);
+	ss_irq_enable(task0.task_id);
+	ss_ctrl_start(ALG_RSA);
+	ss_wait_finish(task0.task_id);
+	ss_pending_clear(task0.task_id);
+	ss_ctrl_stop();
+	ss_irq_disable(task0.task_id);
+	if(ss_check_err())
+	{
+		printf("SS %s fail 0x%x\n",__func__,ss_check_err());
+	}
+
+	invalidate_dcache_range((ulong)p_dst,(ulong)p_dst+mod_size_len_inbytes);
+	__rsa_padding(dst_addr, p_dst, mod_bit_size/64, mod_bit_size/64);
 
 	return 0;
 }
+
+int sunxi_create_rssk(u8 *rssk_buf, u32 rssk_byte)
+{
+	u32 total_bit_len = 0;
+	task_queue task0  __aligned(CACHE_LINE_SIZE) = {0};
+
+	ALLOC_CACHE_ALIGN_BUFFER(u32, total_package_len, 4);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, p_sign, CACHE_LINE_SIZE);
+
+	memset(p_sign, 0, sizeof(p_sign));
+
+	if (rssk_buf == NULL) {
+		return -1;
+	}
+
+	total_bit_len = rssk_byte << 3;
+	total_package_len[0] = total_bit_len;
+	total_package_len[1] = 0;
+
+	task0.task_id = 0;
+	task0.common_ctl = (ALG_TRANG)|(0x1U<<31);
+	task0.key_descriptor = (uint)total_package_len;
+	task0.data_len = total_bit_len;
+	task0.source[0].addr = 0;
+	task0.source[0].length = 0;
+	task0.destination[0].addr = (uint)p_sign;
+	task0.destination[0].length = (rssk_byte>>2);
+	task0.next_descriptor = 0;
+
+	flush_cache((u32)&task0, sizeof(task0));
+	flush_cache((u32)p_sign, CACHE_LINE_SIZE);
+	flush_cache((u32)total_package_len, sizeof(total_package_len));
+
+	ss_set_drq((u32)&task0);
+	ss_irq_enable(task0.task_id);
+	ss_ctrl_start(ALG_TRANG);
+	ss_wait_finish(task0.task_id);
+	ss_pending_clear(task0.task_id);
+	ss_ctrl_stop();
+	ss_irq_disable(task0.task_id);
+
+	if (ss_check_err()) {
+		printf("RSSK %s fail 0x%x\n", __func__, ss_check_err());
+	}
+
+	invalidate_dcache_range((ulong)p_sign, (ulong)p_sign+CACHE_LINE_SIZE);
+	/*copy data*/
+	memcpy(rssk_buf, p_sign, rssk_byte);
+
+	return 0;
+
+
+}
+
+
+#ifdef SUNXI_HASH_TEST
+int do_sha256_test(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	u8  hash[32] = {0};
+	u32 x1 = simple_strtol(argv[1], NULL, 16);
+	u32 x2 = simple_strtol(argv[2], NULL, 16);
+	if(argc < 3)
+	{
+		return -1;
+	}
+	printf("src = 0x%x, len = 0x%x\n", x1,x2);
+
+	tick_printf("sha256 test start 0\n");
+	sunxi_ss_open();
+	sunxi_sha_calc(hash, 32, (u8*)x1,x2);
+	tick_printf("sha256 test end\n");
+	sunxi_dump(hash,32);
+
+	return 0;
+}
+
+U_BOOT_CMD(
+	sha256_test, 3, 0, do_sha256_test,
+	"do a sha256 test, arg1: src address, arg2: len(hex)",
+	"NULL"
+);
+#endif
+

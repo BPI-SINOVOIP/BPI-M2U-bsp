@@ -34,4 +34,9 @@ extern s32	axp22_set_volt(u32 id, u32 voltage);
 extern s32 axp15_suspend_calc(u32 pmu_cnt, u32 id, losc_enter_ss_func *func);
 extern s32 axp20_suspend_calc(u32 id, losc_enter_ss_func *func);
 extern s32 axp22_suspend_calc(u32 id, losc_enter_ss_func *func);
+
+#ifdef CONFIG_AW_AXP259
+extern int axp259_enter_sleep(void);
+#endif
+
 #endif /*_PM_H*/

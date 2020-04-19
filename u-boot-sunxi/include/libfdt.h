@@ -1194,6 +1194,10 @@ static inline int fdt_setprop_u32(void *fdt, int nodeoffset, const char *name,
 	return fdt_setprop(fdt, nodeoffset, name, &tmp, sizeof(tmp));
 }
 
+int sunxi_fdt_getprop_store(void *fdt, const char *path, const char *name,
+				  uint32_t val);
+
+int sunxi_fdt_reflush_all(void);
 /**
  * fdt_setprop_u64 - set a property to a 64-bit integer
  * @fdt: pointer to the device tree blob

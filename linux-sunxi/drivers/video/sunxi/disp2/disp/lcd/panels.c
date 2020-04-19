@@ -3,6 +3,13 @@
 struct sunxi_lcd_drv g_lcd_drv;
 
 __lcd_panel_t* panel_array[] = {
+#if defined(CONFIG_ARCH_SUN50IW3)
+	&ls029b3sx02_panel,
+	&vr_ls055t1sx01_panel,
+	&lq101r1sx03_panel,
+	&he0801a068_panel,
+	&sl008pn21d_panel,
+#else
 	&default_eink,
 	&default_panel,
 	&lt070me05000_panel,
@@ -12,8 +19,12 @@ __lcd_panel_t* panel_array[] = {
 	&tft720x1280_panel,
 	&S6D7AA0X01_panel,
 	&gg1p4062utsw_panel,
+	&vr_sharp_panel,
+	&ls029b3sx02_panel,
+	&S070WV20_MIPI_RGB_panel,
+	&he0801a068_panel,
+#endif /*endif CONFIG_ARCH_SUN50IW3 */
 	/* add new panel below */
-
 	NULL,
 };
 

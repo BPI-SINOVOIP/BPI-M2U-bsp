@@ -22,8 +22,8 @@
 #include <asm/io.h>
 
 
-#define SUNXI_CLUSTER_PWROFF_GATING(cluster)      (SUNXI_RPRCM_BASE + 0x100 + (cluster<<2))
-#define SUNXI_CPU_PWR_CLAMP(cluster, cpu)         (SUNXI_RPRCM_BASE + 0x140 + (cluster<<4) + (cpu<<2))
+#define SUNXI_CLUSTER_PWROFF_GATING(cluster)      (SUNXI_RCPUCFG_BASE + 0x44 + (cluster<<2))
+#define SUNXI_CPU_PWR_CLAMP(cluster, cpu)         (SUNXI_RCPUCFG_BASE + 0x50 + (cluster<<4) + (cpu<<2))
 
 #define SUNXI_CLUSTER_CTRL0(cluster)              (SUNXI_CPUX_CFG_BASE + 0x00 + (cluster<<4))
 #define SUNXI_CLUSTER_CTRL1(cluster)              (SUNXI_CPUX_CFG_BASE + 0x04 + (cluster<<4))
@@ -35,8 +35,8 @@
 
 #define SUNXI_CPU_ENTRY                           (SUNXI_RCPUCFG_BASE + 0x1A4)
 
-#define SUNXI_CLUSTER_PWRON_RESET(cluster)        (SUNXI_RCPUCFG_BASE + 0x30  + (cluster<<2))
-#define SUNXI_CPU_SYS_RESET                       (SUNXI_RCPUCFG_BASE + 0x140)
+#define SUNXI_CLUSTER_PWRON_RESET(cluster)        (SUNXI_RCPUCFG_BASE + 0x40)
+#define SUNXI_CPU_SYS_RESET                       (SUNXI_RCPUCFG_BASE + 0xA0)
 
 
 static inline void sunxi_set_wfi_mode(int cpu)
@@ -49,7 +49,7 @@ static inline void sunxi_set_wfi_mode(int cpu)
 
 static inline int sunxi_probe_wfi_mode(int cpu)
 {
-	return readl(SUNXI_CPUX_CFG_BASE + SUNXI_CLUSTER_CPU_STATUS(0)) & (1<<(16 + cpu));
+	return readl(SUNXI_CLUSTER_CPU_STATUS(0)) & (1<<(16 + cpu));
 }
 
 
@@ -57,6 +57,18 @@ static inline void sunxi_set_secondary_entry(void *entry)
 {
 	writel((u32)entry, SUNXI_CPU_ENTRY);
 }
+
+static inline int sunxi_probe_cpu_power_status(int cpu)
+{
+	int val;
+
+	val = readl(SUNXI_CPU_PWR_CLAMP(0, cpu)) & 0xff;
+	if (val == 0xff)
+		return 0;
+
+	return 1;
+}
+
 
 static int cpu_power_switch_set(u32 cluster, u32 cpu, bool enable)
 {

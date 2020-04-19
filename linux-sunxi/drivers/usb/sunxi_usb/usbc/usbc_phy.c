@@ -417,3 +417,13 @@ void UsbPhyEndReset(__u32 usbc_no)
 	return;
 }
 
+void usb_otg_phy_txtune(void __iomem *regs)
+{
+	__u32 reg_val = 0;
+
+	reg_val = USBC_Readl(regs + USBC_REG_o_PHYTUNE);
+	reg_val |= 0x03 << 2;	/* TXRESTUNE */
+	reg_val &= ~(0xf << 8);
+	reg_val |= 0xc << 8;	/* TXVREFTUNE */
+	USBC_Writel(reg_val, (regs + USBC_REG_o_PHYTUNE));
+}

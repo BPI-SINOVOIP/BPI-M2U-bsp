@@ -54,3 +54,4 @@ obj-$(CONFIG_USB_OCTEON2_COMMON) += octeon2-common.o
 obj-$(CONFIG_USB_HCD_BCMA)	+= bcma-hcd.o
 obj-$(CONFIG_USB_HCD_SSB)	+= ssb-hcd.o
 obj-$(CONFIG_USB_SUNXI_HCI)	+= sunxi_hci.o
+obj-$(CONFIG_USB_SUNXI_XHCI)	+= xhci_sunxi.o

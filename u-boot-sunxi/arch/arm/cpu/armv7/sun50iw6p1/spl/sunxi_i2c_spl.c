@@ -22,6 +22,8 @@
 #define I2C_READY			   0xf8
 #define I2C_DATAREAD_NACK	   0x58
 #define I2C_DATAREAD_ACK	   0x50
+
+#define PL_BASE			(0x07022000)
 /* status or interrupt source */
 /*------------------------------------------------------------------------------
 * Code   Status
@@ -410,12 +412,12 @@ int i2c_write(uchar chip, uint addr, int alen, uchar *buffer, int len)
 	return ret0;
 }
 
-static inline int axp_i2c_write(unsigned char chip, unsigned char addr, unsigned char data)
+int axp_i2c_write(unsigned char chip, unsigned char addr, unsigned char data)
 {
 	return i2c_write(chip, addr, 1, &data, 1);
 }
 
-static inline int axp_i2c_read(unsigned char chip, unsigned char addr, unsigned char *buffer)
+int axp_i2c_read(unsigned char chip, unsigned char addr, unsigned char *buffer)
 {
 	return i2c_read(chip, addr, 1, buffer, 1);
 }
@@ -425,44 +427,42 @@ int set_cpus_i2c_clock(unsigned int onoff)
 {
 	int reg_value = 0;
 
-	//opne CPUS PIO
 	volatile unsigned int reg_val;
-	// R_GPIO reset deassert
-	reg_val = readl(SUNXI_RPRCM_BASE+0xb0);
-	reg_val |= 1;
-	writel(reg_val, SUNXI_RPRCM_BASE+0xb0);
-	// R_GPIO GATING open
-	reg_val = readl(SUNXI_RPRCM_BASE+0x28);
-	reg_val |= 1;
-	writel(reg_val, SUNXI_RPRCM_BASE+0x28);
 
-	//R_GPIO: PL0,PL1 cfg 2
-	writel(readl(0x01F02C00)& ~0xff,0x01F02C00);
-	writel(readl(0x01F02C00)|0x22,0x01F02C00);
-	//PL0,PL1 pull up 1
-	writel(readl(0x01F02C00+0x1C)& ~0xf,0x01F02C00+0x1C);
-	writel(readl(0x01F02C00+0x1C)|0x5,0x01F02C00+0x1C);
-	//PL0,PL1 drv 2
-	writel(readl(0x01F02C00+0x14)& ~0xf,0x01F02C00+0x14);
-	writel(readl(0x01F02C00+0x14)|0xa,0x01F02C00+0x14);
+	reg_val = readl(SUNXI_RTWI_BRG_REG);
+	/* R_TWI reset deassert*/
+	reg_val |= 1 << SUNXI_RTWI0_RST_BIT;
+	/* R_TWI gating open*/
+	reg_val |= 1 << SUNXI_RTWI0_GATING_BIT;
+	writel(reg_val, SUNXI_RTWI_BRG_REG);
 
-	//deassert twi reset
-	reg_value = readl(SUNXI_RPRCM_BASE + 0xb0);
-	reg_value &= ~(0x01 << 6);
-	writel(reg_value,SUNXI_RPRCM_BASE + 0xb0);
-	reg_value = readl(SUNXI_RPRCM_BASE + 0xb0);
-	reg_value |= 0x01 << 6;
-	writel(reg_value,SUNXI_RPRCM_BASE + 0xb0);
+	/*R_GPIO: PL0,PL1 cfg 3*/
+	writel(readl(PL_BASE)& ~0xff,PL_BASE);
+	writel(readl(PL_BASE)|0x33,PL_BASE);
+	/*PL0,PL1 pull up 1*/
+	writel(readl(PL_BASE+0x1C)& ~0xf,PL_BASE+0x1C);
+	writel(readl(PL_BASE+0x1C)|0x5,PL_BASE+0x1C);
+	/*PL0,PL1 drv 2*/
+	writel(readl(PL_BASE+0x14)& ~0xf,PL_BASE+0x14);
+	writel(readl(PL_BASE+0x14)|0x0,PL_BASE+0x14);
+
+	/*deassert twi reset*/
+	reg_value = readl(SUNXI_RTWI_BRG_REG);
+	reg_value &= ~(0x01 << SUNXI_RTWI0_RST_BIT);
+	writel(reg_value,SUNXI_RTWI_BRG_REG);
+	reg_value = readl(SUNXI_RTWI_BRG_REG);
+	reg_value |= 0x01 << SUNXI_RTWI0_RST_BIT;
+	writel(reg_value,SUNXI_RTWI_BRG_REG);
 	__usdelay(10);
 
-	//open twi gating
-	reg_value = readl(SUNXI_RPRCM_BASE + 0x28);
+	/*open twi gating*/
+	reg_value = readl(SUNXI_RTWI_BRG_REG);
 	if(onoff)
-		reg_value |= 0x01 << 6;
+		reg_value |= 0x01 << SUNXI_RTWI0_GATING_BIT;
 	else
-		reg_value &= ~(0x01 << 6);
+		reg_value &= ~(0x01 << SUNXI_RTWI0_GATING_BIT);
 
-	writel(reg_value,SUNXI_RPRCM_BASE + 0x28);
+	writel(reg_value,SUNXI_RTWI_BRG_REG);
 	__usdelay(10);
 	return 0;
 
@@ -472,7 +472,7 @@ int set_cpus_i2c_clock(unsigned int onoff)
 void i2c_set_clock(int speed, int slaveaddr)
 {
 	int i, clk_n, clk_m;
-	    /* reset i2c control  */
+	/* reset i2c control  */
 	i = 0xffff;
 	i2c->srst = 1;
 	while((i2c->srst) && (i))
@@ -481,15 +481,19 @@ void i2c_set_clock(int speed, int slaveaddr)
 	}
 	if((i2c->lcr & 0x30) != 0x30 )
 	{
-	    /* toggle I2CSCL until bus idle */
+	    /* toggle I2C SCL and SDA until bus idle */
 	    i2c->lcr = 0x05;
 	    __usdelay(500);
 	    i = 10;
 		    while ((i > 0) && ((i2c->lcr & 0x02) != 2))
 		    {
+			    /*control scl and sda output high level*/
 			    i2c->lcr |= 0x08;
+			    i2c->lcr |= 0x02;
 			    __usdelay(1000);
+			    /*control scl and sda output low level*/
 			    i2c->lcr &= ~0x08;
+			    i2c->lcr &= ~0x02;
 			    __usdelay(1000);
 			    i--;
 		    }
@@ -522,7 +526,7 @@ void i2c_init_cpus(int speed, int slaveaddr)
 	return ;
 }
 
-
+#if 0//ndef  CONFIG_SUNXI_MULITCORE_BOOT
 static int axp_probe(void)
 {
 	u8	  pmu_type;
@@ -576,4 +580,5 @@ int set_ddr_voltage(int vol)
 		return 0;
 	}
 }
+#endif
 

@@ -44,9 +44,14 @@
 #include <linux/of_platform.h>
 #include <linux/of_gpio.h>
 #include <linux/compat.h>
+#include <linux/dma-buf.h>
+#include <linux/dma-mapping.h>
+#include <asm/barrier.h>
 
 #include <video/sunxi_display2.h>
+#include <video/sunxi_metadata.h>
 #include "../disp_sys_intf.h"
+#include "disp_features.h"
 
 //#include "disp_format_convert.h"
 s32 bsp_disp_get_print_level(void);
@@ -129,6 +134,10 @@ s32 bsp_disp_get_print_level(void);
 #define abs(x) (((x)&0x80000000)? (0-(x)):(x))
 #endif
 
+#define LCD_GAMMA_TABLE_SIZE (256 * sizeof(unsigned int))
+
+#define ONE_SEC 1000000000ull
+
 typedef struct
 {
 	unsigned int   lcd_gamma_en;
@@ -186,7 +195,9 @@ typedef enum
 	BLEND_ATTR_DIRTY       = 0x00000020,
 	BLEND_CTL_DIRTY        = 0x00000040,
 	BLEND_OUT_DIRTY        = 0x00000080,
-	LAYER_ALL_DIRTY        = 0x000000ff,
+	LAYER_ATW_DIRTY        = 0x00000100,
+	LAYER_HDR_DIRTY        = 0x00000200,
+	LAYER_ALL_DIRTY        = 0x000003ff,
 }disp_layer_dirty_flags;
 
 typedef enum
@@ -201,10 +212,132 @@ typedef enum
 	MANAGER_ALL_DIRTY        = 0x0000007f,
 }disp_manager_dirty_flags;
 
+/* disp_atw_info_inner - asynchronous time wrap infomation
+ *
+ * @used: indicate if the atw funtion is used
+ * @mode: atw mode
+ * @b_row: the row number of the micro block
+ * @b_col: the column number of the micro block
+ * @cof_fd: dma_buf fd for the buffer contaied coefficient for atw
+ */
+struct disp_atw_info_inner {
+	bool used;
+	enum disp_atw_mode mode;
+	unsigned int b_row;
+	unsigned int b_col;
+	int cof_fd;
+	unsigned long long cof_addr;
+};
+
+/* disp_fb_info_inner - image buffer info on the inside
+ *
+ * @addr: buffer address for each plane
+ * @size: size<width,height> for each buffer, unit:pixels
+ * @align: align for each buffer, unit:bytes
+ * @format: pixel format
+ * @color_space: color space
+ * @trd_right_addr: the right-eye buffer address for each plane,
+ *                  valid when frame-packing 3d buffer input
+ * @pre_multiply: indicate the pixel use premultiplied alpha
+ * @crop: crop rectangle for buffer to be display
+ * @flag: indicate stereo/non-stereo buffer
+ * @scan: indicate interleave/progressive scan type, and the scan order
+ * @metadata_buf: the phy_address to the buffer contained metadata for fbc/hdr
+ * @metadata_size: the size of metadata buffer, unit:bytes
+ * @metadata_flag: the flag to indicate the type of metadata buffer
+ *	0     : no metadata
+ *	1 << 0: hdr static metadata
+ *	1 << 1: hdr dynamic metadata
+ *	1 << 4:	frame buffer compress(fbc) metadata
+ *	x     : all type could be "or" together
+ */
+struct disp_fb_info_inner {
+	int fd;
+	struct dma_buf           *dmabuf;
+	unsigned long long       addr[3];
+	struct disp_rectsz       size[3];
+	unsigned int             align[3];
+	enum disp_pixel_format   format;
+	enum disp_color_space    color_space;
+	int                      trd_right_fd;
+	unsigned int             trd_right_addr[3];
+	bool                     pre_multiply;
+	struct disp_rect64       crop;
+	enum disp_buffer_flags   flags;
+	enum disp_scan_flags     scan;
+	enum disp_eotf           eotf;
+	int                      depth;
+	unsigned int             fbd_en;
+	int                      metadata_fd;
+	unsigned long long       metadata_buf;
+	unsigned int             metadata_size;
+	unsigned int             metadata_flag;
+};
+
+/* disp_layer_info_inner - layer info on the inside
+ *
+ * @mode: buffer/clolor mode, when in color mode, the layer is widthout buffer
+ * @zorder: the zorder of layer, 0~max-layer-number
+ * @alpha_mode:
+ *	0: pixel alpha;
+ *	1: global alpha
+ *	2: mixed alpha, compositing width pixel alpha before global alpha
+ * @alpha_value: global alpha value, valid when alpha_mode is not pixel alpha
+ * @screen_win: the rectangle on the screen for fb to be display
+ * @b_trd_out: indicate if 3d display output
+ * @out_trd_mode: 3d output mode, valid when b_trd_out is true
+ * @color: the color value to be display, valid when layer is in color mode
+ * @fb: the framebuffer info related width the layer, valid when in buffer mode
+ * @id: frame id, the user could get the frame-id display currently by
+ *	DISP_LAYER_GET_FRAME_ID ioctl
+ * @atw: asynchronous time wrap information
+ */
+struct disp_layer_info_inner {
+	enum disp_layer_mode      mode;
+	unsigned char             zorder;
+	unsigned char             alpha_mode;
+	unsigned char             alpha_value;
+	struct disp_rect          screen_win;
+	bool                      b_trd_out;
+	enum disp_3d_out_mode     out_trd_mode;
+	union {
+		unsigned int               color;
+		struct disp_fb_info_inner  fb;
+	};
+
+	unsigned int              id;
+	struct disp_atw_info_inner atw;
+};
+
+/* disp_layer_config_inner - layer config on the inside
+ *
+ * @info: layer info
+ * @enable: indicate to enable/disable the layer
+ * @channel: the channel index of the layer, 0~max-channel-number
+ * @layer_id: the layer index of the layer widthin it's channel
+ */
+struct disp_layer_config_inner {
+	struct disp_layer_info_inner info;
+	bool enable;
+	unsigned int channel;
+	unsigned int layer_id;
+};
+
+/* disp_layer_config_ops - operations for layer config
+ *
+ * @vmap:vmap a block contigous phys memory into virtual space
+ * @vunmap: release virtual mapping obtained by vmap()
+ */
+struct disp_layer_config_ops {
+	void *(*vmap)(unsigned long phys_addr, unsigned long size);
+	void (*vunmap)(const void *vaddr);
+};
+
 struct disp_layer_config_data
 {
-	struct disp_layer_config config;
+	struct disp_layer_config_inner config;
 	disp_layer_dirty_flags flag;
+	struct disp_layer_config_ops ops;
 };
 
 struct disp_manager_info {
@@ -212,6 +345,7 @@ struct disp_manager_info {
 	struct disp_colorkey ck;
 	struct disp_rect size;
 	enum disp_csc_type cs;
+	enum disp_color_space color_space;
 	u32 color_range;
 	u32 interlace;
 	bool enable;
@@ -219,6 +353,8 @@ struct disp_manager_info {
 	u32 hwdev_index;//indicate the index of timing controller
 	bool blank;//true: disable all layer; false: enable layer according to layer_config.enable
 	u32 de_freq;
+	enum disp_eotf eotf; /* sdr/hdr10/hlg */
+	enum disp_data_bits data_bits;
 };
 
 struct disp_manager_data
@@ -250,13 +386,23 @@ struct disp_clk_info
 
 struct disp_enhance_info
 {
-	//basic adjust
+	/*
+	 * enhance parameters : 0~10, bigger value, stronger enhance level
+	 * mode : combination of enhance_mode and dev_type
+	 * enhance_mode : bit31~bit16 of mode
+	 *              : 0-disable; 1-enable; 2-demo(enable half window)
+	 * dev_type : bit15~bit0 of mode
+	 *          : 0-lcd; 1-tv(hdmi, cvbs, vga, ypbpr)
+	 */
+
 	u32         bright;
 	u32         contrast;
 	u32         saturation;
 	u32         hue;
+	u32         edge;
+	u32         detail;
+	u32         denoise;
 	u32         mode;
-	//ehnance
 	u32         sharp;	//0-off; 1~3-on.
 	u32         auto_contrast;	//0-off; 1~3-on.
 	u32					auto_color;	//0-off; 1-on.
@@ -271,14 +417,21 @@ struct disp_enhance_info
 
 typedef enum
 {
-	ENHANCE_NONE_DIRTY   = 0x0,
-	ENHANCE_ENABLE_DIRTY = 0x1 << 0,
-	ENHANCE_BRIGHT_DIRTY = 0x1 << 1,
-	ENHANCE_SHARP_DIRTY  = 0x1 << 2,
-	ENHANCE_SIZE_DIRTY   = 0x1 << 3,
-	ENHANCE_MODE_DIRTY   = 0X1 << 4,
-	ENHANCE_DEMO_DIRTY   = 0x1 << 5,
-	ENHANCE_ALL_DIRTY    = 0x3f,
+	ENH_NONE_DIRTY       = 0x0,
+	ENH_ENABLE_DIRTY     = 0x1 << 0,  /* enable dirty */
+	ENH_SIZE_DIRTY       = 0x1 << 1,  /* size dirty */
+	ENH_FORMAT_DIRTY     = 0x1 << 2,  /* overlay format dirty */
+	ENH_BYPASS_DIRTY     = 0x1 << 3, /* bypass dirty */
+	ENH_INIT_DIRTY       = 0x1 << 8,  /* initial parameters dirty */
+	ENH_MODE_DIRTY       = 0X1 << 9,  /* enhance mode dirty */
+	ENH_BRIGHT_DIRTY     = 0x1 << 10,  /* brightness level dirty */
+	ENH_CONTRAST_DIRTY   = 0x1 << 11,  /* contrast level dirty */
+	ENH_EDGE_DIRTY       = 0x1 << 12,  /* edge level dirty */
+	ENH_DETAIL_DIRTY     = 0x1 << 13,  /* detail level dirty */
+	ENH_SAT_DIRTY        = 0x1 << 14,  /* saturation level dirty */
+	ENH_DNS_DIRTY        = 0x1 << 15, /* de-noise level dirty */
+	ENH_USER_DIRTY       = 0xff00,     /* dirty by user */
+	ENH_ALL_DIRTY        = 0xffff      /* all dirty */
 }disp_enhance_dirty_flags;
 
 struct disp_enhance_config
@@ -311,6 +464,7 @@ struct disp_csc_config
 {
 	u32 in_fmt;
 	u32 in_mode;
+	u32 in_color_range;
 	u32 out_fmt;
 	u32 out_mode;
 	u32 out_color_range;
@@ -320,6 +474,8 @@ struct disp_csc_config
 	u32 hue;
 	u32 enhance_mode;
 	u32 color;
+	u32 in_eotf;
+	u32 out_eotf;
 };
 
 enum
@@ -336,11 +492,45 @@ typedef enum
   CAPTURE_DIRTY_ALL 	  = 0x00000007,
 }disp_capture_dirty_flags;
 
+/* disp_s_frame_inner - display simple frame buffer
+ *
+ * @format: pixel format of fb
+ * @size: size for each plane
+ * @crop: crop zone to be fill image data
+ * @fd: dma_buf fd
+ * @addr: buffer addr for each plane
+ */
+struct disp_s_frame_inner {
+	enum disp_pixel_format format;
+	struct disp_rectsz size[3];
+	struct disp_rect crop;
+	unsigned long long addr[3];
+	int fd;
+};
+
+/* disp_capture_info_inner - display capture information
+ *
+ * @window: the rectange on the screen to be capture
+ * @out_frame: the framebuffer to be restore capture image data
+ */
+struct disp_capture_info_inner {
+	struct disp_rect window;
+	struct disp_s_frame_inner out_frame;
+};
+
+/* disp_capture_config - configuration for capture function
+ *
+ * @in_frame: input frame information
+ * @out_frame: output framebuffer infomation
+ * @disp: indicate which disp channel to be capture
+ * @flags: caputre flags
+ */
 struct disp_capture_config
 {
-	struct disp_s_frame in_frame;   //only format/size/crop valid
-	struct disp_s_frame out_frame;
-	u32 disp;              //which disp channel to be capture
+	/* only format/size/crop valid */
+	struct disp_s_frame_inner in_frame;
+	struct disp_s_frame_inner out_frame;
+	u32 disp;
 	disp_capture_dirty_flags flags;
 };
 
@@ -387,8 +577,8 @@ typedef enum
 typedef enum
 {
 	LCD_HV_SYUV_FDLY_0LINE	= 0,
-	LCD_HV_SRGB_FDLY_2LINE	= 1, //ccir ntsc
-	LCD_HV_SRGB_FDLY_3LINE	= 2, //ccir pal
+	LCD_HV_SRGB_FDLY_2LINE	= 1, /*ccir pal*/
+	LCD_HV_SRGB_FDLY_3LINE	= 2, /*ccir ntsc*/
 }disp_lcd_hv_syuv_fdly;
 
 typedef enum
@@ -493,6 +683,22 @@ typedef struct
 	unsigned int hstx_ana1;
 }__disp_dsi_dphy_timing_t;
 
+/**
+ * lcd tcon mode(dual tcon drive dual dsi)
+ */
+enum disp_lcd_tcon_mode {
+	DISP_TCON_NORMAL_MODE = 0,
+	DISP_TCON_MASTER_SYNC_AT_FIRST_TIME,
+	DISP_TCON_MASTER_SYNC_EVERY_FRAME,
+	DISP_TCON_SLAVE_MODE,
+	DISP_TCON_DUAL_DSI,
+};
+
+enum disp_lcd_dsi_port {
+	DISP_LCD_DSI_SINGLE_PORT = 0,
+	DISP_LCD_DSI_DUAL_PORT,
+};
+
 typedef struct
 {
 	disp_lcd_if              lcd_if;
@@ -517,6 +723,13 @@ typedef struct
 	unsigned int             lcd_dsi_eotp;
 	unsigned int             lcd_dsi_vc;
 	disp_lcd_te              lcd_dsi_te;
+	enum disp_lcd_dsi_port  lcd_dsi_port_num;
+	enum disp_lcd_tcon_mode  lcd_tcon_mode;
+	unsigned int             lcd_slave_stop_pos;
+	unsigned int             lcd_sync_pixel_num;
+	unsigned int             lcd_sync_line_num;
+	unsigned int             lcd_slave_tcon_num;
+	unsigned int             lcd_tcon_en_odd_even;
 
 	unsigned int             lcd_dsi_dphy_timing_en;
 	__disp_dsi_dphy_timing_t*	lcd_dsi_dphy_timing_p;
@@ -563,6 +776,8 @@ typedef struct
 	unsigned int            tcon_index; //not need to config for user
 	unsigned int            lcd_fresh_mode;//not need to config for user
 	unsigned int            lcd_dclk_freq_original; //not need to config for user
+	unsigned int            ccir_clk_div;/*not need to config for user*/
+	unsigned int            input_csc;/*not need to config for user*/
 }disp_panel_para;
 
 
@@ -577,6 +792,7 @@ typedef enum
 	DISP_MOD_DSI0,
 	DISP_MOD_DSI1,
 	DISP_MOD_DSI2,
+	DISP_MOD_DSI3,
 	DISP_MOD_HDMI,
 	DISP_MOD_LVDS,
 	DISP_MOD_EINK,
@@ -590,6 +806,10 @@ typedef struct
 	int disp; //output disp at bootloader period
 	int type; //output type at bootloader period
 	int mode; //output mode at bootloader period
+	int format;/* YUV or RGB */
+	int bits; /* color deep */
+	int eotf;
+	int cs; /* color space */
 }disp_bootloader_info;
 
 #define DEBUG_TIME_SIZE 100
@@ -598,9 +818,11 @@ typedef struct
 	unsigned long         sync_time[DEBUG_TIME_SIZE];//for_debug
 	unsigned int          sync_time_index;//for_debug
 	unsigned int          skip_cnt;
+	unsigned int          skip_cnt_timeout;
 	unsigned int          error_cnt;//under flow .ect
-	unsigned int          irq_cnt;
+	unsigned long long    irq_cnt;
 	unsigned int          vsync_cnt;
+	unsigned int          vsync_skip_cnt;
 }disp_health_info;
 
 typedef struct
@@ -615,6 +837,7 @@ typedef struct
 	s32 (*capture_event)(u32 sel);
 	s32 (*shadow_protect)(u32 sel, bool protect);
 	disp_bootloader_info boot_info;
+	struct disp_feat_init feat_init;
 }disp_bsp_init_para;
 
 typedef void (*LCD_FUNC) (unsigned int sel);
@@ -698,6 +921,12 @@ struct disp_device {
 	s32 (*set_detect)(struct disp_device *dispdev, bool hpd);
 	s32 (*get_status)(struct disp_device *dispdev);
 	s32 (*get_fps)(struct disp_device *dispdev);
+	/*
+	 * check if be in the safe period now,
+	 * safe period means the current line is less than the start_delay
+	 */
+	bool (*is_in_safe_period)(struct disp_device *dispdev);
+	u32 (*usec_before_vblank)(struct disp_device *dispdev);
 
 	s32 (*get_input_csc)(struct disp_device *dispdev);
 	s32 (*get_input_color_range)(struct disp_device *dispdev);
@@ -714,6 +943,20 @@ struct disp_device {
 	/* HDMI /TV */
 	s32 (*set_mode)(struct disp_device *dispdev, u32 mode);
 	s32 (*get_mode)(struct disp_device *dispdev);
+	s32 (*set_static_config)(struct disp_device *dispdev,
+			  struct disp_device_config *config);
+	s32 (*get_static_config)(struct disp_device *dispdev,
+			  struct disp_device_config *config);
+	s32 (*set_dynamic_config)(struct disp_device *dispdev,
+			  struct disp_device_dynamic_config *config);
+	s32 (*get_dynamic_config)(struct disp_device *dispdev,
+			  struct disp_device_dynamic_config *config);
+	/*
+	 * check_config_dirty
+	 * check if the config is not the same with current one
+	 */
+	bool (*check_config_dirty)(struct disp_device *dispdev,
+				   struct disp_device_config *config);
 	s32 (*check_support_mode)(struct disp_device* dispdev, u32 mode);
 	s32 (*set_func)(struct disp_device*  dispdev, struct disp_device_func * func);
 	s32 (*set_tv_func)(struct disp_device*  dispdev, struct disp_tv_func * func);
@@ -737,6 +980,8 @@ struct disp_device {
 	s32 (*set_gamma_tbl)(struct disp_device* dispdev, u32 *tbl, u32 size);
 	s32 (*enable_gamma)(struct disp_device* dispdev);
 	s32 (*disable_gamma)(struct disp_device* dispdev);
+	s32 (*set_color_temperature)(struct disp_device *dispdev, s32 color_temperature);
+	s32 (*get_color_temperature)(struct disp_device *dispdev);
 	s32 (*set_panel_func)(struct disp_device *lcd, char *name, disp_lcd_panel_fun * lcd_cfg);
 	s32 (*set_open_func)(struct disp_device* lcd, LCD_FUNC func, u32 delay);
 	s32 (*set_close_func)(struct disp_device* lcd, LCD_FUNC func, u32 delay);
@@ -787,10 +1032,14 @@ struct disp_manager {
 	s32 (*get_clk_rate)(struct disp_manager *mgr);
 
 	/* layer mamage */
-	s32 (*check_layer_zorder)(struct disp_manager *mgr, struct disp_layer_config *config, u32 layer_num);
 	s32 (*set_layer_config)(struct disp_manager *mgr, struct disp_layer_config *config, unsigned int layer_num);
 	s32 (*get_layer_config)(struct disp_manager *mgr, struct disp_layer_config *config, unsigned int layer_num);
-	s32 (*extend_layer_config)(struct disp_manager *mgr, struct disp_layer_config *info, unsigned int layer_num);
+	s32 (*set_layer_config2)(struct disp_manager *mgr,
+				 struct disp_layer_config2 *config,
+				 unsigned int layer_num);
+	s32 (*get_layer_config2)(struct disp_manager *mgr,
+				 struct disp_layer_config2 *config,
+				 unsigned int layer_num);
 	s32 (*set_output_color_range)(struct disp_manager *mgr, u32 color_range);
 	s32 (*get_output_color_range)(struct disp_manager *mgr);
 	s32 (*update_color_space)(struct disp_manager *mgr);
@@ -798,7 +1047,7 @@ struct disp_manager {
 	s32 (*apply)(struct disp_manager *mgr);
 	s32 (*force_apply)(struct disp_manager *mgr);
 	s32 (*update_regs)(struct disp_manager *mgr);
-	s32 (*sync)(struct disp_manager *mgr);
+	s32 (*sync)(struct disp_manager *mgr, bool sync);
 	s32 (*tasklet)(struct disp_manager *mgr);
 
 	/* debug interface, dump manager info */
@@ -825,8 +1074,14 @@ struct disp_layer {
 	s32 (*unset_manager)(struct disp_layer* layer);
 
 	s32 (*check)(struct disp_layer* layer, struct disp_layer_config *config);
+	s32 (*check2)(struct disp_layer *layer,
+		      struct disp_layer_config2 *config);
 	s32 (*save_and_dirty_check)(struct disp_layer* layer, struct disp_layer_config *config);
+	s32 (*save_and_dirty_check2)(struct disp_layer *layer,
+				     struct disp_layer_config2 *config);
 	s32 (*get_config)(struct disp_layer* layer, struct disp_layer_config *config);
+	s32 (*get_config2)(struct disp_layer *layer,
+			   struct disp_layer_config2 *config);
 	s32 (*apply)(struct disp_layer* layer);
 	s32 (*force_apply)(struct disp_layer* layer);
 	s32 (*is_dirty)(struct disp_layer* layer);
@@ -930,12 +1185,18 @@ struct disp_enhance {
 	s32 (*set_saturation)(struct disp_enhance* enhance, u32 val);
 	s32 (*set_contrast)(struct disp_enhance* enhance, u32 val);
 	s32 (*set_hue)(struct disp_enhance* enhance, u32 val);
+	s32 (*set_edge)(struct disp_enhance *enhance, u32 val);
+	s32 (*set_detail)(struct disp_enhance *enhance, u32 val);
+	s32 (*set_denoise)(struct disp_enhance *enhance, u32 val);
 	s32 (*set_mode)(struct disp_enhance* enhance, u32 val);
 	s32 (*set_window)(struct disp_enhance* enhance, struct disp_rect *window);
 	s32 (*get_bright)(struct disp_enhance* enhance);
 	s32 (*get_saturation)(struct disp_enhance* enhance);
 	s32 (*get_contrast)(struct disp_enhance* enhance);
 	s32 (*get_hue)(struct disp_enhance* enhance);
+	s32 (*get_edge)(struct disp_enhance *enhance);
+	s32 (*get_detail)(struct disp_enhance *enhance);
+	s32 (*get_denoise)(struct disp_enhance *enhance);
 	s32 (*get_mode)(struct disp_enhance* enhance);
 	s32 (*get_window)(struct disp_enhance* enhance, struct disp_rect *window);
 	s32 (*set_para)(struct disp_enhance *enhance, disp_enhance_para *para);
@@ -953,12 +1214,17 @@ struct disp_capture {
 	s32 (*unset_manager)(struct disp_capture *cptr);
 	s32 (*start)(struct disp_capture *cptr);
 	s32 (*commmit)(struct disp_capture *cptr, struct disp_capture_info *info);
+	s32 (*commmit2)(struct disp_capture *cptr,
+			struct disp_capture_info2 *info);
 	s32 (*stop)(struct disp_capture *cptr);
 	s32 (*sync)(struct disp_capture *cptr);
 	s32 (*tasklet)(struct disp_capture *cptr);
 	s32 (*init)(struct disp_capture *cptr);
 	s32 (*exit)(struct disp_capture *cptr);
 	s32 (*query)(struct disp_capture *cptr);//0: finish, other: fail/err
+
+	/* debug interface, dump capture info */
+	s32 (*dump)(struct disp_capture *cptr, char *buf);
 
 	/* inner interface */
 	s32 (*apply)(struct disp_capture *cptr);
@@ -1073,9 +1339,14 @@ struct disp_eink_manager {
 	struct task_struct * 	   detect_fresh_task;
 	struct task_struct * 	   debug_task;
 	struct mutex standby_lock;
-	int (*eink_update)(struct disp_eink_manager*, void*, enum eink_update_mode, struct area_info);
+	int (*eink_update)(struct disp_eink_manager *manager,
+				struct disp_layer_config *config,
+				unsigned int layer_num,
+				enum eink_update_mode mode,
+				struct area_info update_area);
 	int (*enable)(struct disp_eink_manager *);
 	int (*disable)(struct disp_eink_manager *);
+	int (*op_skip)(struct disp_eink_manager *manager, u32 skip);
 	int (*suspend)(struct disp_eink_manager *);
 	int (*resume)(struct disp_eink_manager *);
 	void (*clearwd)(struct disp_eink_manager *, int);
@@ -1102,8 +1373,8 @@ struct format_manager {
 	struct clk* clk;
 	int (*enable)(unsigned int id);
 	int (*disable)(unsigned int id);
-	int (*start_convert)(unsigned int id, struct image_format *src, struct image_format *dest);
+	int (*start_convert)(unsigned int id, struct disp_layer_config *config,
+			unsigned int layer_num, struct image_format *dest);
 };
 
 #endif
-

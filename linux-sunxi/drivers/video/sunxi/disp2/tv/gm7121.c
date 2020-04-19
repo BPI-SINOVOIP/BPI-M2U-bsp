@@ -202,9 +202,9 @@ static s32 gm7121_tv_get_interface_para(void* para)
 	intf_para.clk_phase = 2;
 	intf_para.sync_polarity = 0;
 	if(g_tv_mode == DISP_TV_MOD_NTSC)
-		intf_para.fdelay = 1;//ntsc
+		intf_para.fdelay = 2;/*ntsc*/
 	else
-		intf_para.fdelay = 2;//pal
+		intf_para.fdelay = 1;/*pal*/
 
 	if(para)
 		memcpy(para, &intf_para, sizeof(struct disp_vdevice_interface_para));

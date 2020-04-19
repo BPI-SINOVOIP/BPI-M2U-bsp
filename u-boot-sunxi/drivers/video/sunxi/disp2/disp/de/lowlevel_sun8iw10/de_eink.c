@@ -107,6 +107,21 @@ int eink_irq_query(void)
 	return -1;
 }
 
+int eink_irq_query_index(void)
+{
+	unsigned int idx_irq;
+	unsigned reg_val = 0;
+
+	reg_val = EINK_RUINT32(ee_base + EE_IRQ);
+	idx_irq = reg_val&0x2;
+
+	if (0x2 == idx_irq) {
+		EINK_WUINT32(reg_val&0x1e, ee_base + EE_IRQ);
+		return 1;
+	}
+	return -1;
+}
+
 /*
 int eink_start_idx	(u32 disp, u32 old_index_data_paddr, u32 new_index_data_paddr, struct ee_img* last_image,
 										struct ee_img* current_image, unsigned char flash_mode, unsigned char win_en, struct area_info* area)

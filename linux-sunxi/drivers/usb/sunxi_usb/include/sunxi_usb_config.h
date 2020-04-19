@@ -33,6 +33,9 @@
 #include  <linux/sys_config.h>
 #include  <linux/gpio.h>
 #include <linux/pinctrl/pinconf-sunxi.h>
+#if defined(CONFIG_USB_SUNXI_HCD0)
+#include  "sunxi_hcd.h"
+#endif
 
 #if defined (CONFIG_FPGA_V4_PLATFORM) || defined (CONFIG_FPGA_V7_PLATFORM)
 #define   SUNXI_USB_FPGA

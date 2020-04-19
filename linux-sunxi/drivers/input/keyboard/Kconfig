@@ -647,10 +647,23 @@ config KEYBOARD_SUNXI
 		Say Y here to enable the keyboard, support 7 keys.
 		based on verify board.
 
+config SUNXI_GPIOKEY
+	tristate "softwinnner GPIO KEY support"
+        help
+                Say Y here to enable the gpio keyboard.
+
 config KEYPAD_SUNXI
 	tristate "softwinnner KEY PAD support"
 	depends on ARCH_SUN8IW11
 	help
 		Say Y here to enable the keyboard, support 8x8 keys.
 		based on verify board.
+config TP_KEY
+	tristate "softwinner touch panel key support"
+	depends on ARCH_SUN3IW1P1_R6
+	default n
+	help
+	  Say Y here to enable tp as key detect using touch panel
+	  as a input device.
+	  if unsure, Say N here
 endif

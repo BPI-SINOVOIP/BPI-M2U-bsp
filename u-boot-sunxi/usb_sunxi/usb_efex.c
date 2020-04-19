@@ -34,6 +34,7 @@
 #include <fdt_support.h>
 #include "efex_queue.h"
 #include <sys_config_old.h>
+#include <sunxi_board.h>
 
 #ifndef CONFIG_SUNXI_SPINOR
 #define _EFEX_USE_BUF_QUEUE_
@@ -76,7 +77,6 @@ static  int sunxi_usb_efex_status_enable = 1;
 #endif
 
 extern int do_bootelf(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]);
-
 
 int  efex_suspend_flag = 0;
 
@@ -1124,13 +1124,13 @@ static int __sunxi_usb_efex_op_cmd(u8 *cmd_buffer)
 			{
 				uint *storage_type = (uint *)trans_data.base_send_buffer;
 
-                                if(uboot_spare_head.boot_data.storage_type == STORAGE_EMMC3)
+                                if(get_boot_storage_type() == STORAGE_EMMC3)
                                 {
                                         *storage_type = STORAGE_EMMC;
                                 }
                                 else
                                 {
-				        *storage_type = uboot_spare_head.boot_data.storage_type;
+				        *storage_type = get_boot_storage_type();
                                 }
 				trans_data.act_send_buffer   = trans_data.base_send_buffer;
 				trans_data.send_size         = 4;
@@ -1382,7 +1382,9 @@ static void dram_data_recv_finish(uint data_type)
                 trans_data.last_err = sunxi_sprite_verify_mbr((void *)trans_data.base_recv_buffer);
 		if(!trans_data.last_err )
 		{
+#ifdef  CONFIG_SUNXI_MODULE_NAND
 		    nand_get_mbr((char *)trans_data.base_recv_buffer, 16 * 1024);
+#endif
 		        //准备擦除
 		    if(!sunxi_sprite_erase_flash((void *)trans_data.base_recv_buffer))
 		    {       //烧录mbr
@@ -1402,18 +1404,18 @@ static void dram_data_recv_finish(uint data_type)
 	{
 		printf("SUNXI_EFEX_BOOT1_TAG\n");
 		printf("boot1 size = 0x%x\n", trans_data.to_be_recved_size);
-		trans_data.last_err = sunxi_sprite_download_uboot((void *)trans_data.base_recv_buffer, uboot_spare_head.boot_data.storage_type, 0);
+		trans_data.last_err = sunxi_sprite_download_uboot((void *)trans_data.base_recv_buffer, get_boot_storage_type(), 0);
 	}
 	else if(data_type == SUNXI_EFEX_BOOT0_TAG)	//传输BOOT0已经完成
 	{
 		printf("SUNXI_EFEX_BOOT0_TAG\n");
 		printf("boot0 size = 0x%x\n", trans_data.to_be_recved_size);
-		trans_data.last_err = sunxi_sprite_download_boot0((void *)trans_data.base_recv_buffer, uboot_spare_head.boot_data.storage_type);
+		trans_data.last_err = sunxi_sprite_download_boot0((void *)trans_data.base_recv_buffer, get_boot_storage_type());
 	}
 	else if(data_type == SUNXI_EFEX_ERASE_TAG)
 	{
 		uint erase_flag;
-
+		int sys_config_erase_flag;
 		printf("SUNXI_EFEX_ERASE_TAG\n");
 		erase_flag = *(uint *)trans_data.base_recv_buffer;
 		if(erase_flag)
@@ -1421,7 +1423,14 @@ static void dram_data_recv_finish(uint data_type)
 		    erase_flag = 1;
 		}
 		printf("erase_flag = 0x%x\n", erase_flag);
-		script_parser_patch("platform", "eraseflag", &erase_flag , 1);
+		if(0 != script_parser_fetch("platform", "eraseflag", &sys_config_erase_flag , 1))
+			printf("get eraseflag fail\n");
+		/*for special erase_flag like 0x11, no need to overlap.*/
+		if(sys_config_erase_flag == 0 || sys_config_erase_flag == 1)
+		{
+			if(0 != script_parser_patch("platform", "eraseflag", &erase_flag , 1))
+				printf("set eraseflag fail\n");
+		}
 	}
 	else if(data_type == SUNXI_EFEX_PMU_SET)
 	{
@@ -1449,8 +1458,23 @@ static void dram_data_recv_finish(uint data_type)
 		printf("begin to set address to unsequency memory\n");
 		memcpy(unseq_mem, (void *)trans_data.act_recv_buffer, trans_data.recv_size);
 	}
-
-
+#ifdef CONFIG_SUNXI_UBIFS
+	else if (data_type == SUNXI_EFEX_EXT4_UBIFS_TAG) {
+		printf("SUNXI_EFEX_EXT4_UBIFS_TAG\n");
+		if (sunxi_chk_ubifs_sb(
+			(void *)trans_data.base_recv_buffer) == 1) {
+			printf("Use ext4 interface in default.\n");
+			sunxi_disable_mtd_ubi_mode();
+		} else {
+			sunxi_enable_mtd_ubi_mode();
+			memcpy((void *)ubifs_sb_packed,
+				(void *)trans_data.base_recv_buffer,
+				MIN(trans_data.to_be_recved_size,
+				sizeof(ubifs_sb_packed)));
+		}
+		trans_data.last_err = 0;
+	}
+#endif
     else//其它数据，直接写入内存
 	{
         memcpy((void *)trans_data.dram_trans_buffer, (void *)trans_data.act_recv_buffer, trans_data.recv_size);

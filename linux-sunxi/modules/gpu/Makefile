@@ -7,18 +7,16 @@
 # Author: Albert Yu <yuxyun@allwinnertech.com>
 #
 
-ifneq ($(LICHEE_KDIR),)
-export KERNEL_DIR = $(LICHEE_KDIR)
+ifneq ($(KDIR),)
+export KDIR = $(KDIR)
+export KERNELDIR = $(DIR)
 else
 $(error LICHEE_KDIR is empty)
 endif
 
-export KDIR = $(KERNEL_DIR)
-export KERNELDIR = $(KERNEL_DIR)
-
 GPU_BUILD_TYPE = release
 
-include $(KERNEL_DIR)/.config
+include $(KERNELDIR)/.config
 
 ifdef CONFIG_OF
 export USING_DT = 1
@@ -55,6 +53,11 @@ GPU_KO_NAME   = $(GPU_BUILD_DIR)/mali.ko
 else ifeq ($(GPU_TYPE), "mali450")
 GPU_BUILD_DIR = mali450/kernel_mode/driver/src/devicedrv/mali
 GPU_KO_NAME   = $(GPU_BUILD_DIR)/mali.ko
+else ifeq ($(strip $(GPU_TYPE)), $(filter $(GPU_TYPE), "mali-t720" "mali-t760"))
+GPU_BUILD_DIR = mali-midgard/kernel_mode/driver
+GPU_KO_NAME   = $(GPU_BUILD_DIR)/drivers/gpu/arm/midgard/mali_kbase.ko
+GPU_KO_NAME  += $(GPU_BUILD_DIR)/drivers/base/kds/kds.ko
+GPU_KO_NAME  += $(GPU_BUILD_DIR)/drivers/base/dma_buf_test_exporter/dma-buf-test-exporter.ko
 else ifeq ($(GPU_TYPE), "sgx544")
 GPU_BUILD_DIR = sgx544/$(WINDOW_SYSTEM_TYPE)/kernel_mode/eurasia_km/eurasiacon/build/linux2/sunxi_android
 GPU_KO_NAME   = sgx544/$(WINDOW_SYSTEM_TYPE)/kernel_mode/eurasia_km/eurasiacon/binary2_sunxi_$(WINDOW_SYSTEM_TYPE)_$(GPU_BUILD_TYPE)/target/pvrsrvkm.ko

@@ -80,7 +80,7 @@ int disp_al_manager_disable_irq(unsigned int disp)
 
 int disp_al_enhance_apply(unsigned int disp, struct disp_enhance_config *config)
 {
-	if (config->flags & ENHANCE_MODE_DIRTY) {
+	if (config->flags & ENH_MODE_DIRTY) {
 		struct disp_csc_config csc_config;
 		de_dcsc_get_config(disp, &csc_config);
 		csc_config.enhance_mode = (config->info.mode >> 16);
@@ -253,6 +253,13 @@ int disp_al_lcd_cfg(u32 screen_id, disp_panel_para * panel, panel_extend_para *e
 		}
 #endif
 	}
+
+	return 0;
+}
+
+int disp_al_lcd_cfg_ext(u32 screen_id, panel_extend_para *extend_panel)
+{
+	tcon0_cfg_ext(screen_id, extend_panel);
 
 	return 0;
 }
@@ -475,7 +482,11 @@ int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info, st
 	struct lcd_clk_info clk_info;
 	disp_panel_para info;
 
-	al_priv.output_type[screen_id] = (u32)DISP_OUTPUT_TYPE_LCD;
+	if(para->sub_intf == LCD_HV_IF_CCIR656_2CYC){
+		al_priv.output_type[screen_id] = (u32)DISP_OUTPUT_TYPE_TV;
+	}
+	else
+		al_priv.output_type[screen_id] = (u32)DISP_OUTPUT_TYPE_LCD;
 	al_priv.output_mode[screen_id] = (u32)para->intf;
 	al_priv.output_fps[screen_id] = video_info->pixel_clk / video_info->hor_total_time /\
 		video_info->ver_total_time;
@@ -509,6 +520,8 @@ int disp_al_vdevice_cfg(u32 screen_id, struct disp_video_timings *video_info, st
 	clk_info.tcon_div = 11;//fixme
 	tcon0_set_dclk_div(screen_id, clk_info.tcon_div);
 
+	if (LCD_HV_IF_CCIR656_2CYC == info.lcd_hv_if)
+		tcon1_yuv_range(screen_id, 1);
 	if (0 != tcon0_cfg(screen_id, &info))
 		DE_WRN("lcd cfg fail!\n");
 	else
@@ -550,7 +563,7 @@ int disp_al_device_get_start_delay(u32 screen_id)
 {
 	u32 tcon_index = al_priv.tcon_index[screen_id];
 
-	tcon_index = (al_priv.output_type[screen_id] == (u32)DISP_OUTPUT_TYPE_LCD)?0:1;
+	tcon_index = (al_priv.tcon_index[screen_id] == 0)?0:1;
 	return tcon_get_start_delay(screen_id, tcon_index);
 }
 

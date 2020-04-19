@@ -1,22 +1,8 @@
 /*
- * Driver for NAND support, Rick Bronson
- * borrowed heavily from:
- * (c) 1999 Machine Vision Holdings, Inc.
- * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
+ * (C) Copyright 2016
+ *Allwinner Technology Co., Ltd. <www.allwinnertech.com>
  *
- * Ported 'dynenv' to 'nand env.oob' command
- * (C) 2010 Nanometrics, Inc.
- * 'dynenv' -- Dynamic environment offset in NAND OOB
- * (C) Copyright 2006-2007 OpenMoko, Inc.
- * Added 16-bit nand support
- * (C) 2004 Texas Instruments
- *
- * Copyright 2010 Freescale Semiconductor
- * The portions of this file whose copyright is held by Freescale and which
- * are not considered a derived work of GPL v2-only code may be distributed
- * and/or modified under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of the
- * License, or (at your option) any later version.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -24,8 +10,48 @@
 #include <android_image.h>
 #include <sys_partition.h>
 #include <sunxi_flash.h>
+#include <sunxi_board.h>
 
 #define  SUNXI_FLASH_READ_FIRST_SIZE      (32 * 1024)
+
+int __attribute__((weak)) nand_uboot_init_force_sprite(int boot_mode)
+{
+	return 0;
+}
+int __attribute__((weak)) sunxi_sprite_download_boot0(void *buffer, int production_media)
+{
+	return 0;
+}
+int __attribute__((weak)) spinor_download_boot0(uint length, void *buffer)
+{
+	return 0;
+}
+
+extern int nand_uboot_init_force_sprite(int boot_mode);
+
+static inline int check_readall_flag(const char *part_name)
+{
+	if((!strncmp(part_name, "boot", strlen("boot"))) ||
+	    (!strncmp(part_name, "recovery", strlen("recovery"))))
+		return 1;
+
+	return 0;
+}
+
+static int get_partition_flash_info(const char *part_name, u32 *start_block,u32 *rblock)
+{
+	if ((NULL == start_block)||(rblock == NULL))
+		return -1;
+
+	*start_block = sunxi_partition_get_offset_byname((const char *)part_name);
+	if(!*start_block) {
+		printf("cant find part named %s\n", (char *)part_name);
+		return -1;
+	}
+	*rblock = sunxi_partition_get_size_byname((const char *)part_name);
+
+	return 0;
+}
 
 static int sunxi_flash_read_all(u32 start, ulong buf, const char *part_name)
 {
@@ -37,21 +63,17 @@ static int sunxi_flash_read_all(u32 start, ulong buf, const char *part_name)
 
 	addr = (void *)buf;
 	ret = sunxi_flash_read(start_block, SUNXI_FLASH_READ_FIRST_SIZE/512, addr);
-	if(!ret)
-	{
+	if(!ret) {
 		printf("read all error: flash start block =%x, dest buffer addr=%lx\n", start_block, (ulong)addr);
 
 		return 1;
 	}
 	fb_hdr = (struct andr_img_hdr *)addr;
-	if (memcmp(fb_hdr->magic, ANDR_BOOT_MAGIC, 8))
-	{
+	if (memcmp(fb_hdr->magic, ANDR_BOOT_MAGIC, 8)) {
 		printf("boota: bad boot image magic, maybe not a boot.img?\n");
 		printf("try to read partition(%s) all\n",part_name);
 		rbytes = sunxi_partition_get_size_byname(part_name) * 512;
-	}
-	else
-	{
+	} else {
 		rbytes = fb_hdr->kernel_size + fb_hdr->ramdisk_size + fb_hdr->second_size + 1024 * 1024 + 511;
 	}
 	rblock = rbytes/512 - SUNXI_FLASH_READ_FIRST_SIZE/512;
@@ -61,11 +83,40 @@ static int sunxi_flash_read_all(u32 start, ulong buf, const char *part_name)
 
 	ret = sunxi_flash_read(start_block, rblock, addr);
 
-	tick_printf("sunxi flash read :offset %x, %d bytes %s\n", start<<9, rbytes,
-		       ret ? "OK" : "ERROR");
+	pr_msg("sunxi flash read :offset %x, %d bytes %s\n", start<<9, rbytes,
+	            ret ? "OK" : "ERROR");
 
 	return ret == 0 ? 1 : 0;
 
+}
+
+static int sunxi_flash_write_boot0(void *addr, int storage_type)
+{
+	int ret = -1;
+	int boot0_len;
+
+	switch (storage_type) {
+		case STORAGE_NAND:
+			nand_uboot_init_force_sprite(0); /*for nand para storage*/
+			ret = sunxi_sprite_download_boot0((void *)addr, storage_type);
+			sunxi_sprite_exit(0);
+			break;
+		case STORAGE_NOR:
+			boot0_len = sunxi_flash_get_boot0_size();
+			if (boot0_len > 0)
+				ret = spinor_download_boot0(boot0_len, (void *)addr);
+			break;
+		case STORAGE_SD:
+		case STORAGE_EMMC:
+		case STORAGE_EMMC3:
+			ret = sunxi_sprite_download_boot0((void *)addr, storage_type);
+			break;
+		default:
+			printf("Unsupport storage %d\n", storage_type);
+			break;
+	}
+
+	return ret;
 }
 
 int do_sunxi_flash(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
@@ -74,6 +125,10 @@ int do_sunxi_flash(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 	ulong addr;
 	char *cmd;
 	char *part_name;
+	int readall_flag = 0;
+	int storage_type;
+	u32 start_block = 0;
+	u32 rblock = 0;
 
 	/* at least four arguments please */
 	if ((argc != 4) && (argc != 5))
@@ -81,59 +136,44 @@ int do_sunxi_flash(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 
 	cmd = argv[1];
 	part_name = argv[3];
-/*
-************************************************
-*************  read only   *********************
-************************************************
-*/
+	storage_type = get_boot_storage_type();
 
-	if (strncmp(cmd, "read", 4) == 0)
-	{
-		u32 start_block;
-		u32 rblock;
-		int readall_flag = 0;
-
+	if (strncmp(cmd, "read", strlen("read")) == 0) {
 		addr = (ulong)simple_strtoul(argv[2], NULL, 16);
+		readall_flag = check_readall_flag(part_name);
 
-		if((!strncmp(part_name, "boot", 4)) || (!strncmp(part_name, "recovery", 8)))
-		{
-			readall_flag = 1;
-		}
-		start_block = sunxi_partition_get_offset_byname((const char *)part_name);
-		if(!start_block)
-		{
-			printf("cant find part named %s\n", (char *)part_name);
+		if (!strncmp("uboot", part_name, 5))
+			return read_boot_package(storage_type, (void *)addr);
+		else if (!strncmp("boot0", part_name, 5))
+			return sunxi_flash_upload_boot0((void *)addr, sunxi_flash_get_boot0_size());
 
-			goto usage;
-		}
-		if(argc == 4)
-		{
-			if(readall_flag)
-			{
-				puts("read partition: boot or recovery\n");
-
-				return sunxi_flash_read_all(start_block, addr, (const char *)part_name);
-			}
-			rblock = sunxi_partition_get_size_byname((const char *)part_name);
-		}
-		else
-		{
+		if (argc == 4) {	/* read size: indecated on partemeter 1 */
+			if (get_partition_flash_info(part_name, &start_block,&rblock))
+				goto usage;
+		} else { /* read size: partemeter 2 */
+			start_block = (u32)simple_strtoul(argv[3], NULL, 16)/512;
 			rblock = (u32)simple_strtoul(argv[4], NULL, 16)/512;
 		}
+
+		if (readall_flag) {
+			pr_msg("read partition: boot or recovery\n");
+
+			return sunxi_flash_read_all(start_block, addr, (const char *)part_name);
+		}
+
 #ifdef DEBUG
 		printf("part name   = %s\n", part_name);
-		printf("start block = %x\n", start_block);
-		printf("     nblock = %x\n", rblock);
+		printf("addr        = %ld\n", addr);
+		printf("start block = 0x%x\n", start_block);
+		printf("nblock 		= 0x%x\n", rblock);
 #endif
 		ret = sunxi_flash_read(start_block, rblock, (void *)addr);
 
-		tick_printf("sunxi flash read :offset %x, %d bytes %s\n", start_block<<9, rblock<<9,
-		       ret ? "OK" : "ERROR");
+		pr_msg("sunxi flash read :offset %x, %d bytes %s\n", start_block<<9, rblock<<9,
+		            ret ? "OK" : "ERROR");
 
 		return ret == 0 ? 1 : 0;
-	}
-	else if(strncmp(cmd, "log_read", strlen("log_read")) == 0)
-	{
+	} else if(strncmp(cmd, "log_read", strlen("log_read")) == 0) {
 		u32 start_block;
 		u32 rblock;
 
@@ -145,13 +185,11 @@ int do_sunxi_flash(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 
 		ret = sunxi_flash_read(start_block, rblock, (void *)addr);
 
-		tick_printf("sunxi flash log_read :offset %x, %d sectors %s\n", start_block, rblock,
-		ret ? "OK" : "ERROR");
+		pr_msg("sunxi flash log_read :offset %x, %d sectors %s\n", start_block, rblock,
+		            ret ? "OK" : "ERROR");
 
 		return ret == 0 ? 1 : 0;
-	}
-	else if(strncmp(cmd, "phy_read", strlen("phy_read")) == 0)
-	{
+	} else if(strncmp(cmd, "phy_read", strlen("phy_read")) == 0) {
 		u32 start_block;
 		u32 rblock;
 
@@ -163,8 +201,31 @@ int do_sunxi_flash(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 
 		ret = sunxi_flash_phyread(start_block, rblock, (void *)addr);
 
-		tick_printf("sunxi flash phy_read :offset %x, %d sectors %s\n", start_block, rblock,
-		       ret ? "OK" : "ERROR");
+		pr_msg("sunxi flash phy_read :offset %x, %d sectors %s\n", start_block, rblock,
+		            ret ? "OK" : "ERROR");
+
+		return ret == 0 ? 1 : 0;
+	} else if (strncmp(cmd, "write", 4) == 0) {
+		addr = (ulong)simple_strtoul(argv[2], NULL, 16);
+
+		if (!strncmp("uboot", part_name, 5))
+			return sunxi_sprite_download_uboot((void *)addr, storage_type, 0);
+		else if (!strncmp("boot0", part_name, 5))
+			return sunxi_flash_write_boot0((void *)addr, storage_type);
+
+		/* write size: indecated on partemeter 1 */
+		if (argc == 4) {
+			if (get_partition_flash_info(part_name, &start_block,&rblock))
+				goto usage;
+		} else {
+			/* write size: partemeter 2 */
+			start_block = (u32)simple_strtoul(argv[3], NULL, 16)/512;
+			rblock = (u32)simple_strtoul(argv[4], NULL, 16)/512;
+		}
+		ret = sunxi_flash_write(start_block, rblock, (void *)addr);
+
+		pr_msg("sunxi flash write :offset %x, %d bytes %s\n", start_block<<9, rblock<<9,
+		            ret ? "OK" : "ERROR");
 
 		return ret == 0 ? 1 : 0;
 	}
@@ -174,12 +235,18 @@ usage:
 }
 
 U_BOOT_CMD(
-	sunxi_flash, CONFIG_SYS_MAXARGS, 1, do_sunxi_flash,
-	"sunxi_flash sub-system",
-	"read command parmeters : \n"
-	"parmeters 0 : addr to load(hex only)\n"
-	"parmeters 1 : the name of the part to be load\n"
-	"[parmeters 2] : the number of bytes to be load(hex only)\n"
-	"if [parmeters 2] not exist, the number of bytes to be load "
-	"is the size of the part indecated on partemeter 1"
+        sunxi_flash, CONFIG_SYS_MAXARGS, 1, do_sunxi_flash,
+        "sunxi_flash sub-system",
+        "read command parmeters : \n"
+        "parmeters 0 : addr to load(hex only)\n"
+        "parmeters 1 : the name of the part to be load or the flash offset\n"
+        "[parmeters 2] : the number of bytes to be load(hex only)\n"
+        "if [parmeters 2] not exist, the number of bytes to be load "
+        "is the size of the part indecated on partemeter 1\n"
+        "\nwrite command parmeters : \n"
+        "parmeters 0 : addr to save(hex only)\n"
+        "parmeters 1 : the name of the part to be write or the flash offset\n"
+        "[parmeters 2] : the number of bytes to be write(hex only)\n"
+        "if [parmeters 2] not exist, the number of bytes to be write "
+        "is the size of the part indecated on partemeter 1"
 );

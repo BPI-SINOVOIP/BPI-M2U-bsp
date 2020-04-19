@@ -35,7 +35,11 @@
 #define HD720_WIDTH   1280
 #define HD720_HEIGHT  720
 #define XGA_WIDTH     1024
+#ifdef CONFIG_ARCH_SUN3IW1P1
+#define XGA_HEIGHT    576
+#else
 #define XGA_HEIGHT    768
+#endif
 #define SVGA_WIDTH    800
 #define SVGA_HEIGHT   600
 #define VGA_WIDTH     640
@@ -69,8 +73,6 @@ struct sensor_info {
   int                                   contrast;
   int                                   saturation;
   int                                   hue;
-  int 									sharpness;
-  int									framerate;
   unsigned int                          hflip;
   unsigned int                          vflip;
   unsigned int                          gain;
@@ -87,6 +89,11 @@ struct sensor_info {
   struct v4l2_fract                     tpf; 
   struct sensor_win_size                *current_wins;
   struct flash_dev_info                 *fl_dev_info;
+  enum v4l2_resolution                  resolution;
+  struct delayed_work work;
+  struct workqueue_struct *wq;
+  int night_mode;
+  int streaming;
 };
 
 #endif //__CAMERA__H__

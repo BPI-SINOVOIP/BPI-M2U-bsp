@@ -35,13 +35,9 @@ obj-y += bootretry.o
 endif
 
 # boards
-ifdef CONFIG_SUNXI_MULITCORE_BOOT
-obj-$(CONFIG_SYS_GENERIC_BOARD) += board_f_smp.o
-obj-$(CONFIG_SYS_GENERIC_BOARD) += board_r_smp.o
-else
-obj-$(CONFIG_SYS_GENERIC_BOARD) += board_f.o
 obj-$(CONFIG_SYS_GENERIC_BOARD) += board_r.o
-endif
+obj-$(CONFIG_SYS_GENERIC_BOARD) += board_f.o
+
 # core command
 obj-y += cmd_boot.o
 obj-$(CONFIG_CMD_BOOTM) += cmd_bootm.o bootm.o bootm_os.o
@@ -49,13 +45,12 @@ obj-y += cmd_help.o
 obj-y += cmd_version.o
 obj-$(CONFIG_CMD_BOOTA) += cmd_boota.o cmd_sunxi_flash.o
 obj-$(CONFIG_CMD_SUNXI_SPRITE) += cmd_sunxi_sprite.o
+obj-$(CONFIG_CMD_SUNXI_USBMASS) += cmd_sunxi_usbmass.o
 obj-$(CONFIG_CMD_SUNXI_TIMER) += cmd_sunxi_timer.o
 obj-$(CONFIG_CMD_SUNXI_EFEX) += cmd_sunxi_efex.o
 obj-$(CONFIG_CMD_SUNXI_SHUTDOWN) += cmd_sunxi_shutdown.o
 obj-$(CONFIG_CMD_SUNXI_MEMTEST) += cmd_sunxi_memtest.o
-ifdef CONFIG_SUNXI_DISPLAY
 obj-$(CONFIG_CMD_SUNXI_BMP) += cmd_sunxi_bmp.o
-endif
 
 obj-$(CONFIG_CMD_SUNXI_BURN) += cmd_sunxi_burn.o
 obj-$(CONFIG_CMD_MODIFY_SYSCONFIG) += cmd_modify_sysconfig.o
@@ -284,7 +279,10 @@ obj-$(CONFIG_IO_TRACE) += iotrace.o
 obj-y += memsize.o
 obj-y += stdio.o
 obj-y += sunxi_mem_alloc.o
+obj-y += sunxi_keybox_install.o
 obj-$(CONFIG_SUNXI_CMD_SMC) += cmd_sunxi_smc.o
 obj-$(CONFIG_SUNXI_CMD_DMA) += cmd_sunxi_dma.o
-obj-$(CONFIG_SUNXI_PRIVATE_KEY) += cmd_svudata.o
+obj-$(CONFIG_CMD_SUNXI_PMU) += cmd_sunxi_pmu.o
+obj-$(CONFIG_CMD_SUNXI_SYSCFG) += cmd_sunxi_sysconfig.o
+obj-y += cmd_svudata.o
 CFLAGS_env_embedded.o := -Wa,--no-warn -DENV_CRC=$(shell tools/envcrc 2>/dev/null)

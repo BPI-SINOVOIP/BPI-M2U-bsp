@@ -4,4 +4,8 @@
 #
 #
 
+ifeq ($(CONFIG_ARCH_SUN8IW5P1),y)
+obj-y += disp/
+else
 obj-y += disp2/
+endif

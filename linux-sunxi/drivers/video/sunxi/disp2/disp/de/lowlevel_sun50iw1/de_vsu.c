@@ -310,30 +310,30 @@ int de_vsu_set_para(unsigned int sel, unsigned int chno, unsigned int enable, un
 	//fir coefficient
 	//ch0
 	pt_coef = de_vsu_calc_fir_coef(ypara->hstep);
-	memcpy(&vsu_dev[sel][chno]->yhcoeff0, lan3coefftab32_left+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
-	memcpy(&vsu_dev[sel][chno]->yhcoeff1, lan3coefftab32_right+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
+	memcpy((void *)&vsu_dev[sel][chno]->yhcoeff0, lan3coefftab32_left+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
+	memcpy((void *)&vsu_dev[sel][chno]->yhcoeff1, lan3coefftab32_right+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
 
 	pt_coef = de_vsu_calc_fir_coef(ypara->vstep);
-	memcpy(&vsu_dev[sel][chno]->yvcoeff, lan2coefftab32+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
+	memcpy((void *)&vsu_dev[sel][chno]->yvcoeff, lan2coefftab32+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
 
 	//ch1/2
 	if (VSU_FORMAT_RGB == format)
 	{
 		pt_coef = de_vsu_calc_fir_coef(cpara->hstep);
-		memcpy(&vsu_dev[sel][chno]->chcoeff0, lan3coefftab32_left+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
-		memcpy(&vsu_dev[sel][chno]->chcoeff1, lan3coefftab32_right+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
+		memcpy((void *)&vsu_dev[sel][chno]->chcoeff0, lan3coefftab32_left+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
+		memcpy((void *)&vsu_dev[sel][chno]->chcoeff1, lan3coefftab32_right+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
 
 		pt_coef = de_vsu_calc_fir_coef(cpara->vstep);
-		memcpy(&vsu_dev[sel][chno]->cvcoeff, lan2coefftab32+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
+		memcpy((void *)&vsu_dev[sel][chno]->cvcoeff, lan2coefftab32+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
 	}
 	else
 	{
 		pt_coef = de_vsu_calc_fir_coef(cpara->hstep);
-		memcpy(&vsu_dev[sel][chno]->chcoeff0, bicubic8coefftab32_left+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
-		memcpy(&vsu_dev[sel][chno]->chcoeff1, bicubic8coefftab32_right+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
+		memcpy((void *)&vsu_dev[sel][chno]->chcoeff0, bicubic8coefftab32_left+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
+		memcpy((void *)&vsu_dev[sel][chno]->chcoeff1, bicubic8coefftab32_right+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
 
 		pt_coef = de_vsu_calc_fir_coef(cpara->vstep);
-		memcpy(&vsu_dev[sel][chno]->cvcoeff, bicubic4coefftab32+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
+		memcpy((void *)&vsu_dev[sel][chno]->cvcoeff, bicubic4coefftab32+pt_coef, sizeof(unsigned int)*VSU_PHASE_NUM);
 	}
 	vsu_dev[sel][chno]->ctrl.bits.coef_switch_rdy = 1;
 	vsu_glb_block[sel][chno].dirty 			= 1;

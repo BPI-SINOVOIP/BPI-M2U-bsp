@@ -86,10 +86,10 @@ DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82441,	quirk_p
     
 static void quirk_isa_dma_hangs(struct pci_dev *dev)
 {
-	if (!isa_dma_bridge_buggy) {
+	/*if (!isa_dma_bridge_buggy) {
 		isa_dma_bridge_buggy=1;
 		dev_info(&dev->dev, "Activating ISA DMA hang workarounds\n");
-	}
+	}*/
 }
 	/*
 	 * Its not totally clear which chipsets are the problematic ones

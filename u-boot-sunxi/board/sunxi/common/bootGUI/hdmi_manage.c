@@ -1,38 +1,81 @@
+#include <common.h>
 #include "dev_manage.h"
 #include "hdmi_manage.h"
+#include "video_hal.h"
+#include "video_misc_hal.h"
 
-int get_saved_hdmi_vendor_id(void)
+#define EDID_LENGTH 0x80
+#define ID_VENDOR 0x08
+#define VENDOR_INFO_SIZE 10
+
+#define DISPLAY_PARTITION_NAME "Reserve0"
+
+enum {
+	ALWAYS_NOT_CHECK_MODE = 0,
+	ALWAYS_CHECK_MODE,
+	CHECK_MODE_ONLY_IF_SAME_TV,
+};
+
+static int get_mode_check_policy(int def_check)
 {
-	char data_buf[512] = {0};
-	char *pvendor_id, *pdata, *pdata_end;
-	int vendor_id = 0;
-	int i = 0;
-	int ret = 0;
-
-	ret = hal_fat_fsload(DISPLAY_PARTITION_NAME, "tv_vdid.fex", data_buf, 512);
-	if (0 >= ret)
-		return 0;
-
-	pvendor_id = data_buf;
-	pdata = data_buf;
-	pdata_end = pdata + ret;
-	for (; (i < 4) && (pdata != pdata_end); pdata++) {
-		if ('\n' == *pdata) {
-			*pdata = '\0';
-			ret = (int)simple_strtoul(pvendor_id, NULL, 16);
-			vendor_id |= ((ret & 0xFF) << (8 * (3 - i)));
-			printf("pvendor_id=%s, ret=0x%x, vendorID=0x%x\n",
-				pvendor_id, ret, vendor_id);
-			pvendor_id = pdata + 1;
-			i++;
-		}
-	}
-	return vendor_id;
+	disp_getprop_by_name(get_disp_fdt_node(), "hdmi_mode_check",
+		(uint32_t *)&def_check, def_check);
+	return def_check;
 }
 
-int edid_checksum(char const *edid_buf)
+/*
+* the format of saved vendor id is string of hex:
+* "data[0],data[1],...,data[9],".
+*/
+static int get_saved_vendor_id(char *vendor_id, int num)
 {
-#define EDID_LENGTH 0x80
+	char data_buf[64] = {0};
+	char *p = data_buf;
+	char *pdata = data_buf;
+	char *p_end;
+	int len = 0;
+	int i;
+
+	len = hal_fat_fsload(DISPLAY_PARTITION_NAME,
+		"tv_vdid.fex", data_buf, sizeof(data_buf));
+	if (0 >= len)
+		return 0;
+
+	i = 0;
+	p_end = p + len;
+	for (; p < p_end; ++p) {
+		if (',' == *p) {
+			*p = '\0';
+			vendor_id[i] = (char)simple_strtoul(pdata, NULL, 16);
+			++i;
+			if (i >= num)
+				break;
+			pdata = p + 1;
+		}
+	}
+	return i;
+}
+
+static int is_same_vendor(unsigned char *edid_buf,
+	char *vendor, int num)
+{
+	int i;
+	char *pdata = (char *)edid_buf + ID_VENDOR;
+	for (i = 0; i < num; ++i) {
+		if (pdata[i] != vendor[i]) {
+			printf("different vendor[current <-> saved]\n");
+			for (i = 0; i < num; ++i) {
+				printf("[%x <-> %x]\n", pdata[i], vendor[i]);
+			}
+			return 0;
+		}
+	}
+	printf("same vendor\n");
+	return !0;
+}
+
+static int edid_checksum(char const *edid_buf)
+{
 	char csum = 0;
 	char all_null = 0;
 	int i = 0;
@@ -54,60 +97,47 @@ int edid_checksum(char const *edid_buf)
 	}
 }
 
-int hdmi_get_vendor_id(unsigned char *edid_buf)
+int hdmi_verify_mode(int channel, int mode, int *vid)
 {
-#define ID_VENDOR 0x08
-	int vendor_id = 0;
-	unsigned char *pVendor = NULL;
+	unsigned char edid_buf[EDID_LENGTH];
+	int check, vendor_size;
+	char saved_vendor_id[VENDOR_INFO_SIZE];
 
-	pVendor = edid_buf + ID_VENDOR;
-	vendor_id = (pVendor[0] << 24);
-	vendor_id |= (pVendor[1] << 16);
-	vendor_id |= (pVendor[2] << 8);
-	vendor_id |= pVendor[3];
-	printf("vendor_id=%08x\n", vendor_id);
-	return vendor_id;
-}
-
-int hdmi_verify_mode(int channel, int mode, int *vid, int check)
-{
-	/* self-define hdmi mode list */
-	const int HDMI_MODES[] = {
-		DISP_TV_MOD_720P_60HZ,
-		DISP_TV_MOD_720P_50HZ,
-		DISP_TV_MOD_1080P_60HZ,
-		DISP_TV_MOD_1080P_50HZ,
-	};
-	int i = 0;
-	unsigned char edid_buf[256] = {0};
-	int actual_vendor_id = 0;
-	int saved_vendor_id = 0;
-
-	hal_get_hdmi_edid(channel, edid_buf, 128); /* here we only get edid block0 */
+	/* here we only get edid block0 */
+	hal_get_hdmi_edid(channel, edid_buf, EDID_LENGTH);
 
 	if (-2 == edid_checksum((char const *)edid_buf))
-		check = 0;
+		check = ALWAYS_NOT_CHECK_MODE;
+	else
+		check = get_mode_check_policy(ALWAYS_CHECK_MODE);
 
-	actual_vendor_id = hdmi_get_vendor_id(edid_buf);
-	saved_vendor_id = get_saved_hdmi_vendor_id();
-	*vid = actual_vendor_id ? actual_vendor_id : saved_vendor_id;
-	if (2 == check) {
+	vendor_size = get_saved_vendor_id(saved_vendor_id, VENDOR_INFO_SIZE);
+	if (CHECK_MODE_ONLY_IF_SAME_TV == check) {
 		/* if vendor id change , check mode: check = 1 */
-		if (actual_vendor_id && (actual_vendor_id != saved_vendor_id)) {
-			check = 1;
-			*vid = actual_vendor_id;
-			printf("vendor:0x%x, saved_vendor:0x%x\n",
-				actual_vendor_id, saved_vendor_id);
+		if ((0 == vendor_size)
+			|| !is_same_vendor(edid_buf, saved_vendor_id, vendor_size)) {
+			check = ALWAYS_CHECK_MODE;
 		}
 	}
 
 	/* check if support the output_mode by television,
 	 * return 0 is not support */
-	if ((1 == check)
+	if ((ALWAYS_CHECK_MODE == check)
 		&& (1 != hal_is_support_mode(channel,
 			DISP_OUTPUT_TYPE_HDMI, mode))) {
-		/* any mode of HDMI_MODES is not supported. fixme: use HDMI_MODES[0] ? */
-		mode = HDMI_MODES[0];
+		int i = 0;
+		/* self-define hdmi mode list */
+		const int HDMI_MODES[] = {
+			DISP_TV_MOD_3840_2160P_30HZ,
+			DISP_TV_MOD_1080P_60HZ,
+			DISP_TV_MOD_1080I_60HZ,
+			DISP_TV_MOD_1080P_50HZ,
+			DISP_TV_MOD_1080I_50HZ,
+			DISP_TV_MOD_720P_60HZ,
+			DISP_TV_MOD_720P_50HZ,
+			DISP_TV_MOD_576P,
+			DISP_TV_MOD_480P,
+		};
 		for (i = 0; i < sizeof(HDMI_MODES) / sizeof(HDMI_MODES[0]); i++) {
 			if (1 == hal_is_support_mode(channel,
 				DISP_OUTPUT_TYPE_HDMI, HDMI_MODES[i])) {
@@ -122,5 +152,3 @@ int hdmi_verify_mode(int channel, int mode, int *vid, int check)
 
 	return mode;
 }
-
-

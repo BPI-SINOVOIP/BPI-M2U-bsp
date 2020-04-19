@@ -59,3 +59,13 @@ u32 dump_layer_config(struct disp_layer_config_data *data)
 	DE_WRN("%s", buf);
 	return count;
 }
+
+void *disp_vmap(unsigned long phys_addr, unsigned long size)
+{
+	return (void *)phys_addr;
+}
+
+void disp_vunmap(const void *vaddr)
+{
+}
+

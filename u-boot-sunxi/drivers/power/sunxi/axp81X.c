@@ -228,19 +228,39 @@ int axp81_probe_power_status(void)
 int axp81_probe_battery_exist(void)
 {
 	u8 reg_value;
+	ulong begin_time, over_time;
 
-	if(axp_i2c_read(AXP81X_ADDR, BOOT_POWER81X_MODE_CHGSTATUS, &reg_value))
-	{
+	if (axp_i2c_read(AXP81X_ADDR, BOOT_POWER81X_MODE_CHGSTATUS,
+		&reg_value))
 		return -1;
+
+	/* indicate whether valid battery detected or not yet,
+	    1--valide 0--invalid
+	*/
+	if ((reg_value & 0x10))
+		return reg_value&0x20;
+
+	begin_time = get_timer(0);
+	over_time = 3000;
+
+	pr_msg("***battery detect invalid, try again***\n");
+	while (1) {
+		axp_i2c_read(AXP81X_ADDR, BOOT_POWER81X_MODE_CHGSTATUS,
+			&reg_value);
+
+		if ((reg_value & 0x10)) {
+			pr_msg("***battery detect used %d ms***\n",
+				get_timer(begin_time));
+			return reg_value&0x20;
+		}
+
+		if (get_timer(begin_time) > over_time) {
+			pr_msg("***battery detect overtime***\n");
+			return 0;
+		}
+		mdelay(10);
 	}
-	if((reg_value & 0x10))//indicate whether valid battery detected or not yet,1--valide 0--invalid
-	{
-		return (reg_value & 0x20);
-	}
-	else
-	{
-		return 0;
-	}
+	return 0;
 }
 /*
 ************************************************************************************************************
@@ -499,6 +519,10 @@ int axp81_set_charge_current(int current)
 	u8   reg_value;
 	int  step;
 
+	if( !current )
+	{
+		return 0;
+	}
 	if(axp_i2c_read(AXP81X_ADDR, BOOT_POWER81X_CHARGE1, &reg_value))
     {
         return -1;
@@ -571,6 +595,11 @@ int axp81_probe_charge_current(void)
 int axp81_set_vbus_cur_limit(int current)
 {
 	uchar reg_value;
+
+	if( !current )
+	{
+		return 0;
+	}
 
 	//set bus current limit off
 	if(axp_i2c_read(AXP81X_ADDR, BOOT_POWER81X_CHARGE3, &reg_value))
@@ -707,6 +736,11 @@ int axp81_set_vbus_vol_limit(int vol)
 {
 	uchar reg_value;
 
+	if( !vol )
+	{
+		return 0;
+	}
+
 	//set bus vol limit off
 	if(axp_i2c_read(AXP81X_ADDR, BOOT_POWER81X_VBUS_SET, &reg_value))
 	{
@@ -832,6 +866,116 @@ int axp81_set_int_enable(uchar *addr)
 	}
 
 	return 0;
+}
+
+int axp81_set_power_reset(void)
+{
+	u8 reg_value;
+	if(axp_i2c_read(AXP81X_ADDR, BOOT_POWER81X_VOFF_SET, &reg_value))
+	{
+		printf("axp81_set_power_reset: axp_i2c_read error!\n");
+		return -1;
+	}
+	reg_value |= (1<<6);
+	printf("axp will reset the system....\n");
+	if(axp_i2c_write(AXP81X_ADDR, BOOT_POWER81X_VOFF_SET, reg_value))
+	{
+		printf("axp81_set_power_reset: axp_i2c_write error!\n");
+		return -1;
+	}
+	return 0;
+}
+
+void sunxi_pmu_reset(void)
+{
+	if (uboot_spare_head.boot_data.work_mode == WORK_MODE_BOOT) {
+		printf("restart system by pmu\n");
+		mdelay(2000);
+		axp81_set_power_reset();
+		while(1);
+	}
+}
+
+int axp_probe_vbus_type(void)
+{
+	u8 reg_value;
+	int pmu_bc_en = 0;
+	int vbus_type = 0;
+
+	extern int script_parser_fetch(char *main_name, char *sub_name, int value[], int count);
+	extern int get_boot_work_mode(void);
+
+	/* if enable this function, the vbus current limit will work(set cur limit to 450mA if
+	    VBUS PC exist). this situation will affect the  working status of USB.
+	    So we cat't enable this function at usb product mode.
+	 */
+	if(get_boot_work_mode() != WORK_MODE_BOOT)
+	{
+		return 0;
+	}
+	if (AXP_VBUS_EXIST != axp81_probe_power_status())
+		return SUNXI_VBUS_NULL;
+
+	script_parser_fetch(PMU_SCRIPT_NAME, "pmu_init_bc_en", &pmu_bc_en, 1);
+
+	if(!pmu_bc_en)
+	{
+		return SUNXI_VBUS_PC;
+	}
+
+	/* REG2C: BC module global reg */
+	if(axp_i2c_read(AXP81X_ADDR, 0x2C, &reg_value))
+	{
+		return -1;
+	}
+	reg_value |= (1<<0);
+	if(axp_i2c_write(AXP81X_ADDR, 0x2C, reg_value))
+	{
+		return -1;
+	}
+	mdelay(1);
+	reg_value = 0;
+	/* REG2C Bit2: BC detection status*/
+	if(axp_i2c_read(AXP81X_ADDR, 0x2C, &reg_value))
+	{
+		return -1;
+	}
+	/* wait dection finish */
+	while(reg_value&0x02)
+	{
+		udelay(1);
+		axp_i2c_read(AXP81X_ADDR, 0x2C, &reg_value);
+	}
+
+	/* REG2F: BC detect stauts reg */
+	if(axp_i2c_read(AXP81X_ADDR, 0x2F, &reg_value))
+	{
+		return -1;
+	}
+
+	/*
+	reg2f: 7-4bits
+	001x: SDP - desktop computer
+	010x: CDP - laptop
+	011x: DCP - adapter
+	 */
+	reg_value >>=5;
+	switch(reg_value)
+	{
+	case 0x1:
+	case 0x2:
+		vbus_type = SUNXI_VBUS_PC;
+		pr_msg("vbus pc exist\n");
+		break;
+	case 0x3:
+		vbus_type = SUNXI_VBUS_DC;
+		pr_msg("vbus dc exist\n");
+	default:
+		vbus_type = SUNXI_VBUS_PC;
+		pr_msg("can't detect vbus type,default is PC\n");
+		break;
+	}
+	return vbus_type;
 }
 
 

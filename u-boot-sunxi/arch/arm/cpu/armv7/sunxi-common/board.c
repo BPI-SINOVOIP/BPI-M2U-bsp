@@ -42,6 +42,7 @@
 #include <fdt_support.h>
 #include <sys_config_old.h>
 #include <arisc.h>
+#include <private_toc.h>
 
 /* The sunxi internal brom will try to loader external bootloader
  * from mmc0, nannd flash, mmc2.
@@ -81,31 +82,65 @@ int display_inner(void)
 	return 0;
 }
 
-int script_init(void)
+static int soc_script_init(void)
 {
-	uint offset, length;
-	char *addr;
+	char *addr = NULL;
 
-	offset = uboot_spare_head.boot_head.uboot_length;
-	length = uboot_spare_head.boot_head.length - uboot_spare_head.boot_head.uboot_length;
+	addr   = (char *)CONFIG_SOCCFG_STORE_IN_DRAM_BASE;
+	script_head_t *orign_head = (script_head_t *)addr;
 
-	addr   = (char *)CONFIG_SYS_TEXT_BASE + offset;
-
-	if(length == 0)
+	if (orign_head->length == 0)
 	{
-		script_parser_init(NULL);
+		soc_script_parser_init(NULL);
 		return 0;
 	}
 
 	if (!(gd->flags & GD_FLG_RELOC))
 	{
-		script_parser_init((char *)addr);
+		soc_script_parser_init((char *)addr);
 	}
 	else
 	{
-		script_parser_init((char *)(gd->script_reloc_buf));
+		soc_script_parser_init((char *)get_script_reloc_buf(SOC_SCRIPT));
 	}
 
+	return 0;
+}
+
+#ifdef USE_BOARD_CONFIG
+static int bd_script_init(void)
+{
+	char *addr = NULL;
+
+	addr   = (char *)CONFIG_BDCFG_STORE_IN_DRAM_BASE;
+	script_head_t *orign_head = (script_head_t *)addr;
+
+	if (orign_head->length == 0)
+	{
+		bd_script_parser_init(NULL);
+		return 0;
+	}
+
+	if (!(gd->flags & GD_FLG_RELOC))
+	{
+		bd_script_parser_init((char *)addr);
+	}
+	else
+	{
+		bd_script_parser_init((char *)get_script_reloc_buf(BD_SCRIPT));
+	}
+
+	return 0;
+}
+#endif
+
+int script_init(void)
+{
+	script_parser_func_init();
+	soc_script_init();
+#ifdef USE_BOARD_CONFIG
+	bd_script_init();
+#endif
 	return 0;
 }
 
@@ -188,6 +223,11 @@ void sunxi_board_close_source(void)
 	return ;
 }
 
+__weak void sunxi_pmu_reset(void)
+{
+	printf("weak pmu_reset call\n");
+}
+
 int sunxi_board_restart(int next_mode)
 {
 	if(!next_mode)
@@ -202,6 +242,7 @@ int sunxi_board_restart(int next_mode)
 	drv_disp_exit();
 #endif
 	sunxi_board_close_source();
+	sunxi_pmu_reset();
 	reset_cpu(0);
 
 	return 0;
@@ -229,11 +270,27 @@ int sunxi_board_shutdown(void)
 
 }
 
+int sunxi_board_prepare_kernel(void)
+{
+	axp_set_next_poweron_status(PMU_PRE_SYS_MODE);
+#ifdef CONFIG_SUNXI_DISPLAY
+#ifndef CONFIG_SUNXI_MULITCORE_BOOT
+	board_display_wait_lcd_open();
+	board_display_set_exit_mode(1);
+#endif
+#endif
+	sunxi_board_close_source();
+
+	return 0;
+}
+
 void sunxi_flush_allcaches(void)
 {
 	icache_disable();
 	flush_dcache_all();
+#ifdef CONFIG_ARM_A7
 	dcache_disable();
+#endif
 }
 
 
@@ -266,6 +323,33 @@ int sunxi_board_run_fel_eraly(void)
 	reset_cpu(0);
 
 	return 0;
+}
+
+int sunxi_probe_secure_monitor(void)
+{
+	return uboot_spare_head.boot_data.monitor_exist == SUNXI_SECURE_MODE_USE_SEC_MONITOR?1:0;
+}
+
+int sunxi_probe_secure_os(void)
+{
+	return uboot_spare_head.boot_data.secureos_exist;
+}
+
+int sunxi_get_securemode(void)
+{
+	return gd->securemode;
+}
+
+
+__weak void cpu_spin_lock(unsigned int *lock)
+{
+}
+__weak unsigned int cpu_spin_trylock(unsigned int *lock)
+{
+	return 0;
+}
+__weak void cpu_spin_unlock(unsigned int *lock)
+{
 }
 
 

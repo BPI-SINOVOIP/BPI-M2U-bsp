@@ -21,7 +21,10 @@
 
 #include "../utility/vfe_io.h"
 
-#if defined CONFIG_ARCH_SUN8IW1P1
+#if defined CONFIG_ARCH_SUN3IW1P1
+#define ADDR_BIT_R_SHIFT 0
+#define CLK_POL 0
+#elif defined CONFIG_ARCH_SUN8IW1P1
 #define ADDR_BIT_R_SHIFT 0
 #define CLK_POL 0
 #elif defined CONFIG_ARCH_SUN8IW3P1

@@ -17,6 +17,140 @@ static __u32 backup_ccu_uart_reset;
 static __u32 backup_gpio_uart;
 static __u32 serial_inited_flag;
 static __u32 backup_port_id;
+
+#ifdef CONFIG_ARCH_SUN3I
+static __u32 set_serial_clk(__u32 mmu_flag)
+{
+	__u32 src_freq = 0;
+	__u32 p2clk = 0;
+
+	volatile unsigned int *reg = (volatile unsigned int *)(0);
+	__ccmu_reg_list_t *ccu_reg = (__ccmu_reg_list_t *) (0);
+	__ccmu_ahb1_ratio_reg0054_t apb1_reg;
+
+	__u32 port = 0;
+	__u32 i = 0;
+
+	if (1 == mmu_flag)
+		ccu_reg = (__ccmu_reg_list_t *) IO_ADDRESS(AW_CCM_BASE);
+	else
+		ccu_reg = (__ccmu_reg_list_t *) (AW_CCM_BASE);
+
+	apb1_reg.dwval = ccu_reg->Ahb1Div.dwval;
+
+	switch (apb1_reg.bits.Ahb1ClkSrc) {
+	case 0:
+		src_freq = 32000;	/*32k */
+		break;
+	case 1:
+		src_freq = 24000000;	/*24M */
+		break;
+	case 2:
+		src_freq = 528000000;
+		break;
+	case 3:
+		src_freq = 528000000 / (apb1_reg.bits.Ahb1PreDiv + 1);
+		break;
+	default:
+		break;
+	}
+
+	p2clk = src_freq  / ((1 << apb1_reg.bits.Ahb1Div) *
+		(1 << (apb1_reg.bits.Apb1Div > 1 ? apb1_reg.bits.Apb1Div : 1)));
+
+	/*notice:
+	 ** not all the p2clk is able to create the specified baudrate.
+	 ** unproper p2clk may result in unacceptable baudrate, just because
+	 ** the uartdiv is not proper and the baudrate err exceed the
+	 ** acceptable range.
+	 */
+	if (mmu_flag) {
+		/*backup apb1 gating; */
+		backup_ccu_uart =
+		    *(volatile unsigned int *)(IO_ADDRESS(AW_CCU_UART_PA));
+		/*backup uart reset */
+		backup_ccu_uart_reset =
+		    *(volatile unsigned int
+		      *)(IO_ADDRESS(AW_CCU_UART_RESET_PA));
+
+		/*de-assert uart reset */
+		reg =
+		    (volatile unsigned int *)(IO_ADDRESS(AW_CCU_UART_RESET_PA));
+		*reg &= ~(1 << (20 + port));
+		for (i = 0; i < 100; i++)
+			;
+		*reg |= (1 << (20 + port));
+		/*config uart clk: apb1 gating. */
+		reg = (volatile unsigned int *)(IO_ADDRESS(AW_CCU_UART_PA));
+		*reg &= ~(1 << (20 + port));
+		for (i = 0; i < 100; i++)
+			;
+		*reg |= (1 << (20 + port));
+
+	} else {
+		/*de-assert uart reset */
+		reg = (volatile unsigned int *)(AW_CCU_UART_RESET_PA);
+		*reg &= ~(1 << (20 + port));
+		for (i = 0; i < 100; i++)
+			;
+		*reg |= (1 << (20 + port));
+		/*config uart clk */
+		reg = (volatile unsigned int *)(AW_CCU_UART_PA);
+		*reg &= ~(1 << (20 + port));
+		for (i = 0; i < 100; i++)
+			;
+		*reg |= (1 << (20 + port));
+	}
+
+	return p2clk;
+}
+
+static void set_serial_gpio(__u32 mmu_flag, __u32 port_id)
+{
+	__u32 i = 0;
+	volatile unsigned int *reg = (volatile unsigned int *)(0);
+
+	if (port_id != 1)
+		return;
+
+	/* config uart gpio */
+	/* config tx gpio */
+	/*fpga not need care gpio config; */
+
+	if (mmu_flag) {
+		/*backup gpio */
+		backup_gpio_uart =
+		    *(volatile unsigned int *)(IO_ADDRESS(AW_UART_GPIO_PA));
+		reg = (__u32 *) (IO_ADDRESS(AW_UART_GPIO_PA));
+	} else {
+		reg = (__u32 *) (AW_UART_GPIO_PA);
+	}
+
+	*reg &= ~(0x7777);
+	for (i = 0; i < 100; i++)
+			;
+	*reg |= (0x5555);
+	return;
+}
+
+void serial_exit(void)
+{
+	/*restore apb2 gating; */
+	*(volatile unsigned int *)(IO_ADDRESS(AW_CCU_UART_PA)) =
+	    backup_ccu_uart;
+	/*restore uart reset */
+	*(volatile unsigned int *)(IO_ADDRESS(AW_CCU_UART_RESET_PA)) =
+	    backup_ccu_uart_reset;
+	/*restore gpio */
+	*(volatile unsigned int *)(IO_ADDRESS(AW_UART_GPIO_PA)) =
+	    backup_gpio_uart;
+
+	serial_exit_manager();
+	return;
+}
+#endif
+
+
 #ifdef CONFIG_ARCH_SUN8I
 /*notice: sun8iw8 use uart2, this interface need support this.*/
 static __u32 set_serial_clk(__u32 mmu_flag)
@@ -395,11 +529,18 @@ static void serial_put_char_nommu(char c)
 {
 	while (!(readl(SUART_USR_PA) & 2))
 		;
+
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	asm volatile ("dsb");
 	asm volatile ("isb");
+#endif
+
 	writel(c, SUART_THR_PA);
+
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	asm volatile ("dsb");
 	asm volatile ("isb");
+#endif
 
 	return;
 }
@@ -500,11 +641,18 @@ static void serial_put_char(char c)
 {
 	while (!(readl(SUART_USR) & 2))
 		;
+
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	asm volatile ("dsb");
 	asm volatile ("isb");
+#endif
+
 	writel(c, SUART_THR);
+
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	asm volatile ("dsb");
 	asm volatile ("isb");
+#endif
 
 	return;
 }

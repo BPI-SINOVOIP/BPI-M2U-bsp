@@ -16,6 +16,8 @@ struct sunxi_disp_source_ops
 	int (*sunxi_lcd_dsi_dcs_write)(unsigned int scree_id, unsigned char command, unsigned char *para, unsigned int para_num);
 	int (*sunxi_lcd_dsi_gen_write)(unsigned int scree_id, unsigned char command, unsigned char *para, unsigned int para_num);
 	int (*sunxi_lcd_dsi_clk_enable)(u32 screen_id, u32 en);
+	int (*sunxi_lcd_dsi_open)(unsigned int scree_id);
+	int (*sunxi_lcd_dsi_close)(unsigned int scree_id);
 	int (*sunxi_lcd_backlight_enable)(unsigned int screen_id);
 	int (*sunxi_lcd_backlight_disable)(unsigned int screen_id);
 	int (*sunxi_lcd_pwm_enable)(unsigned int screen_id);
@@ -47,11 +49,16 @@ s32 bsp_disp_get_lcd_registered(u32 disp);
 s32 bsp_disp_get_hdmi_registered(void);
 s32 bsp_disp_get_output_type(u32 disp);
 s32 bsp_disp_device_switch(int disp, enum disp_output_type output_type, enum disp_output_type mode);
-s32 bsp_disp_eink_update(struct disp_eink_manager* manager, void * src_image, enum eink_update_mode mode, struct area_info* area);
+s32 bsp_disp_device_set_config(int disp, struct disp_device_config *config);
+s32 bsp_disp_eink_update(struct disp_eink_manager *manager,
+			struct disp_layer_config *config,
+			unsigned int layer_num,
+			enum eink_update_mode mode,
+			struct area_info *update_area);
+
 s32 bsp_disp_eink_set_temperature(struct disp_eink_manager* manager, unsigned int temp);
 s32 bsp_disp_eink_get_temperature(struct disp_eink_manager* manager);
-
-
+s32 bsp_disp_eink_op_skip(struct disp_eink_manager *manager, unsigned int en);
 
 s32 bsp_disp_set_hdmi_func(struct disp_device_func * func);
 s32 bsp_disp_hdmi_check_support_mode(u32 disp, enum disp_output_type mode);
@@ -59,6 +66,7 @@ s32 bsp_disp_hdmi_set_detect(bool hpd);
 s32 bsp_disp_sync_with_hw(disp_bsp_init_para * para);
 s32 bsp_disp_get_fps(u32 disp);
 s32 bsp_disp_get_health_info(u32 disp, disp_health_info *info);
+s32 bsp_disp_set_edp_func(struct disp_tv_func *func);
 
 //lcd
 s32 bsp_disp_lcd_set_panel_funs(char *name, disp_lcd_panel_fun * lcd_cfg);
@@ -90,6 +98,11 @@ s32 bsp_disp_tv_resume(void);
 extern s32   dsi_dcs_wr(u32 sel, u8 cmd, u8* para_p, u32 para_num);
 extern s32   dsi_gen_wr(u32 sel,u8 cmd,u8* para_p,u32 para_num);
 extern s32   dsi_clk_enable(u32 sel, u32 en);
+s32 bsp_disp_lcd_dsi_open(u32 disp);
+s32 bsp_disp_lcd_dsi_close(u32 disp);
+s32 bsp_disp_lcd_dsi_clk_enable(u32 disp, u32 en);
+s32 bsp_disp_lcd_dsi_dcs_wr(u32 disp, u8 command, u8 *para, u32 para_num);
+s32 bsp_disp_lcd_dsi_gen_wr(u32 disp, u8 command, u8 *para, u32 para_num);
 
 extern struct disp_manager* disp_get_layer_manager(u32 disp);
 
@@ -104,4 +117,3 @@ s32 bsp_disp_is_in_vb(void);
 #endif
 
 #endif
-

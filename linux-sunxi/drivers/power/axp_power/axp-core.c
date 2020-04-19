@@ -19,6 +19,7 @@ static LIST_HEAD(axp_dev_list);
 static DEFINE_SPINLOCK(axp_list_lock);
 int axp_dev_register_count;
 struct work_struct axp_irq_work;
+int axp_usb_connect;
 
 void axp_platform_ops_set(int pmu_num, struct axp_platform_ops *ops)
 {
@@ -42,6 +43,12 @@ s32 axp_usb_vbus_output(int high)
 	return ap_ops[0].usb_vbus_output(high);
 }
 EXPORT_SYMBOL_GPL(axp_usb_vbus_output);
+
+int axp_usb_is_connected(void)
+{
+	return axp_usb_connect;
+}
+EXPORT_SYMBOL_GPL(axp_usb_is_connected);
 
 int config_pmux_para(int num, struct aw_pm_info *api, int *pmu_id)
 {
@@ -1502,9 +1509,31 @@ struct class axp_class = {
 	.class_attrs = axp_class_attrs,
 };
 
+#ifdef CONFIG_AXP_TWI_USED
+#include <linux/reboot.h>
+#include <linux/cpufreq.h>
+
+static int axp_reboot_notifier_call(struct notifier_block *this,
+				unsigned long code, void *_cmd)
+{
+	disable_cpufreq();
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block axp_reboot_notifier = {
+	.notifier_call = axp_reboot_notifier_call,
+};
+#endif
+
 static s32 __init axp_core_init(void)
 {
 	class_register(&axp_class);
+
+#ifdef CONFIG_AXP_TWI_USED
+	/* register reboot notifier for process axp when reboot */
+	register_reboot_notifier(&axp_reboot_notifier);
+#endif
+
 	return 0;
 }
 arch_initcall(axp_core_init);

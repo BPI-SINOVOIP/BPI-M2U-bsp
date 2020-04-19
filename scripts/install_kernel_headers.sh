@@ -3,7 +3,6 @@
 # ref(https://github.com/longsleep/build-pin64-image)
 #
 
-
 die() {
         echo "$*" >&2
         exit 1
@@ -11,45 +10,41 @@ die() {
 
 [ -s "./env.sh" ] || die "please run ./configure first."
 
-set -e
-
 . ./env.sh
-
-set -e
 
 LINUX="$TOPDIR/linux-sunxi"
 DEST="$LINUX/output"
 
 echo "Using Linux from $LINUX ..."
 
-VERSION=$(strings $LINUX/arch/arm/boot/Image |grep "Linux version"|awk '{print $3}')
+VERSION=$(strings $LINUX/arch/$ARCH/boot/Image |grep "Linux version"|awk '{print $3}')
 echo "Kernel build version $VERSION ..."
 if [ -z "$VERSION" ]; then
 	echo "Failed to get build version, correct <linux-folder>?"
 	exit 1
 fi
 
-LINUX_ARCH=arm
-CROSS_COMPILE=arm-linux-gnueabihf-
+CROSS_COMPILE=$1
 
 cd $LINUX
 
 TARGET="$DEST/usr/src/linux-headers-$VERSION"
 mkdir -p "$TARGET"
 cp -a Makefile "$TARGET"
-mkdir -p "$TARGET/arch/$LINUX_ARCH"
-cp -a arch/$LINUX_ARCH/Makefile "$TARGET/arch/$LINUX_ARCH"
+mkdir -p "$TARGET/arch/$ARCH"
+cp -a arch/$ARCH/Makefile "$TARGET/arch/$ARCH"
 cp -a Module.symvers "$TARGET"
 
 # Install Kernel headers
-make ARCH=$LINUX_ARCH CROSS_COMPILE=$CROSS_COMPILE headers_install INSTALL_HDR_PATH="$TARGET"
+make ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE headers_install INSTALL_HDR_PATH="$TARGET"
 
 tar cfh - include | (cd "$TARGET"; umask 000; tar xsf -)
 tar cfh - scripts | (cd "$TARGET"; umask 000; tar xsf -)
-find . -path './scripts/*'   -prune -o -path './Documentation/*' -prune -o  \
-               -path './debian/*'    -prune -o -type f                      \
-               \( -name Makefile -o  -name 'Kconfig*' \) -print  |          \
-                  cpio -pd --preserve-modification-time "$TARGET";
+find . -path './scripts/*'   -prune -o \
+       -path './Documentation/*' -prune -o  \
+       -path './output/*'    -prune -o -type f  \
+       \( -name Makefile -o  -name 'Kconfig*' \) -print  | \
+       cpio -pd --preserve-modification-time "$TARGET";
 
 # Clean compile host executables and replace some with target arch.
 find "$TARGET/scripts" -type f | while read i; do if file -b $i | egrep -q "^ELF.*executable"; then rm "$i"; fi; done
@@ -65,14 +60,20 @@ find "$TARGET/scripts" -type f | while read i; do if file -b $i | egrep -q "^ELF
 (cd scripts/mod && ${CROSS_COMPILE}gcc mk_elfconfig.c -o "$TARGET/scripts/mod/mk_elfconfig")
 (cd scripts/genksyms && ${CROSS_COMPILE}gcc genksyms.c parse.tab.c lex.lex.c -o "$TARGET/scripts/genksyms/genksyms")
 
-find arch/$LINUX_ARCH/include   \
+find arch/*/include   \
                -print | cpio -pdL --preserve-modification-time "$TARGET";
 
 mkdir -p "$TARGET/arch/um"
 cp -a arch/um/Makefile* "$TARGET/arch/um/"
-mkdir -p "$TARGET/arch/$LINUX_ARCH/kernel"
-cp -a arch/$LINUX_ARCH/kernel/asm-offsets.s "$TARGET/arch/$LINUX_ARCH/kernel"
+mkdir -p "$TARGET/arch/$ARCH/kernel"
+cp -a arch/$ARCH/kernel/asm-offsets.s "$TARGET/arch/$ARCH/kernel"
 rm -f "$TARGET/include/linux/version.h"
 cp -a .config "$TARGET/"
+
+# link source for module build
+rm $DEST/lib/modules/$VERSION/build
+rm $DEST/lib/modules/$VERSION/source
+ln -sf "/usr/src/linux-headers-$VERSION" "$DEST/lib/modules/$VERSION/build"
+ln -sf "/usr/src/linux-headers-$VERSION" "$DEST/lib/modules/$VERSION/source"
 
 echo "Done - installed Kernel headers to $DEST"

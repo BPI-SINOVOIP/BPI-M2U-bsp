@@ -32,7 +32,7 @@
 #define SUNXI_SS_BASE                       SUNXI_CE_BASE
 
 //CPUX
-#define SUNXI_CPUXCFG_BASE                  (0x09010000L)
+#define SUNXI_CPUX_CFG_BASE                  (0x09010000L)
 #define SUNXI_DE_BASE                       (0x01000000L)
 
 /*sys ctrl*/
@@ -43,15 +43,17 @@
 #define SUNXI_SPINLOCK_BASE                 (0x03004000L)
 #define SUNXI_HSTMR_BASE                    (0x03005000L)
 #define SUNXI_SID_BASE                      (0x03006000L)
+#define SUNXI_SID_SRAM                      (SUNXI_SID_BASE + 0x200)
 #define SUNXI_SMC_BASE                      (0x03007000L)
 #define SUNXI_SPC_BASE                      (0x03008000L)
 #define SUNXI_TIMER_BASE                    (0x03009000L)
 #define SUNXI_PWM_BASE                      (0x0300A000L)
 #define SUNXI_PIO_BASE                      (0x0300B000L)
+#define SUNXI_R_PIO_BASE                    (0x07022000L)
 #define SUNXI_PSI_BASE                      (0x0300C000L)
 #define SUNXI_DCU_BASE                      (0x03010000L)
 #define SUNXI_GIC_BASE                      (0x03020000L)
-#define SUNXI_IOMMU_BASE                    (0x0303D000L)
+#define SUNXI_IOMMU_BASE                    (0x030F0000L)
 
 /*storage*/
 #define SUNXI_DRAMCTL0_BASE                 (0x04002000L)
@@ -81,7 +83,7 @@
 #define SUNXI_KEYADC_BASE                   SUNXI_LRADC_BASE
 
 #define SUNXI_USBOTG_BASE                   (0x05100000L)
-#define SUNXI_EHCI0_BASE                    (0x05200000L)
+#define SUNXI_EHCI0_BASE                    (0x05101000L)
 #define SUNXI_EHCI1_BASE                    (0x05311000L)
 
 #define SUNXI_LCD0_BASE                     (0x06511000L)
@@ -101,8 +103,24 @@
 #define SUNXI_RTWI_BASE                     (0x07081400L)
 #define SUNXI_RRSB_BASE                     (0x07083000L)
 
-#define RVBARADDR0_L                        (SUNXI_CPUXCFG_BASE+0x40)
-#define RVBARADDR0_H                        (SUNXI_CPUXCFG_BASE+0x44)
+#define PLL_CTRL_REG1                       (SUNXI_RPRCM_BASE + 0x244)
+#define RES_CAL_CTRL_REG                    (SUNXI_RPRCM_BASE + 0x310)
 
+#define SUNXI_RTWI_BRG_REG					(SUNXI_RPRCM_BASE+0x019c)
+#define SUNXI_RTWI0_RST_BIT					(16)
+#define SUNXI_RTWI0_GATING_BIT				(0)
+
+#define RVBARADDR0_L                        (SUNXI_CPUX_CFG_BASE+0x40)
+#define RVBARADDR0_H                        (SUNXI_CPUX_CFG_BASE+0x44)
+
+#define GPIO_BIAS_MAX_LEN (32)
+#define GPIO_BIAS_MAIN_NAME "gpio_bias"
+#define GPIO_POW_MODE_REG (0x0340)
+#define GPIO_3_3V_MODE 0
+#define GPIO_1_8V_MODE 1
+
+/*dram_para_offset is the numbers of u32 before dram data sturcture(dram_para) in struct arisc_para*/
+#define SCP_DRAM_PARA_OFFSET                 (sizeof(u32) * 2)
+#define SCP_DARM_PARA_NUM	             (32)
 
 #endif

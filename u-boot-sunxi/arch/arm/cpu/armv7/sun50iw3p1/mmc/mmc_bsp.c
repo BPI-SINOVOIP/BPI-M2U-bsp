@@ -135,11 +135,11 @@ static int mmc_clk_io_onoff(int sdc_no, int onoff, const normal_gpio_cfg *gpio_i
 	}
 	else // if(sdc_no == 2)
 	{
-		boot_set_gpio((void *)(gpio_info + offset), 10, 1);
+		boot_set_gpio((void *)(gpio_info + offset), 12, 1);
 	}
 	/* config ahb clock */
 	rval = readl(mmchost->hclkbase);
-	rval |= (1 << (0 + sdc_no));
+	rval |= (1 << (sdc_no));
 	writel(rval, mmchost->hclkbase);
 
 	rval = readl(mmchost->hclkrst);
@@ -361,7 +361,10 @@ static int mmc_get_timing_cfg_tm4(u32 sdc_no, u32 spd_md_id, u32 freq_id, u8 *od
 				}
 			}
 
-			*odly = 0;
+			if (spd_md_id == HSDDR52_DDR50)
+				*odly = 1;
+			else
+				*odly = 0;
 			*sdly = dly;
 			mmcdbg("%s: %d %d 0x%x 0x%x, odly %d sdly %d\n", __FUNCTION__, spd_md_id, freq_id, spd_md_sdly, dly, *odly, *sdly);
 		}
@@ -398,12 +401,13 @@ static int mmc_get_timing_cfg(u32 sdc_no, u32 spd_md_id, u32 freq_id, u8 *odly, 
 static int _get_pll_periph0(void)
 {
 	unsigned int reg_val;
-	int factor_n, factor_k, pll6;
+	int factor_n, factor_m0, factor_m1, pll6;
 
-	reg_val = readl(CCMU_PLL_PERIPH0_CTRL_REG);
-	factor_n = ((reg_val >> 8) & 0x1f) + 1;
-	factor_k = ((reg_val >> 4) & 0x03) + 1;
-	pll6 = 24 * factor_n * factor_k/2;
+	reg_val = readl(CCMU_PLL_PERI0_CTRL_REG);
+	factor_n = ((reg_val >> 8) & 0xff) + 1;
+	factor_m0 = (reg_val & 0x01) + 1;
+	factor_m1 = ((reg_val >> 1 ) & 0x01) +1;
+	pll6 = ((24 * factor_n) /(factor_m0 * factor_m1)) >> 2;
 	return pll6;
 }
 
@@ -444,7 +448,7 @@ static int mmc_set_mclk(struct sunxi_mmc_host* mmchost, u32 clk_hz)
 	}
 
 	//rval = (1U << 31) | (src << 24) | (n << 16) | (m - 1);
-	rval = (src << 24) | (n << 16) | (m - 1);
+	rval = (src << 24) | (n << 8) | (m - 1);
 	writel(rval, mmchost->mclkbase);
 
 	return 0;
@@ -456,8 +460,8 @@ static unsigned mmc_get_mclk(struct sunxi_mmc_host* mmchost)
 	unsigned rval = readl(mmchost->mclkbase);
 
 	m = rval & 0xf;
-	n = (rval>>16) & 0x3;
-	src = (rval>>24) & 0x3;
+	n = (rval >> 8) & 0x3;
+	src = (rval >> 24) & 0x3;
 
 	if (src == 0)
 		sclk_hz = 24000000;
@@ -469,7 +473,7 @@ static unsigned mmc_get_mclk(struct sunxi_mmc_host* mmchost)
 		mmcinfo("%s: wrong clock source %d\n",__func__, src);
 	}
 
-	return (sclk_hz / (1<<n) / (m+1) );
+	return (sclk_hz / (1 << n) / (m+1));
 }
 
 static unsigned mmc_config_delay(struct sunxi_mmc_host* mmchost, u32 spd_md_id, u32 freq_id)
@@ -778,14 +782,21 @@ static void mmc_ddr_mode_onoff(struct mmc *mmc, int on)
 	rval = readl(&mmchost->reg->gctrl);
 	rval &= (~(1U << 10));
 
+	/*disable ccu clock*/
+	writel(readl(mmchost->mclkbase) & (~(1 << 31)),mmchost->mclkbase);
+	mmcdbg("disable mmc %d mclk %x\n", mmchost->mmc_no, readl(mmchost->mclkbase));
 	if (on) {
 		rval |= (1U << 10);
 		writel(rval, &mmchost->reg->gctrl);
-		mmcdbg("set %d rgctrl 0x%x to enable ddr mode\n", mmchost->mmc_no, readl(&mmchost->reg->gctrl));
+		mmcdbg("set mmc %d rgctrl 0x%x to enable ddr mode\n", mmchost->mmc_no, readl(&mmchost->reg->gctrl));
 	} else {
 		writel(rval, &mmchost->reg->gctrl);
-		mmcdbg("set %d rgctrl 0x%x to disable ddr mode\n", mmchost->mmc_no, readl(&mmchost->reg->gctrl));
+		mmcdbg("set mmc %d rgctrl 0x%x to disable ddr mode\n", mmchost->mmc_no, readl(&mmchost->reg->gctrl));
 	}
+
+	/*enable ccu clock*/
+	writel(readl(mmchost->mclkbase)|(1<<31), mmchost->mclkbase);
+	mmcdbg("enable mmc %d mclk %x\n", mmchost->mmc_no, readl(mmchost->mclkbase));
 }
 
 static void mmc_hs400_mode_onoff(struct mmc *mmc, int on)
@@ -1254,6 +1265,11 @@ void mmc_update_host_caps(int sdc_no)
 		mmc->f_max_ddr = ext_f_max * 1000000;
 	if (ext_f_max && ((mmc->f_max/1000000) > ext_f_max))
 		mmc->f_max = ext_f_max * 1000000;
+
+	/*set bias according to uboot burning info*/
+	if(priv_info->ext_para1 & EXT_PARA1_1V8_GPIO_BIAS)
+		writel(readl(SUNXI_PIO_BASE + GPIO_POW_MODE_REG) |
+		(1 << 2), SUNXI_PIO_BASE + GPIO_POW_MODE_REG);
 #endif
 }
 
@@ -1303,6 +1319,7 @@ int sunxi_mmc_init(int sdc_no, unsigned bus_width, const normal_gpio_cfg *gpio_i
 	}
 
 	mmc_clk_io_onoff(sdc_no, 1, gpio_info, offset);
+	mmcinfo("mmc %d bias %x\n", sdc_no, readl(SUNXI_PIO_BASE + GPIO_POW_MODE_REG));
 	ret = mmc_register(sdc_no, mmc);
 	if (ret < 0){
 		mmcinfo("mmc %d register failed\n",sdc_no);

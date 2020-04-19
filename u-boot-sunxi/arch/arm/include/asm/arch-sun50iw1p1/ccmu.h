@@ -125,5 +125,21 @@
 #define DMA_GATING_PASS                     (1)
 #define DMA_GATING_BIT                      (6)
 
+/* ehci */
+#define BUS_CLK_GATING_REG 0x60
+#define BUS_SOFTWARE_RESET_REG 0x2c0
+#define USBPHY_CONFIG_REG 0xcc
+
+#define USBEHCI0_RST_BIT 24
+#define USBEHCI0_GATIING_BIT 24
+#define USBPHY0_RST_BIT 0
+#define USBPHY0_SCLK_GATING_BIT 8
+
+#define USBEHCI1_RST_BIT 25
+#define USBEHCI1_GATIING_BIT 25
+#define USBPHY1_RST_BIT 1
+#define USBPHY1_SCLK_GATING_BIT 9
+
+
 #endif
 

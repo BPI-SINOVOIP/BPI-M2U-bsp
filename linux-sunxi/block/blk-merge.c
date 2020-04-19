@@ -9,6 +9,8 @@
 
 #include "blk.h"
 
+extern int sunxi_crypt_need_crypt(struct bio *bio);
+
 static unsigned int __blk_recalc_rq_segments(struct request_queue *q,
 					     struct bio *bio)
 {
@@ -208,6 +210,71 @@ int blk_rq_map_sg(struct request_queue *q, struct request *rq,
 	return nsegs;
 }
 EXPORT_SYMBOL(blk_rq_map_sg);
+
+int sunxi_blk_rq_map_sg(struct request_queue *q, struct request *rq,
+		  struct scatterlist *sglist)
+{
+	struct bio_vec *bvec, *bvprv;
+	struct bio *bio;
+	struct scatterlist *sg;
+	int nsegs, cluster;
+	int crypt_flags = 0;
+	nsegs = 0;
+	cluster = blk_queue_cluster(q);
+
+	/*
+	 * for each bio in rq
+	 */
+	bvprv = NULL;
+	sg = NULL;
+	if (rq->bio) {
+		bio = rq->bio;
+#if defined(CONFIG_DM_CRYPT) && defined(CONFIG_SUNXI_EMCE)
+		crypt_flags = sunxi_crypt_need_crypt(bio);
+#endif
+		for (bio = rq->bio; bio; bio = bio->bi_next) {
+			int i;
+			for (i = bio->bi_idx; i < bio->bi_vcnt; i++) {
+				bvec = &(bio->bi_io_vec[i]);
+				__blk_segment_map_sg(q, bvec, sglist,
+						&bvprv, &sg, &nsegs, &cluster);
+			}
+		}
+	}
+
+	if (sg && crypt_flags)
+		sglist->offset |= (1 << ((sizeof(sglist->offset) << 3) - 1));
+
+	if (unlikely(rq->cmd_flags & REQ_COPY_USER) &&
+	    (blk_rq_bytes(rq) & q->dma_pad_mask)) {
+		unsigned int pad_len =
+			(q->dma_pad_mask & ~blk_rq_bytes(rq)) + 1;
+
+		sg->length += pad_len;
+		rq->extra_len += pad_len;
+	}
+
+	if (q->dma_drain_size && q->dma_drain_needed(rq)) {
+		if (rq->cmd_flags & REQ_WRITE)
+			memset(q->dma_drain_buffer, 0, q->dma_drain_size);
+
+		sg->page_link &= ~0x02;
+		sg = sg_next(sg);
+		sg_set_page(sg, virt_to_page(q->dma_drain_buffer),
+			    q->dma_drain_size,
+			    ((unsigned long)q->dma_drain_buffer) &
+			    (PAGE_SIZE - 1));
+		nsegs++;
+		rq->extra_len += q->dma_drain_size;
+	}
+
+	if (sg)
+		sg_mark_end(sg);
+
+	return nsegs;
+}
+EXPORT_SYMBOL(sunxi_blk_rq_map_sg);
+
 
 /**
  * blk_bio_map_sg - map a bio to a scatterlist

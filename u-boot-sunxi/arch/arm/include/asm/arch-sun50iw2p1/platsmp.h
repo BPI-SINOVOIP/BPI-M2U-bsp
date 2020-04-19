@@ -49,7 +49,7 @@ static inline void sunxi_set_wfi_mode(int cpu)
 
 static inline int sunxi_probe_wfi_mode(int cpu)
 {
-	return readl(SUNXI_CPUX_CFG_BASE + SUNXI_CLUSTER_CPU_STATUS(0)) & (1<<(16 + cpu));
+	return readl(SUNXI_CLUSTER_CPU_STATUS(0)) & (1<<(16 + cpu));
 }
 
 
@@ -57,6 +57,18 @@ static inline void sunxi_set_secondary_entry(void *entry)
 {
 	writel((u32)entry, SUNXI_CPU_ENTRY);
 }
+
+static inline int sunxi_probe_cpu_power_status(int cpu)
+{
+	int val;
+
+	val = readl(SUNXI_CPU_PWR_CLAMP(0, cpu)) & 0xff;
+	if (val == 0xff)
+		return 0;
+
+	return 1;
+}
+
 
 static int cpu_power_switch_set(u32 cluster, u32 cpu, bool enable)
 {

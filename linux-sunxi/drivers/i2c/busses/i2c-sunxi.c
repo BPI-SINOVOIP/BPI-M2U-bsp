@@ -81,9 +81,7 @@ struct sunxi_i2c {
 	unsigned int		msg_idx;
 	unsigned int		msg_ptr;
 
-#ifdef CONFIG_EVB_PLATFORM
 	struct clk         *mclk;
-#endif
 
 	unsigned int     	bus_freq;
 	int					irq;
@@ -99,7 +97,11 @@ static inline void twi_clear_irq_flag(void __iomem *base_addr)
 {
 	unsigned int reg_val = readl(base_addr + TWI_CTL_REG);
 	/* start and stop bit should be 0 */
+#ifdef CONFIG_ARCH_SUN3IW1
+	reg_val &= ~TWI_CTL_INTFLG;
+#else
 	reg_val |= TWI_CTL_INTFLG;
+#endif
 	reg_val &= ~(TWI_CTL_STA | TWI_CTL_STP);
 	writel(reg_val ,base_addr + TWI_CTL_REG);
 	/* read two more times to make sure that interrupt flag does really be cleared */
@@ -149,7 +151,11 @@ static inline void twi_disable_irq(void __iomem *base_addr)
 {
 	unsigned int reg_val = readl(base_addr + TWI_CTL_REG);
 	reg_val &= ~TWI_CTL_INTEN;
+#ifdef CONFIG_ARCH_SUN3IW1
+	reg_val &= ~(TWI_CTL_STA | TWI_CTL_STP);
+#else
 	reg_val &= ~(TWI_CTL_STA | TWI_CTL_STP | TWI_CTL_INTFLG);
+#endif
 	writel(reg_val, base_addr + TWI_CTL_REG);
 }
 
@@ -172,7 +178,9 @@ static inline void twi_set_start(void __iomem *base_addr)
 {
 	unsigned int reg_val = readl(base_addr + TWI_CTL_REG);
 	reg_val |= TWI_CTL_STA;
+#ifndef CONFIG_ARCH_SUN3IW1
 	reg_val &= ~TWI_CTL_INTFLG;
+#endif
 	writel(reg_val, base_addr + TWI_CTL_REG);
 }
 
@@ -205,7 +213,9 @@ static inline void twi_disable_ack(void __iomem  *base_addr)
 {
 	unsigned int reg_val = readl(base_addr + TWI_CTL_REG);
 	reg_val &= ~TWI_CTL_ACK;
+#ifndef CONFIG_ARCH_SUN3IW1
 	reg_val &= ~TWI_CTL_INTFLG;
+#endif
 	writel(reg_val, base_addr + TWI_CTL_REG);
 }
 
@@ -214,7 +224,9 @@ static inline void twi_enable_ack(void __iomem  *base_addr)
 {
 	unsigned int reg_val = readl(base_addr + TWI_CTL_REG);
 	reg_val |= TWI_CTL_ACK;
+#ifndef CONFIG_ARCH_SUN3IW1
 	reg_val &= ~TWI_CTL_INTFLG;
+#endif
 	writel(reg_val, base_addr + TWI_CTL_REG);
 }
 
@@ -409,7 +421,16 @@ static int twi_stop(void __iomem *base_addr, int bus_num)
 	}
 
 	timeout = 0xff;
-	while((TWI_LCR_IDLE_STATUS != readl(base_addr + TWI_LCR_REG))&&(--timeout));
+#ifndef CONFIG_ARCH_SUN3IW1
+	while ((TWI_LCR_IDLE_STATUS != readl(base_addr + TWI_LCR_REG)
+		&& TWI_LCR_NORM_STATUS != readl(base_addr + TWI_LCR_REG))
+		&& (--timeout)) {
+#else
+	while ((TWI_LCR_IDLE_STATUS != readl(base_addr + TWI_LCR_REG))
+		&& (--timeout)) {
+#endif
+		;
+	}
 	if (timeout == 0) {
 		I2C_ERR("[i2c%d] i2c lcr(0x%08x) isn't idle(0x3a)\n", bus_num, readl(base_addr + TWI_LCR_REG));
 		return SUNXI_I2C_TFAIL;
@@ -917,7 +938,6 @@ static const struct i2c_algorithm sunxi_i2c_algorithm = {
 	.functionality	  = sunxi_i2c_functionality,
 };
 
-#ifdef CONFIG_EVB_PLATFORM
 
 static int sunxi_i2c_clk_init(struct sunxi_i2c *i2c)
 {
@@ -962,24 +982,6 @@ static int sunxi_i2c_clk_exit(struct sunxi_i2c *i2c)
 
 	return 0;
 }
-
-#else
-
-static int sunxi_i2c_clk_init(struct sunxi_i2c *i2c)
-{
-	twi_enable_bus(i2c->base_addr);
-	
-	twi_set_clock(24000000, i2c->bus_freq, i2c->base_addr);
-	return 0;
-}
-
-static int sunxi_i2c_clk_exit(struct sunxi_i2c *i2c)
-{
-	twi_disable_bus(i2c->base_addr);
-
-	return 0;
-}
-#endif
 
 static int sunxi_i2c_hw_init(struct sunxi_i2c *i2c, struct sunxi_i2c_platform_data *pdata)
 {
@@ -1197,14 +1199,12 @@ static int sunxi_i2c_probe(struct platform_device *pdev)
 	spin_lock_init(&i2c->lock);
 	init_waitqueue_head(&i2c->wait);
 
-#ifdef CONFIG_EVB_PLATFORM
 	i2c->mclk = of_clk_get(np, 0);
 	if (IS_ERR_OR_NULL(i2c->mclk)) {
 		I2C_ERR("[i2c%d] request TWI clock failed\n", i2c->bus_num);
 		ret = -EIO;
 		goto eremap;
 	}
-#endif
 
 	i2c->adap.algo = &sunxi_i2c_algorithm;
 
@@ -1251,9 +1251,7 @@ static int sunxi_i2c_probe(struct platform_device *pdev)
 	return 0;
 
 eadapt:
-#ifdef CONFIG_EVB_PLATFORM
 	clk_disable_unprepare(i2c->mclk);
-#endif
 
 ehwinit:
 	free_irq(irq, i2c);
@@ -1261,13 +1259,11 @@ ehwinit:
 ereqirq:
 	iounmap(i2c->base_addr);
 
-#ifdef CONFIG_EVB_PLATFORM
 eremap:
 	if (!IS_ERR_OR_NULL(i2c->mclk)) {
 		clk_put(i2c->mclk);
 		i2c->mclk = NULL;
 	}
-#endif
 
 eiomap:
 	release_mem_region(mem_res->start, resource_size(mem_res));
@@ -1291,7 +1287,6 @@ static int sunxi_i2c_remove(struct platform_device *pdev)
 
 	/* disable clock and release gpio */
 	sunxi_i2c_hw_exit(i2c, pdev->dev.platform_data);
-#ifdef CONFIG_EVB_PLATFORM
 	if (IS_ERR_OR_NULL(i2c->mclk)) {
 		I2C_ERR("i2c mclk handle is invalid, just return!\n");
 		return -1;
@@ -1299,7 +1294,6 @@ static int sunxi_i2c_remove(struct platform_device *pdev)
 		clk_put(i2c->mclk);
 		i2c->mclk = NULL;
 	}
-#endif
 
 	iounmap(i2c->base_addr);
 	kfree(i2c);
@@ -1312,7 +1306,6 @@ static int sunxi_i2c_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 static int sunxi_i2c_suspend(struct device *dev)
 {
-#ifdef CONFIG_EVB_PLATFORM
 	struct platform_device *pdev = to_platform_device(dev);
 	struct sunxi_i2c *i2c = platform_get_drvdata(pdev);
 	int count = 10;
@@ -1341,13 +1334,12 @@ static int sunxi_i2c_suspend(struct device *dev)
 	twi_regulator_disable(dev->platform_data);
 
 	I2C_DBG("[i2c%d] suspend okay..\n", i2c->bus_num);
-#endif
+
 	return 0;
 }
 
 static int sunxi_i2c_resume(struct device *dev)
 {
-#ifdef CONFIG_EVB_PLATFORM
 	struct platform_device *pdev = to_platform_device(dev);
 	struct sunxi_i2c *i2c = platform_get_drvdata(pdev);
 
@@ -1370,13 +1362,13 @@ static int sunxi_i2c_resume(struct device *dev)
 	twi_soft_reset(i2c->base_addr);
 
 	I2C_DBG("[i2c%d] resume okay..\n", i2c->bus_num);
-#endif
+
 	return 0;
 }
 
 static const struct dev_pm_ops sunxi_i2c_dev_pm_ops = {
-	.suspend = sunxi_i2c_suspend,
-	.resume = sunxi_i2c_resume,
+	.suspend_late = sunxi_i2c_suspend,
+	.resume_early = sunxi_i2c_resume,
 };
 
 #define SUNXI_I2C_DEV_PM_OPS (&sunxi_i2c_dev_pm_ops)
@@ -1387,6 +1379,7 @@ static const struct dev_pm_ops sunxi_i2c_dev_pm_ops = {
 static const struct of_device_id sunxi_i2c_match[] = {
 	{ .compatible = "allwinner,sun8i-twi", },
 	{ .compatible = "allwinner,sun50i-twi", },
+	{ .compatible = "allwinner,sun3i-twi", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, sunxi_i2c_match);

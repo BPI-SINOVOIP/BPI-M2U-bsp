@@ -363,9 +363,19 @@ static int ptrace_attach(struct task_struct *task, long request,
 
 	__ptrace_link(task, current);
 
-	/* SEIZE doesn't trap tracee on attach */
-	if (!seize)
-		send_sig_info(SIGSTOP, SEND_SIG_FORCED, task);
+
+	/*
+	 * If doing coredump, just convert directly to TASK_TRACED.
+	 * A dying process doesn't process signals normally.
+	 */
+	if (unlikely(task->mm->core_state)) {
+		set_task_state(task, TASK_TRACED);
+	} else {
+		/* SEIZE doesn't trap tracee on attach */
+		if (!seize) {
+			send_sig_info(SIGSTOP, SEND_SIG_FORCED, task);
+		}
+	}
 
 	spin_lock(&task->sighand->siglock);
 

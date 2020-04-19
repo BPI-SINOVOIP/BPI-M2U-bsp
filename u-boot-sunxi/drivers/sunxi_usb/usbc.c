@@ -296,6 +296,11 @@ void USBC_ConfigFIFO_Base(__hdle hUSB, __u32 sram_base, __u32 fifo_mode)
 	if(usbc_otg->port_num == 0){
 		usbc_info->port0_fifo_addr = 0x00;
 		usbc_info->port0_fifo_size = (8 * 1024);	//8k
+#ifdef CONFIG_ARCH_SUN3IW1P1
+		reg_value = USBC_Readl(SUNXI_SRAM_BASE + 0x04);
+		reg_value |= (1 << 0);
+		USBC_Writel(reg_value, (SUNXI_SRAM_BASE + 0x04));
+#endif
 	}
 	return ;
 }

@@ -32,10 +32,9 @@ extern struct _nand_disk *get_disk_from_phy_partition(struct _nand_phy_partition
 extern uint16 get_partitionNO(struct _nand_phy_partition *phy_partition);
 extern int nftl_exit(struct _nftl_blk *nftl_blk);
 extern int NAND_Print_DBG(const char *fmt, ...);
-extern struct _nftl_blk *get_nftl_need_read_claim(struct _nftl_blk *start_blk,
-						  uint32 utc);
+extern struct _nftl_blk *get_nftl_need_read_claim(struct _nftl_blk *start_blk);
 extern int read_reclaim(struct _nftl_blk *start_blk, struct _nftl_blk *nftl_blk,
-			uchar *buf, uint32 utc);
+			uchar *buf);
 
 int _dev_nand_read(struct _nand_dev *nand_dev, __u32 start_sector, __u32 len,
 		   unsigned char *buf);
@@ -51,8 +50,7 @@ int nand_flush(struct nand_blk_dev *dev);
 int add_nand(struct nand_blk_ops *tr,
 	     struct _nand_phy_partition *phy_partition);
 int remove_nand(struct nand_blk_ops *tr);
-unsigned int nand_read_reclaim(struct _nftl_blk *nftl_blk, unsigned char *buf,
-			       uint32 utc);
+unsigned int nand_read_reclaim(struct _nftl_blk *nftl_blk, unsigned char *buf);
 
 /*****************************************************************************
 *Name         :
@@ -63,10 +61,10 @@ unsigned int nand_read_reclaim(struct _nftl_blk *nftl_blk, unsigned char *buf,
 *****************************************************************************/
 int nand_thread(void *arg)
 {
-	unsigned long time, utc, ret, time_val;
+	unsigned long ret, time_val;
 	struct nand_blk_ops *tr = (struct nand_blk_ops *)arg;
 
-	unsigned int start_time = 4800;
+	unsigned int start_time = 600;
 	unsigned char *temp_buf = kmalloc(64 * 1024, GFP_KERNEL);
 
 	time_val = NAND_SCHEDULE_TIMEOUT;
@@ -74,23 +72,11 @@ int nand_thread(void *arg)
 	while (!kthread_should_stop()) {
 		if (start_time != 0) {
 			start_time--;
-			if (start_time < 3)
-				utc = get_seconds();
 			goto nand_thread_exit;
 		}
-
-		time = jiffies;
-		if (time_after(time, nand_active_time + HZ) != 0) {
-			ret =
-			    nand_read_reclaim(tr->nftl_blk_head.nftl_blk_next,
-					      temp_buf, utc);
-			if (ret == 1) {
-				time_val = HZ << 5;	/*32s*/
-				utc = get_seconds();
-			} else {
-				time_val = NAND_SCHEDULE_TIMEOUT;
-			}
-		}
+		ret =
+		    nand_read_reclaim(tr->nftl_blk_head.nftl_blk_next,
+				      temp_buf);
 
 nand_thread_exit:
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -111,7 +97,6 @@ static int nftl_thread(void *arg)
 {
 	struct _nftl_blk *nftl_blk = arg;
 	unsigned long time;
-	int cache_nums;
 	unsigned long swl_time = jiffies;
 	int first_miss_swl = 0;
 	int need_swl = 0;
@@ -120,46 +105,12 @@ static int nftl_thread(void *arg)
 	while (!kthread_should_stop()) {
 		mutex_lock(nftl_blk->blk_lock);
 
-		cache_nums =
-		    nftl_get_zone_write_cache_nums(nftl_blk->nftl_zone);
 		time = jiffies;
-
-		if (cache_nums > 300) {
-			if (time_after
-			    ((unsigned long)time,
-			     (unsigned long)(nand_write_active_time + HZ)) !=
-			    0) {
-				nftl_blk->flush_write_cache(nftl_blk, 32);
-			}
-		} else if (cache_nums > 200) {
-			if (time_after
-			    ((unsigned long)time,
-			     (unsigned long)(nand_write_active_time + HZ)) !=
-			    0) {
-				nftl_blk->flush_write_cache(nftl_blk, 8);
-			}
-		} else if (cache_nums > 100) {
-			if (time_after
-			    ((unsigned long)time,
-			     (unsigned long)(nand_write_active_time + HZ)) !=
-			    0) {
-				nftl_blk->flush_write_cache(nftl_blk, 4);
-			}
-		} else if (cache_nums > 50) {
-			if (time_after
-			    ((unsigned long)time,
-			     (unsigned long)(nand_write_active_time + HZ)) !=
-			    0) {
+		if (time_after((unsigned long)time, (unsigned long)(nand_write_active_time+HZ+HZ)) != 0) {
 				nftl_blk->flush_write_cache(nftl_blk, 2);
-			}
-		} else {
-			if (time_after
-			    ((unsigned long)time,
-			     (unsigned long)(nand_write_active_time + HZ +
-					     HZ)) != 0) {
-				nftl_blk->flush_write_cache(nftl_blk, 2);
-			}
 		}
+
+		static_wear_leveling(nftl_blk->nftl_zone);
 
 #if WEAR_LEVELING
 
@@ -727,19 +678,18 @@ int _dev_nand_write2(char *name, unsigned int start_sector, unsigned int len,
 *Return       :
 *Note         :
 *****************************************************************************/
-uint32 nand_read_reclaim(struct _nftl_blk *start_blk, unsigned char *buf,
-			 uint32 utc)
+uint32 nand_read_reclaim(struct _nftl_blk *start_blk, unsigned char *buf)
 {
 	uint32 ret = 0;
 	struct _nftl_blk *nftl_blk;
 
-	nftl_blk = get_nftl_need_read_claim(start_blk, utc);
+	nftl_blk = get_nftl_need_read_claim(start_blk);
 	if (nftl_blk == NULL)
 		return 1;
 
 	mutex_lock(nftl_blk->blk_lock);
 
-	ret = read_reclaim(start_blk, nftl_blk, buf, utc);
+	ret = read_reclaim(start_blk, nftl_blk, buf);
 
 	mutex_unlock(nftl_blk->blk_lock);
 

@@ -47,7 +47,8 @@
 #define NR_MAX_CHAN	16			/* total of channels */
 #elif defined(CONFIG_ARCH_SUN8IW7) \
 	|| defined(CONFIG_ARCH_SUN50IW2) \
-	|| defined(CONFIG_ARCH_SUN50IW3)
+	|| defined(CONFIG_ARCH_SUN50IW3)\
+	|| defined(CONFIG_ARCH_SUN8IW17)
 #define NR_MAX_CHAN	12			/* total of channels */
 #else
 #define NR_MAX_CHAN	8			/* total of channels */
@@ -64,7 +65,8 @@
 #define DMA_IRQ_STAT(x)	(0x010 + ((x) << 2))	/* Inetrrupt status register */
 
 #if defined(CONFIG_ARCH_SUN9I) \
-	|| defined(CONFIG_ARCH_SUN50I)
+	|| defined(CONFIG_ARCH_SUN50I)\
+	|| defined(CONFIG_ARCH_SUN8IW17)
 #define DMA_SECU	0x20			/* DMA security register */
 #endif
 
@@ -145,7 +147,8 @@
 #endif
 
 #if defined(CONFIG_ARCH_SUN50IW3) \
-	|| defined(CONFIG_ARCH_SUN50IW6)
+	|| defined(CONFIG_ARCH_SUN50IW6)\
+	|| defined(CONFIG_ARCH_SUN8IW17)
 #define SRC_IO_MODE	(0x01 << 8)
 #define SRC_LINEAR_MODE	(0x00 << 8)
 #else
@@ -167,7 +170,8 @@
 #endif
 
 #if defined(CONFIG_ARCH_SUN50IW3) \
-	|| defined(CONFIG_ARCH_SUN50IW6)
+	|| defined(CONFIG_ARCH_SUN50IW6)\
+	|| defined(CONFIG_ARCH_SUN8IW17)
 #define DST_IO_MODE	(0x01 << 24)
 #define DST_LINEAR_MODE	(0x00 << 24)
 #else
@@ -1132,7 +1136,7 @@ static void sunxi_dma_hw_init(struct sunxi_dmadev *dev)
 
 	clk_prepare_enable(sunxi_dev->ahb_clk);
 #if defined(CONFIG_SUNXI_SMC)
-	sunxi_smc_writel(0xff, sunxi_dev->pbase + DMA_SECU);
+	sunxi_smc_writel((1 << NR_MAX_CHAN) - 1, sunxi_dev->pbase + DMA_SECU);
 #endif
 
 #if defined(CONFIG_ARCH_SUN8IW3) || \
@@ -1341,6 +1345,7 @@ static struct platform_device sunxi_dma_device = {
 #else
 static const struct of_device_id sunxi_dma_match[] = {
         { .compatible = "allwinner,sun50i-dma", },
+	{ .compatible = "allwinner,sun8i-dma", },
         {},
 };
 #endif

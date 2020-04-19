@@ -19,14 +19,20 @@
 #ifndef _LINUX_IF_H
 #define _LINUX_IF_H
 
+#ifndef __KERNEL__
+#include <linux/libc-compat.h>
+#endif
 #include <linux/types.h>		/* for "__kernel_caddr_t" et al	*/
 #include <linux/socket.h>		/* for "struct sockaddr" et al	*/
 #include <linux/compiler.h>		/* for "__user" et al           */
 
+#if defined(__KERNEL__) || __DEF_IF_IFNAMSIZ
 #define	IFNAMSIZ	16
+#endif /* __DEF_IF_IFNAMSIZ */
 #define	IFALIASZ	256
 #include <linux/hdlc/ioctl.h>
 
+#if defined(__KERNEL__) || __DEF_IF_NET_DEVICE_FLAGS
 /* Standard interface flags (netdevice->flags). */
 #define	IFF_UP		0x1		/* interface is up		*/
 #define	IFF_BROADCAST	0x2		/* broadcast address valid	*/
@@ -47,11 +53,15 @@
 #define IFF_PORTSEL	0x2000          /* can set media type		*/
 #define IFF_AUTOMEDIA	0x4000		/* auto media select active	*/
 #define IFF_DYNAMIC	0x8000		/* dialup device with changing addresses*/
+#endif /* __DEF_IF_NET_DEVICE_FLAGS */
 
+#if defined(__KERNEL__) || __DEF_IF_NET_DEVICE_FLAGS_LOWER_UP_DORMANT_ECHO
 #define IFF_LOWER_UP	0x10000		/* driver signals L1 up		*/
 #define IFF_DORMANT	0x20000		/* driver signals dormant	*/
 
 #define IFF_ECHO	0x40000		/* echo sent packets		*/
+#endif /* __DEF_IF_NET_DEVICE_FLAGS_LOWER_UP_DORMANT_ECHO */
+
 
 #define IFF_VOLATILE	(IFF_LOOPBACK|IFF_POINTOPOINT|IFF_BROADCAST|IFF_ECHO|\
 		IFF_MASTER|IFF_SLAVE|IFF_RUNNING|IFF_LOWER_UP|IFF_DORMANT)
@@ -139,6 +149,7 @@ enum {
  *	being very small might be worth keeping for clean configuration.
  */
 
+#if defined(__KERNEL__) || __DEF_IF_IFMAP
 struct ifmap {
 	unsigned long mem_start;
 	unsigned long mem_end;
@@ -148,21 +159,22 @@ struct ifmap {
 	unsigned char port;
 	/* 3 bytes spare */
 };
+#endif /* __DEF_IF_IFMAP */
 
 struct if_settings {
 	unsigned int type;	/* Type of physical device or protocol */
 	unsigned int size;	/* Size of the data allocated by the caller */
 	union {
 		/* {atm/eth/dsl}_settings anyone ? */
-		raw_hdlc_proto		__user *raw_hdlc;
-		cisco_proto		__user *cisco;
-		fr_proto		__user *fr;
-		fr_proto_pvc		__user *fr_pvc;
-		fr_proto_pvc_info	__user *fr_pvc_info;
+		raw_hdlc_proto		*raw_hdlc;
+		cisco_proto		*cisco;
+		fr_proto		*fr;
+		fr_proto_pvc		*fr_pvc;
+		fr_proto_pvc_info	*fr_pvc_info;
 
 		/* interface settings */
-		sync_serial_settings	__user *sync;
-		te1_settings		__user *te1;
+		sync_serial_settings	*sync;
+		te1_settings		*te1;
 	} ifs_ifsu;
 };
 
@@ -172,7 +184,7 @@ struct if_settings {
  * definitions which begin with ifr_name.  The
  * remainder may be interface specific.
  */
-
+#if defined(__KERNEL__) || __DEF_IF_IFREQ
 struct ifreq {
 #define IFHWADDRLEN	6
 	union
@@ -192,10 +204,11 @@ struct ifreq {
 		struct  ifmap ifru_map;
 		char	ifru_slave[IFNAMSIZ];	/* Just fits the size */
 		char	ifru_newname[IFNAMSIZ];
-		void __user *	ifru_data;
+		void 	*ifru_data;
 		struct	if_settings ifru_settings;
 	} ifr_ifru;
 };
+#endif /* __DEF_IF_IFREQ */
 
 #define ifr_name	ifr_ifrn.ifrn_name	/* interface name 	*/
 #define ifr_hwaddr	ifr_ifru.ifru_hwaddr	/* MAC address 		*/
@@ -221,14 +234,15 @@ struct ifreq {
  * for machine (useful for programs which
  * must know all networks accessible).
  */
-
+#if defined(__KERNEL__) || __DEF_IF_IFCONF
 struct ifconf  {
 	int	ifc_len;			/* size of buffer	*/
 	union {
-		char __user *ifcu_buf;
-		struct ifreq __user *ifcu_req;
+		char *ifcu_buf;
+		struct ifreq *ifcu_req;
 	} ifc_ifcu;
 };
+#endif /* __DEF_IF_IFCONF */
 #define	ifc_buf	ifc_ifcu.ifcu_buf		/* buffer address	*/
 #define	ifc_req	ifc_ifcu.ifcu_req		/* array of structures	*/
 

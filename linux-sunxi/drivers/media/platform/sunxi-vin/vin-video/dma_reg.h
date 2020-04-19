@@ -3,8 +3,9 @@
 #define __CSIC__DMA__REG__H__
 
 #include <linux/types.h>
+#include <media/sunxi_camera_v2.h>
 
-#define MAX_CSIC_DMA_NUM 4
+#define MAX_CSIC_DMA_NUM 8
 
 /*register value*/
 
@@ -43,17 +44,6 @@ enum output_fmt {
 	FIELD_UV_CB_YUV420_10 = 13,
 	FIELD_VU_CB_YUV422_10 = 14,
 	FIELD_VU_CB_YUV420_10 = 15,
-#if 0
-	/* only when input is yuv420 */
-	FIELD_PLANAR_YUV420 = 1,
-	FRAME_PLANAR_YUV420 = 2,
-	FIELD_UV_CB_YUV420 = 5,
-	FRAME_UV_CB_YUV420 = 6,
-	FIELD_VU_CB_YUV420 = 9,
-	FRAME_VU_CB_YUV420 = 10,
-	FIELD_UV_CB_YUV420_10 = 13,
-	FIELD_VU_CB_YUV420_10 = 15,
-#endif
 };
 
 /*
@@ -169,8 +159,13 @@ struct dma_pclk_statistic {
 };
 
 int csic_dma_set_base_addr(unsigned int sel, unsigned long addr);
+int csic_dma_get_frame_cnt(unsigned int sel);
 void csic_dma_enable(unsigned int sel);
 void csic_dma_disable(unsigned int sel);
+void csic_fbc_enable(unsigned int sel);
+void csic_fbc_disable(unsigned int sel);
+void csic_frame_cnt_enable(unsigned int sel);
+void csic_frame_cnt_disable(unsigned int sel);
 void csic_dma_clk_cnt_en(unsigned int sel, unsigned int en);
 void csic_dma_clk_cnt_sample(unsigned int sel, unsigned int en);
 
@@ -182,6 +177,8 @@ void csic_dma_buffer_address(unsigned int sel, enum fifo_buf_sel buf,
 				unsigned long addr);
 void csic_dma_buffer_length(unsigned int sel, struct dma_buf_len *buf_len);
 void csic_dma_flip_size(unsigned int sel, struct dma_flip_size *flip_size);
+void csic_dma_line_cnt(unsigned int sel, int line);
+void csic_dma_frm_cnt(unsigned int sel, struct csi_sync_ctrl *sync);
 void csic_dma_cap_status(unsigned int sel, struct dma_capture_status *status);
 void csic_dma_int_enable(unsigned int sel,	enum dma_int_sel interrupt);
 void csic_dma_int_disable(unsigned int sel, enum dma_int_sel interrupt);

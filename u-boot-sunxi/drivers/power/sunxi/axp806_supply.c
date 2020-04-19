@@ -1086,9 +1086,9 @@ static int axp806_set_cldo2(int set_vol, int onoff)
 		{
 			set_vol = 700;
 		}
-		else if(set_vol > 1900)
+		else if(set_vol > 4200)
 		{
-			set_vol = 1900;
+			set_vol = 4200;
 		}
 		if(axp_i2c_read(AXP806_ADDR, BOOT_POWER806_CLDO2OUT_VOL, &reg_value))
 		{
@@ -1170,9 +1170,9 @@ static int axp806_set_cldo3(int set_vol, int onoff)
 		{
 			set_vol = 700;
 		}
-		else if(set_vol > 1900)
+		else if(set_vol > 3300)
 		{
-			set_vol = 1900;
+			set_vol = 3300;
 		}
 		if(axp_i2c_read(AXP806_ADDR, BOOT_POWER806_CLDO3OUT_VOL, &reg_value))
 		{

@@ -29,6 +29,8 @@
 #include <linux/idr.h>
 #include <linux/notifier.h>
 #include <linux/err.h>
+#include <linux/debugfs.h>
+#include "iommu-debug.h"
 
 static struct kset *iommu_group_kset;
 static struct ida iommu_group_ida;
@@ -642,6 +644,33 @@ void iommu_set_fault_handler(struct iommu_domain *domain,
 }
 EXPORT_SYMBOL_GPL(iommu_set_fault_handler);
 
+
+/**
+ * iommu_reg_read() - read an IOMMU register
+ *
+ * Reads the IOMMU register at the given offset.
+ */
+unsigned long iommu_reg_read(struct iommu_domain *domain, unsigned long offset)
+{
+	if (domain->ops->reg_read)
+		return domain->ops->reg_read(domain, offset);
+	return 0;
+}
+
+/**
+ * iommu_reg_write() - write an IOMMU register
+ *
+ * Writes the given value to the IOMMU register at the given offset.
+ */
+void iommu_reg_write(struct iommu_domain *domain, unsigned long offset,
+		     unsigned long val)
+{
+	if (domain->ops->reg_write)
+		domain->ops->reg_write(domain, offset, val);
+}
+
+struct iommu_domain *global_single_domain;
+
 struct iommu_domain *iommu_domain_alloc(struct bus_type *bus)
 {
 	struct iommu_domain *domain;
@@ -660,6 +689,7 @@ struct iommu_domain *iommu_domain_alloc(struct bus_type *bus)
 	if (ret)
 		goto out_free;
 
+	global_single_domain = domain;
 	return domain;
 
 out_free:
@@ -668,6 +698,7 @@ out_free:
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(iommu_domain_alloc);
+EXPORT_SYMBOL_GPL(global_single_domain);
 
 void iommu_domain_free(struct iommu_domain *domain)
 {
@@ -680,10 +711,16 @@ EXPORT_SYMBOL_GPL(iommu_domain_free);
 
 int iommu_attach_device(struct iommu_domain *domain, struct device *dev)
 {
+	int ret;
 	if (unlikely(domain->ops->attach_dev == NULL))
 		return -ENODEV;
 
-	return domain->ops->attach_dev(domain, dev);
+	iommu_debug_domain_add(domain);
+	ret = domain->ops->attach_dev(domain, dev);
+	if (!ret)
+		iommu_debug_attach_device(domain, dev);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(iommu_attach_device);
 
@@ -692,7 +729,9 @@ void iommu_detach_device(struct iommu_domain *domain, struct device *dev)
 	if (unlikely(domain->ops->detach_dev == NULL))
 		return;
 
+	iommu_debug_detach_device(domain, dev);
 	domain->ops->detach_dev(domain, dev);
+	iommu_debug_domain_remove(domain);
 }
 EXPORT_SYMBOL_GPL(iommu_detach_device);
 
@@ -763,9 +802,10 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 	int ret = 0;
 
 	if (unlikely(domain->ops->unmap == NULL ||
-		     domain->ops->pgsize_bitmap == 0UL))
+		     domain->ops->pgsize_bitmap == 0UL)) {
+		pr_err("%s, %d, iommu_ops err\n", __func__, __LINE__);
 		return -ENODEV;
-
+	}
 	/* find out the minimum page size supported */
 	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
 
@@ -783,7 +823,7 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 
 	pr_debug("map: iova 0x%lx pa 0x%lx size 0x%lx\n", iova,
 				(unsigned long)paddr, (unsigned long)size);
-
+#if 0
 	while (size) {
 		unsigned long pgsize, addr_merge = iova | paddr;
 		unsigned int pgsize_idx;
@@ -823,6 +863,8 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 		paddr += pgsize;
 		size -= pgsize;
 	}
+#endif
+	ret = domain->ops->map(domain, iova, paddr, size, prot);
 
 	/* unroll mapping in case something went wrong */
 	if (ret)
@@ -901,6 +943,8 @@ void iommu_domain_window_disable(struct iommu_domain *domain, u32 wnd_nr)
 }
 EXPORT_SYMBOL_GPL(iommu_domain_window_disable);
 
+struct dentry *iommu_debugfs_top;
+
 static int __init iommu_init(void)
 {
 	iommu_group_kset = kset_create_and_add("iommu_groups",
@@ -909,6 +953,12 @@ static int __init iommu_init(void)
 	mutex_init(&iommu_group_mutex);
 
 	BUG_ON(!iommu_group_kset);
+
+	iommu_debugfs_top = debugfs_create_dir("iommu", NULL);
+	if (!iommu_debugfs_top) {
+		pr_err("Couldn't create iommu debugfs directory\n");
+		return -ENODEV;
+	}
 
 	return 0;
 }

@@ -43,6 +43,9 @@
 #include <fdt_support.h>
 #include <sys_config_old.h>
 #include <arisc.h>
+#include "asm/arch/rtc_region.h"
+
+extern int sunxi_arisc_probe(void);
 
 /* The sunxi internal brom will try to loader external bootloader
  * from mmc0, nannd flash, mmc2.
@@ -58,87 +61,42 @@ __weak int axp_probe_id(int pmu_id)
 
 int power_source_init(void)
 {
-	int pmu_id;
+
+	int pll_cpux;
+	int axp_exist = 0;
 
 #ifdef CONFIG_SUNXI_ARISC_EXIST
-	sunxi_arisc_wait_ready();
+	sunxi_arisc_probe();
 #endif
-	pmu_id = uboot_spare_head.boot_ext[0].data[0];
-	printf("pmu type = 0x%x\n", pmu_id);
 
-	axp_probe_id(0);
-	if (pmu_id > 0) {
-
-		printf("factory\n");
-		axp_probe_factory_mode();
+	axp_exist = axp_probe();
+	if(axp_exist)
+	{
 		gd->pmu_saved_status = axp_probe_pre_sys_mode();
-		printf("axp end\n");
-
-		return 0;
-	}
-#if 0
-	int pll_cpux;
-	uint32_t dcdc_vol = 0;
-	int cpu_vol = 0;
-	int nodeoffset=0;
-	//PMU_SUPPLY_DCDC2 is for cpua
-	nodeoffset =  fdt_path_offset(working_fdt,FDT_PATH_POWER_SPLY);
-	if(nodeoffset >=0)
-	{
-		fdt_getprop_u32(working_fdt, nodeoffset, "dcdc2_vol", &dcdc_vol);
-	}
-	if(!dcdc_vol)
-	{
-		cpu_vol = 900;
-	}
-	else
-	{
-		cpu_vol = dcdc_vol%10000;
-	}
-
-	if(!axp_probe(0))
-	axp_probe_id(0);
-	{
 		axp_probe_factory_mode();
-		if(!axp_probe_power_supply_condition())
-		{
-			//PMU_SUPPLY_DCDC2 is for cpua
-			if(!axp_set_supply_status(0, PMU_SUPPLY_DCDC2, cpu_vol, -1))
-			{
-				tick_printf("PMU: dcdc2 %d\n", cpu_vol);
-				sunxi_clock_set_corepll(uboot_spare_head.boot_data.run_clock);
-			}
-			else
-			{
-				printf("axp_set_dcdc2 fail\n");
-			}
-		}
-		else
-		{
-			printf("axp_probe_power_supply_condition error\n");
-		}
+		 /* axp_probe_power_supply_condition(); */
+		axp_set_charge_vol_limit();
+		axp_set_all_limit();
+		axp_set_hardware_poweron_vol();
+		axp_set_power_supply_output();
+		/* enable BC1.2 after all limit */
+		gd->vbus_status = axp_probe_vbus_type();
+		set_sunxi_gpio_power_bias();
 	}
 	else
 	{
 		printf("axp_probe error\n");
 	}
 
+
+	sunxi_clock_set_corepll(uboot_spare_head.boot_data.run_clock);
+
 	pll_cpux = sunxi_clock_get_corepll();
-	tick_printf("PMU: cpux %d Mhz,AXI=%d Mhz\n", pll_cpux,sunxi_clock_get_axi());
-	printf("PLL6=%d Mhz,AHB1=%d Mhz, APB1=%dMhz AHB2=%dMhz MBus=%dMhz\n", sunxi_clock_get_pll6(),
-		sunxi_clock_get_ahb(),
-		sunxi_clock_get_apb(),
-		sunxi_clock_get_ahb2(),
-	if(axp_exist)
-	{
-		axp_set_charge_vol_limit();
-		axp_set_all_limit();
-		axp_set_hardware_poweron_vol();
-		axp_set_power_supply_output();
-		//power_config_gpio_bias();
-		power_limit_init();
-	}
-#endif
+	pr_notice("cpux %d Mhz,AXI=%d Mhz\n", pll_cpux,sunxi_clock_get_axi());
+	pr_notice("PLL6=%d Mhz,AHB=%d Mhz, APB1=%dMhz  MBus=%dMhz\n",
+		sunxi_clock_get_pll6(),sunxi_clock_get_ahb(),
+		sunxi_clock_get_apb1(),sunxi_clock_get_mbus());
+
 	return 0;
 }
 
@@ -147,7 +105,7 @@ int sunxi_probe_securemode(void)
 	int secure_mode = 0;
 
 	secure_mode =  sid_get_security_status();
-	printf("secure enable bit: %d\n", secure_mode);
+	pr_msg("secure enable bit: %d\n", secure_mode);
 
 	if(secure_mode)
 	{
@@ -156,12 +114,12 @@ int sunxi_probe_securemode(void)
 		if(uboot_spare_head.boot_data.secureos_exist==1)
 		{
 			gd->securemode = SUNXI_SECURE_MODE_WITH_SECUREOS;
-			printf("secure mode: with secureos\n");
+			pr_msg("secure mode: with secureos\n");
 		}
 		else
 		{
 			gd->securemode = SUNXI_SECURE_MODE_NO_SECUREOS;
-			printf("secure mode: no secureos\n");
+			pr_msg("secure mode: no secureos\n");
 		}
 		gd->bootfile_mode = SUNXI_BOOT_FILE_TOC;
 	}
@@ -173,7 +131,7 @@ int sunxi_probe_securemode(void)
 
 		gd->securemode = SUNXI_NORMAL_MODE;
 		gd->bootfile_mode = SUNXI_BOOT_FILE_PKG;
-		printf("normal mode: with secure monitor\n");
+		pr_msg("normal mode: with secure monitor\n");
 
 		if (script_parser_fetch("target", "burn_secure_mode", &burn_secure_mode, 1))
 			return 0;
@@ -191,7 +149,8 @@ int sunxi_set_secure_mode(void)
 {
 	int mode;
 
-	if((gd->securemode == SUNXI_NORMAL_MODE) && (gd->bootfile_mode = SUNXI_BOOT_FILE_TOC))
+	if ((gd->securemode == SUNXI_NORMAL_MODE) &&
+		(gd->bootfile_mode == SUNXI_BOOT_FILE_TOC))
 	{
 		mode = sid_probe_security_mode();
 		if(!mode)
@@ -204,14 +163,23 @@ int sunxi_set_secure_mode(void)
 	return 0;
 }
 
-int sunxi_get_securemode(void)
+int sunxi_set_bootmode_flag(u8 flag)
 {
-	return gd->securemode;
+	volatile uint reg_val;
+	do {
+		writel(flag, RTC_DATA_HOLD_REG_BASE + SUNXI_RTC_GPREG_NUM*0x4);
+		reg_val = readl(RTC_DATA_HOLD_REG_BASE + SUNXI_RTC_GPREG_NUM*0x4);
+	} while ((reg_val & 0xff) != flag);
+
+	return 0;
 }
 
-int sunxi_probe_secure_monitor(void)
+int sunxi_get_bootmode_flag(void)
 {
-	return uboot_spare_head.boot_data.secureos_exist == SUNXI_SECURE_MODE_USE_SEC_MONITOR?1:0;
+	uint fel_flag;
+
+	/* operation should be same with kernel write rtc */
+	fel_flag = readl(RTC_DATA_HOLD_REG_BASE + SUNXI_RTC_GPREG_NUM*0x4);
+
+	return fel_flag;
 }
-
-

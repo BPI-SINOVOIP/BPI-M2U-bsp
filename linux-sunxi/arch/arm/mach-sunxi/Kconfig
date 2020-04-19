@@ -27,7 +27,6 @@ config ARCH_SUN8I
 	select GENERIC_IRQ_CHIP
 	select SPARSE_IRQ
 	select SUN4I_TIMER
-	select HAVE_UNSTABLE_SCHED_CLOCK
 	select GENERIC_ALLOCATOR
 	help
 	  Allwinner A7 smp SoCs(sun8i)
@@ -51,10 +50,30 @@ config ARCH_SUN50I
 	select GENERIC_IRQ_CHIP
 	select SPARSE_IRQ
 	select SUN4I_TIMER
-	select HAVE_UNSTABLE_SCHED_CLOCK
 	select GENERIC_ALLOCATOR
 	help
 	  Allwinner A53 smp SoCs(sun50i)
+
+config ARCH_SUN3I
+	bool "Allwinner arm926ejs socs(sun3i)"
+	select CPU_ARM926T
+	select SUNXI_TIMER
+	select COMMON_CLK
+	select CLKDEV_LOOKUP
+	select NEED_MACH_IO_H
+	select MULTI_IRQ_HANDLER
+	select PINCTRL
+	select PINCTRL_SUNXI
+	select ARCH_REQUIRE_GPIOLIB
+	select CLKSRC_MMIO
+	select CLKSRC_OF
+	select OF_RESERVED_MEM
+	select GENERIC_CLOCKEVENTS
+	select GENERIC_IRQ_CHIP
+	select SUN4I_TIMER
+	help
+	  Allwinner arm926ejs socs
+
 endchoice
 
 # Select the wafer with sun8i
@@ -62,23 +81,77 @@ endchoice
 if ARCH_SUN8I
 choice
 	prompt "Select the wafer with arch sun8i"
-	default ARCH_SUN8IW10
+	default ARCH_SUN8IW8
 	help
 	  Select the wafer with arch sun8i
 
+config ARCH_SUN8IW5
+	bool "Allwinner sun8iw5 SoCs"
+	select HAVE_UNSTABLE_SCHED_CLOCK
+	help
+	Allwinner sun8iw5 SoCs
+
+config ARCH_SUN8IW8
+	bool "Allwinner sun8iw8 SoCs"
+	select HAVE_UNSTABLE_SCHED_CLOCK
+	help
+	Allwinner sun8iw8 SoCs
+
 config ARCH_SUN8IW10
         bool "Allwinner sun8iw10 SoCs"
+	select HAVE_UNSTABLE_SCHED_CLOCK
         help
           Allwinner sun8iw10 SoCs
 
 config ARCH_SUN8IW11
         bool "Allwinner sun8iw11 SoCs"
+	select HAVE_UNSTABLE_SCHED_CLOCK
         help
           Allwinner sun8iw11 SoCs
+
+config ARCH_SUN8IW17
+        bool "Allwinner sun8iw17 SoCs"
+        help
+          Allwinner sun8iw17 SoCs
 endchoice
+
+config SUN8I_CCI
+       bool "Cache Coherent Interconnect support"
+       depends on ARCH_SUN8IW17
+       default n
+       help
+         Enable Cache Coherent Interconnect support
 endif
 
 # Select the SoC with specific arch and wafer
+
+if ARCH_SUN8IW5
+choice
+	prompt "Select the SoC with wafer sun8iw5"
+	default ARCH_SUN8IW5P1
+	help
+	Select the SoC with wafer sun8iw5
+
+config ARCH_SUN8IW5P1
+	bool "Allwinner sun8iw5p1 SoC"
+	help
+	Allwinner sun8iw5p1 SoC
+endchoice
+endif
+
+if ARCH_SUN8IW8
+choice
+	prompt "Select the SoC with wafer sun8iw8"
+	default ARCH_SUN8IW8P1
+	help
+	Select the SoC with wafer sun8iw8
+
+config ARCH_SUN8IW8P1
+	bool "Allwinner sun8iw8p1 SoC"
+	help
+	Allwinner sun8iw8p1 SoC
+endchoice
+endif
 
 if ARCH_SUN8IW10
 choice
@@ -105,6 +178,20 @@ config ARCH_SUN8IW11P1
 	bool "Allwinner sun8iw11p1 SoC"
 	help
 	  Allwinner sun8iw11p1 SoC
+endchoice
+endif
+
+if ARCH_SUN8IW17
+choice
+	prompt "Select the SoC with wafer sun8iw17"
+	default ARCH_SUN8IW17P1
+	help
+	 Select the SoC with wafer sun8iw17
+
+config ARCH_SUN8IW17P1
+	bool "Allwinner sun8iw17p1 SoC"
+	help
+	  Allwinner sun8iw17p1 SoC
 endchoice
 endif
 
@@ -142,11 +229,13 @@ choice
 
 config ARCH_SUN50IW1
         bool "Allwinner sun50iw1 SoCs"
+	select HAVE_UNSTABLE_SCHED_CLOCK
         help
           Allwinner sun50iw1 SoCs
 
 config ARCH_SUN50IW2
         bool "Allwinner sun50iw2 SoCs"
+	select HAVE_UNSTABLE_SCHED_CLOCK
         help
           Allwinner sun50iw2 SoCs
 endchoice
@@ -179,6 +268,53 @@ config ARCH_SUN50IW2P1
 	bool "Allwinner sun50iw2p1 SoC"
 	help
 	  Allwinner sun50iw2p1 SoC
+endchoice
+endif
+
+if ARCH_SUN3I
+choice
+	prompt "Select the wafer with arch sun3i"
+	default ARCH_SUN3IW1
+	help
+	 Select the wafer with arch sun3i
+
+config ARCH_SUN3IW1
+	bool "Allwinner sun3iw1 SOC"
+	help
+	  Allwinner sun3iw1 SOC
+endchoice
+endif
+
+if ARCH_SUN3IW1
+choice
+	prompt "Select the Soc with wafer sun3iw1"
+	default ARCH_SUN3IW1P1
+	help
+	 Select the SoC with wafer sun3iw1
+
+config ARCH_SUN3IW1P1
+	bool "Allwinner sun3iw1p1 SoC"
+	help
+	  Allwinner sun3iw1p1 SoC
+endchoice
+endif
+
+if ARCH_SUN3IW1P1
+choice
+	prompt "Select the target board with sun3iw1p1"
+	default ARCH_SUN3IW1P1_C600
+	help
+	  Select the target board with sun3iw1p1
+
+config ARCH_SUN3IW1P1_C600
+	bool "Allwinner sun3iw1p1 C600"
+	help
+	  Allwinner sun3iw1p1 C600 Soc
+
+config ARCH_SUN3IW1P1_R6
+	bool "Allwinner sun3iw1p1 R6"
+	help
+	  Allwinner sun3iw1p1 R6 Soc
 endchoice
 endif
 

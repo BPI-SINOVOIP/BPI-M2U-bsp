@@ -48,6 +48,11 @@
 #define DRQSRC_OTG_EP4		33
 #define DRQSRC_OTG_EP5		34
 
+/* Add by wolfgang to support Audio Hub */
+#define DRQSRC_AHUB0_RX		43
+#define DRQSRC_AHUB1_RX		44
+#define DRQSRC_AHUB2_RX		45
+
 /*
  * The destination DRQ type and port corresponding relation
  *
@@ -95,4 +100,8 @@
 #define DRQDST_OTG_EP4		33
 #define DRQDST_OTG_EP5		34
 
+/* Add by wolfgang to support Audio Hub */
+#define DRQDST_AHUB0_TX		43
+#define DRQDST_AHUB1_TX		44
+#define DRQDST_AHUB2_TX		45
 #endif /*__DMA_SUN50IW6__  */

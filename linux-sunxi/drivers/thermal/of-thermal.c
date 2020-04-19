@@ -45,8 +45,8 @@
 
 struct __thermal_trip {
 	struct device_node *np;
-	unsigned long int temperature;
-	unsigned long int hysteresis;
+	int temperature;
+	int hysteresis;
 	enum thermal_trip_type type;
 };
 
@@ -96,14 +96,14 @@ struct __thermal_zone {
 
 	/* sensor interface */
 	void *sensor_data;
-	int (*get_temp)(void *, long *);
+	int (*get_temp)(void *, int *);
 	int (*get_trend)(void *, long *);
 };
 
 /***   DT thermal zone device callbacks   ***/
 
 static int of_thermal_get_temp(struct thermal_zone_device *tz,
-			       unsigned long *temp)
+				int *temp)
 {
 	struct __thermal_zone *data = tz->devdata;
 
@@ -236,7 +236,7 @@ static int of_thermal_get_trip_type(struct thermal_zone_device *tz, int trip,
 }
 
 static int of_thermal_get_trip_temp(struct thermal_zone_device *tz, int trip,
-				    unsigned long *temp)
+					int *temp)
 {
 	struct __thermal_zone *data = tz->devdata;
 
@@ -249,7 +249,7 @@ static int of_thermal_get_trip_temp(struct thermal_zone_device *tz, int trip,
 }
 
 static int of_thermal_set_trip_temp(struct thermal_zone_device *tz, int trip,
-				    unsigned long temp)
+					int temp)
 {
 	struct __thermal_zone *data = tz->devdata;
 
@@ -263,7 +263,7 @@ static int of_thermal_set_trip_temp(struct thermal_zone_device *tz, int trip,
 }
 
 static int of_thermal_get_trip_hyst(struct thermal_zone_device *tz, int trip,
-				    unsigned long *hyst)
+					int *hyst)
 {
 	struct __thermal_zone *data = tz->devdata;
 
@@ -276,7 +276,7 @@ static int of_thermal_get_trip_hyst(struct thermal_zone_device *tz, int trip,
 }
 
 static int of_thermal_set_trip_hyst(struct thermal_zone_device *tz, int trip,
-				    unsigned long hyst)
+					int hyst)
 {
 	struct __thermal_zone *data = tz->devdata;
 
@@ -290,7 +290,7 @@ static int of_thermal_set_trip_hyst(struct thermal_zone_device *tz, int trip,
 }
 
 static int of_thermal_get_crit_temp(struct thermal_zone_device *tz,
-				    unsigned long *temp)
+				     int *temp)
 {
 	struct __thermal_zone *data = tz->devdata;
 	int i;
@@ -324,7 +324,7 @@ static struct thermal_zone_device_ops of_thermal_ops = {
 static struct thermal_zone_device *
 thermal_zone_of_add_sensor(struct device_node *zone,
 			   struct device_node *sensor, void *data,
-			   int (*get_temp)(void *, long *),
+			   int (*get_temp)(void *, int *),
 			   int (*get_trend)(void *, long *))
 {
 	struct thermal_zone_device *tzd;
@@ -383,7 +383,7 @@ thermal_zone_of_add_sensor(struct device_node *zone,
  */
 struct thermal_zone_device *
 thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
-				void *data, int (*get_temp)(void *, long *),
+				void *data, int (*get_temp)(void *, int *),
 				int (*get_trend)(void *, long *))
 {
 	struct device_node *np, *child, *sensor_np;

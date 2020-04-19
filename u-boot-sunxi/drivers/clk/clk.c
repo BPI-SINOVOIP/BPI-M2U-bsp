@@ -181,8 +181,8 @@ static struct clk *__clk_init_parent(struct clk *clk)
 	}
 
 	if (!clk->ops->get_parent) {
-		printf("%s: multi-parent clocks must implement .get_parent\n",
-			__func__);
+		printf("%s:multi-parent clocks %s must implement .get_parent\n",
+			__func__, clk->name);
 		goto out;
 	};
 
@@ -400,6 +400,7 @@ unsigned long clk_get_rate(struct clk *clk)
 {
 	unsigned long rate;
 
+	__clk_recalc_rates(clk);
 	rate = __clk_get_rate(clk);
 
 	return rate;
@@ -412,7 +413,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 	unsigned long new_rate;
 
 	/* bail early if nothing to do */
-	if (rate == clk->rate && !(clk->flags & CLK_GET_RATE_NOCACHE)) {
+	if (rate == clk_get_rate(clk) && !(clk->flags & CLK_GET_RATE_NOCACHE)) {
 		goto out;
 	}
 
@@ -526,7 +527,7 @@ int of_pll_clk_config_setup(struct clk *child_clk, u32 parent_handle)
 
 	clk = clk_get(NULL, clk_name);
 	if (!clk) {
-		printf("%s: get clk is null\n", __func__);
+		printf("%s: get clk is null:%s\n", __func__, clk_name);
 		return -1;
 	}
 

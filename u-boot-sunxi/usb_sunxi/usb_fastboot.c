@@ -51,6 +51,12 @@ static  uint  all_download_bytes;
 int     fastboot_data_flag;
 
 extern int sunxi_usb_exit(void);
+
+int get_fastboot_data_flag(void)
+{
+	return fastboot_data_flag;
+}
+
 /*
 *******************************************************************************
 *                     do_usb_req_set_interface
@@ -566,7 +572,7 @@ static void __flash_to_uboot(void)
 	}
 
 	printf("ready to download bytes 0x%x\n", trans_data.try_to_recv);
-	ret = sunxi_sprite_download_uboot((char *)temp_buf,uboot_spare_head.boot_data.storage_type ,1);
+	ret = sunxi_sprite_download_uboot((char *)temp_buf,get_boot_storage_type() ,1);
 	if (!ret)
 	{
 		printf("sunxi fastboot: successed in downloading uboot package\n");
@@ -968,7 +974,9 @@ static void __oem_operation(char *operation)
 static void __continue(void)
 {
 	char response[32];
+	int storage_type;
 
+	storage_type = get_boot_storage_type();
 	memset(response, 0, 32);
 	strcpy(response,"OKAY");
 
@@ -976,11 +984,11 @@ static void __continue(void)
 
 	sunxi_usb_exit();
 
-	if(uboot_spare_head.boot_data.storage_type)
+	if( storage_type == STORAGE_EMMC || storage_type == STORAGE_SD)
 	{
 		setenv("bootcmd", "run setargs_mmc boot_normal");
 	}
-	else
+	else if (storage_type == STORAGE_NAND)
 	{
 		setenv("bootcmd", "run setargs_nand boot_normal");
 	}

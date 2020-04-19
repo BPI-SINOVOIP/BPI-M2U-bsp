@@ -41,9 +41,20 @@
 #include "./arisc_dbgs.h"
 #include "./arisc_para.h"
 
+#include "./arisc_messages.h"
+#include "./arisc_message_manager.h"
+
+#include "./arisc_hwmsgbox.h"
+
 /* global functions */
+#if defined CONFIG_SUNXI_ARISC_COM_DIRECTLY
+extern int arisc_axp_int_notify(struct arisc_message *pmessage);
+extern int arisc_audio_perdone_notify(struct arisc_message *pmessage);
+extern int arisc_report_error_info(struct arisc_message *pmessage);
+#endif
 extern int arisc_set_debug_level(unsigned int level);
-extern int arisc_dvfs_cfg_vf_table(void);
+extern int arisc_dvfs_cfg_vf_table(unsigned int cluster, unsigned int vf_num,
+					void *vf_tbl);
 extern int arisc_set_uart_baudrate(u32 baudrate);
 extern int arisc_set_dram_crc_paras(unsigned int dram_crc_en, unsigned int dram_crc_srcaddr, unsigned int dram_crc_len);
 extern int arisc_sysconfig_sstpower_paras(void);
@@ -51,5 +62,5 @@ extern int arisc_sysconfig_sstpower_paras(void);
 /* global vars */
 extern unsigned long arisc_sram_a2_vbase;
 extern struct arisc_cfg arisc_cfg;
-
+extern void flush_message_pool(void);
 #endif /* __ARISC_INCLUDES_H */

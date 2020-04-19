@@ -91,10 +91,8 @@ struct sunxi_spi {
 	void __iomem *base_addr; /* register */
 	u32 base_addr_phy;
 
-#ifdef CONFIG_EVB_PLATFORM
-	struct clk *pclk;  /* PLL clock */	
+	struct clk *pclk;  /* PLL clock */
 	struct clk *mclk;  /* spi module clock */
-#endif
 
 #ifdef CONFIG_DMA_ENGINE
 	spi_dma_info_t dma_rx;
@@ -389,6 +387,8 @@ static void spi_set_bc_tc_stc(u32 tx_len, u32 rx_len, u32 stc_len, u32 dummy_cnt
 	reg_val = readl(base_addr + SPI_BCC_REG);
 	reg_val &= ~SPI_BCC_STC_MASK;
 	reg_val |= (SPI_BCC_STC_MASK & stc_len);
+	reg_val &= ~(0xf << 24);
+	reg_val |= (dummy_cnt << 24);
 	writel(reg_val, base_addr + SPI_BCC_REG);
 	//SPI_DBG("\n-- STC = %d --\n", readl(base_addr + SPI_BCC_REG));
 }
@@ -423,6 +423,13 @@ static void spi_set_all_burst_received(void __iomem *base_addr)
 	u32 reg_val = readl(base_addr+SPI_TC_REG);
 	reg_val &= ~SPI_TC_DHB;
 	writel(reg_val, base_addr + SPI_TC_REG);
+}
+
+static void spi_clear_dual_read(void __iomem  *base_addr)
+{
+	u32 reg_val = readl(base_addr+SPI_BCC_REG);
+	reg_val &= ~SPI_BCC_DUAL_MOD_RX_EN;
+	writel(reg_val, base_addr + SPI_BCC_REG);
 }
 
 static void spi_set_dual_read(void __iomem  *base_addr)
@@ -573,13 +580,13 @@ static int sunxi_spi_dma_init_sg(spi_dma_info_t *info, void *addr, int len, int 
 		else
 			mapbytes = PAGE_SIZE - offset_in_page(bufp);
 
-		SPI_DBG("%d: len %d, offset %ld, addr %p(%d)\n", i, mapbytes, 
+		SPI_DBG("%d: len %d, offset %ld, addr %p(%d)\n", i, mapbytes,
 				offset_in_page(bufp), bufp, virt_addr_valid(bufp));
 		if (virt_addr_valid(bufp))
 			sg_set_page(&info->sg[i], virt_to_page(bufp), mapbytes, offset_in_page(bufp));
 		else
 			sg_set_page(&info->sg[i], vmalloc_to_page(bufp), mapbytes, offset_in_page(bufp));
-		
+
 		bufp += mapbytes;
 		bytesleft -= mapbytes;
 	}
@@ -607,7 +614,7 @@ static int sunxi_spi_prepare_dma(spi_dma_info_t *_info, enum spi_dma_dir _dir)
 			return -EINVAL;
 		}
 	}
-	
+
 	_info->dir = _dir;
 	return 0;
 }
@@ -641,7 +648,7 @@ static int sunxi_spi_config_dma_rx(struct sunxi_spi *sspi, struct spi_transfer *
 	}
 	SPI_DBG("npages = %d, nents = %d \n", sspi->dma_rx.nents, nents);
 
-	dma_desc = dmaengine_prep_slave_sg(sspi->dma_rx.chan, sspi->dma_rx.sg, nents, 
+	dma_desc = dmaengine_prep_slave_sg(sspi->dma_rx.chan, sspi->dma_rx.sg, nents,
 				DMA_FROM_DEVICE, DMA_PREP_INTERRUPT|DMA_CTRL_ACK);
 	if (!dma_desc) {
 		SPI_ERR("[spi-%d]dmaengine_prep_slave_sg() failed!\n", sspi->master->bus_num);
@@ -677,18 +684,18 @@ static int sunxi_spi_config_dma_tx(struct sunxi_spi *sspi, struct spi_transfer *
 	dma_conf.slave_id = sunxi_slave_id(SUNXI_SPI_DRQ_TX(sspi->master->bus_num), DRQSRC_SDRAM);
 	dmaengine_slave_config(sspi->dma_tx.chan, &dma_conf);
 
-	nents = dma_map_sg(&sspi->pdev->dev, sspi->dma_tx.sg, sspi->dma_tx.nents, DMA_FROM_DEVICE);
+	nents = dma_map_sg(&sspi->pdev->dev, sspi->dma_tx.sg, sspi->dma_tx.nents, DMA_TO_DEVICE);
 	if (!nents) {
 		SPI_ERR("dma_map_sg(%d) failed! return %d\n", sspi->dma_tx.nents, nents);
 		return -ENOMEM;
 	}
 	SPI_DBG("npages = %d, nents = %d \n", sspi->dma_tx.nents, nents);
 
-	dma_desc = dmaengine_prep_slave_sg(sspi->dma_tx.chan, sspi->dma_tx.sg, nents, 
+	dma_desc = dmaengine_prep_slave_sg(sspi->dma_tx.chan, sspi->dma_tx.sg, nents,
 				DMA_TO_DEVICE, DMA_PREP_INTERRUPT|DMA_CTRL_ACK);
 	if (!dma_desc) {
 		SPI_ERR("[spi-%d]dmaengine_prep_slave_sg() failed!\n", sspi->master->bus_num);
-		dma_unmap_sg(&sspi->pdev->dev, sspi->dma_tx.sg, sspi->dma_tx.nents, DMA_FROM_DEVICE);
+		dma_unmap_sg(&sspi->pdev->dev, sspi->dma_tx.sg, sspi->dma_tx.nents, DMA_TO_DEVICE);
 		return -1;
 	}
 
@@ -726,7 +733,7 @@ static void sunxi_spi_dma_free_sg(struct sunxi_spi *sspi, spi_dma_info_t *info)
 {
 	if (info->dir == SPI_DMA_RWNULL)
 		return;
-	
+
 	dma_unmap_sg(&sspi->pdev->dev, info->sg, info->nents, (enum dma_data_direction)info->dir);
 	info->dir = SPI_DMA_RWNULL;
 
@@ -745,7 +752,7 @@ static int sunxi_spi_release_dma(struct sunxi_spi *sspi, struct spi_transfer *t)
 
 	sunxi_spi_dma_free_sg(sspi, &sspi->dma_rx);
 	sunxi_spi_dma_free_sg(sspi, &sspi->dma_tx);
-	
+
 	spin_unlock_irqrestore(&sspi->lock, flags);
 	return 0;
 }
@@ -840,11 +847,7 @@ static int sunxi_spi_xfer_setup(struct spi_device *spi, struct spi_transfer *t)
    	if(config->max_speed_hz > SPI_MAX_FREQUENCY) {
 	    return -EINVAL;
 	}
-#ifdef CONFIG_EVB_PLATFORM
 	spi_set_clk(config->max_speed_hz, clk_get_rate(sspi->mclk), base_addr);
-#else
-	spi_set_clk(config->max_speed_hz, 24000000, base_addr);
-#endif
 	/*
 	*  master : set POL,PHA,SSOPL,LMTF,DDB,DHB; default: SSCTL=0,SMC=1,TBW=0.
 	*  set bit width-default: 8 bits
@@ -855,6 +858,80 @@ static int sunxi_spi_xfer_setup(struct spi_device *spi, struct spi_transfer *t)
 	return 0;
 }
 
+static int sunxi_spi_mode_check(struct sunxi_spi *sspi, struct spi_device *spi, struct spi_transfer *t)
+{
+	unsigned long flags = 0;
+	static int dual_mode_enable;
+	struct sunxi_dual_mode_dev_data *dual_mode_cfg = (struct sunxi_dual_mode_dev_data *)spi->dev.platform_data;
+
+	if (sspi->mode_type != MODE_TYPE_NULL)
+		return -EINVAL;
+
+	SPI_DBG("dual_mode_cfg = %p\n", dual_mode_cfg);
+
+	/* dual spi mode */
+	if ((dual_mode_cfg != NULL) && (dual_mode_cfg->dual_mode == 1)) {
+		SPI_DBG("in dual SPI mode\n");
+		if (t->tx_buf && t->rx_buf) {
+			SPI_ERR("full duplex is not support in dual spi mode\n");
+			return -1;
+		}
+
+		/* half duplex transmit(dual mode) */
+		if (t->tx_buf) {
+			/* If the command is Dual Mode Read. */
+			if (*(const u8 *)t->tx_buf == 0x3b) {
+				dual_mode_enable = 1;
+				spi_set_dual_read(sspi->base_addr);
+				spi_set_bc_tc_stc(t->len, 0, t->len, dual_mode_cfg->dummy_cnt, sspi->base_addr);
+			} else {
+				dual_mode_enable = 0;
+				spi_clear_dual_read(sspi->base_addr);
+				spi_set_bc_tc_stc(t->len, 0, t->len, 0, sspi->base_addr);
+			}
+
+			spin_lock_irqsave(&sspi->lock, flags);
+			sspi->mode_type = SINGLE_HALF_DUPLEX_TX;
+			spin_unlock_irqrestore(&sspi->lock, flags);
+		} /* half duplex receive(dual mode) */
+		else if (t->rx_buf) {
+			spin_lock_irqsave(&sspi->lock, flags);
+			if (dual_mode_enable == 1) {
+				spi_set_bc_tc_stc(dual_mode_cfg->single_cnt, t->len,
+					dual_mode_cfg->single_cnt, 0, sspi->base_addr);
+				sspi->mode_type = DUAL_HALF_DUPLEX_RX;
+			} else {
+				spi_set_bc_tc_stc(0, t->len, 0, 0, sspi->base_addr);
+				sspi->mode_type = SINGLE_HALF_DUPLEX_RX;
+			}
+			spin_unlock_irqrestore(&sspi->lock, flags);
+		}
+		return 0;
+	}
+
+	/* single spi mode */
+	SPI_DBG("in single SPI mode\n");
+	spin_lock_irqsave(&sspi->lock, flags);
+	if (t->tx_buf && t->rx_buf) {
+		/* full duplex */
+		spi_set_all_burst_received(sspi->base_addr);
+		spi_set_bc_tc_stc(t->len, 0, t->len, 0, sspi->base_addr);
+		sspi->mode_type = SINGLE_FULL_DUPLEX_RX_TX;
+	} else {
+		/* half duplex transmit(single mode) */
+		if (t->tx_buf) {
+			spi_set_bc_tc_stc(t->len, 0, t->len, 0, sspi->base_addr);
+			sspi->mode_type = SINGLE_HALF_DUPLEX_TX;
+		} /* half duplex receive(single mode) */
+		else if (t->rx_buf) {
+			spi_set_bc_tc_stc(0, t->len, 0, 0, sspi->base_addr);
+			sspi->mode_type = SINGLE_HALF_DUPLEX_RX;
+		}
+	}
+	spin_unlock_irqrestore(&sspi->lock, flags);
+
+	return 0;
+}
 /*
  * < 64 : cpu ;  >= 64 : dma
  * wait for done completion in this function, wakup in the irq hanlder
@@ -868,10 +945,9 @@ static int sunxi_spi_xfer(struct spi_device *spi, struct spi_transfer *t)
 	unsigned rx_len = t->len;	/* number of bytes sent */
 	unsigned char *rx_buf = (unsigned char *)t->rx_buf;
 	unsigned char *tx_buf = (unsigned char *)t->tx_buf;
-	struct sunxi_dual_mode_dev_data *dual_mode_cfg = (struct sunxi_dual_mode_dev_data *)spi->dev.platform_data;
 	int ret = 0;
 
-	SPI_DBG("[spi-%d]: begin transfer, txbuf %p, rxbuf %p, len %d, mode %d\n", 
+	SPI_DBG("[spi-%d]: begin transfer, txbuf %p, rxbuf %p, len %d, mode %d\n",
 		spi->master->bus_num, tx_buf, rx_buf, t->len, sspi->mode_type);
 	if ((!t->tx_buf && !t->rx_buf) || !t->len)
 		return -EINVAL;
@@ -883,68 +959,12 @@ static int sunxi_spi_xfer(struct spi_device *spi, struct spi_transfer *t)
 	/* reset tx/rx fifo */
 	spi_reset_fifo(base_addr);
 
-	if(sspi->mode_type != MODE_TYPE_NULL)
+	if (sunxi_spi_mode_check(sspi, spi, t))
 		return -EINVAL;
 
-	SPI_DBG("dual_mode_cfg = %p \n", dual_mode_cfg);
-	/* single spi mode */
-	if(!dual_mode_cfg || dual_mode_cfg->dual_mode == 0) {
-		SPI_DBG("in single SPI mode\n");
-		/* full duplex */
-		spin_lock_irqsave(&sspi->lock, flags);
-		if(tx_buf && rx_buf) {
-			spi_set_all_burst_received(sspi->base_addr);
-			spi_set_bc_tc_stc(tx_len, 0, tx_len, 0, base_addr);
-			sspi->mode_type = SINGLE_FULL_DUPLEX_RX_TX;
-		} else {
-			/* half duplex transmit(single mode) */
-			if(tx_buf) {
-				spi_set_bc_tc_stc(tx_len, 0, tx_len, 0, base_addr);
-				sspi->mode_type = SINGLE_HALF_DUPLEX_TX;
-			}/* half duplex receive(single mode) */
-			else if(rx_buf) {
-				spi_set_bc_tc_stc(0, rx_len, 0, 0, base_addr);
-				sspi->mode_type = SINGLE_HALF_DUPLEX_RX;
-			}
-		}
-		spin_unlock_irqrestore(&sspi->lock, flags);
-	} else {
-		/* dual spi mode */
-		if(dual_mode_cfg->dual_mode == 1){
-			SPI_DBG("in dual SPI mode\n");
-			if(tx_buf && rx_buf) {
-				SPI_ERR("full duplex is not support in dual spi mode\n");
-				return -1;
-			} else {
-				/* half duplex transmit(dual mode) */
-				if(tx_buf) {
-					if(dual_mode_cfg->single_cnt >= tx_len){
-						SPI_ERR("single tranmit count must be less than total transmit count in dual spi mode\n");
-						return -1;
-					}
-					spin_lock_irqsave(&sspi->lock, flags);
-					spi_set_bc_tc_stc(tx_len, 0, dual_mode_cfg->single_cnt, 0, base_addr);
-					sspi->mode_type = DUAL_HALF_DUPLEX_TX;
-					spin_unlock_irqrestore(&sspi->lock, flags);
-				}/* half duplex receive(dual mode) */
-				else if(rx_buf) {
-					spin_lock_irqsave(&sspi->lock, flags);
-					spi_set_dual_read(base_addr);
-					spi_set_bc_tc_stc(dual_mode_cfg->single_cnt, rx_len, dual_mode_cfg->single_cnt, dual_mode_cfg->dummy_cnt, base_addr);
-					sspi->mode_type = DUAL_HALF_DUPLEX_RX;
-					spin_unlock_irqrestore(&sspi->lock, flags);
-				}
-			}
-		} else {
-			SPI_ERR("dual_mode %d is invalid!\n", dual_mode_cfg->dual_mode);
-			return -1;
-		}
-	}
-
-	/*
-	* 1. Tx/Rx error irq,process in IRQ;
-	* 2. Transfer Complete Interrupt Enable
-	*/
+	/* 1. Tx/Rx error irq,process in IRQ;
+	 * 2. Transfer Complete Interrupt Enable
+	 */
 	spi_enable_irq(SPI_INTEN_TC|SPI_INTEN_ERR, base_addr);
 
 	/* >64 use DMA transfer, or use cpu */
@@ -952,6 +972,7 @@ static int sunxi_spi_xfer(struct spi_device *spi, struct spi_transfer *t)
 #ifdef CONFIG_DMA_ENGINE
 		switch(sspi->mode_type) {
 		case SINGLE_HALF_DUPLEX_RX:
+		case DUAL_HALF_DUPLEX_RX:
 		{
 			SPI_DBG(" rx -> by dma\n");
 			/* For Rx mode, the DMA end(not TC flag) is real end. */
@@ -1016,11 +1037,6 @@ static int sunxi_spi_xfer(struct spi_device *spi, struct spi_transfer *t)
 			sunxi_spi_start_dma(&sspi->dma_tx);
 			break;
 		}
-		case DUAL_HALF_DUPLEX_RX:
-		{
-			SPI_ERR("dual half duplex rx -> by dma (not support now)\n");
-			break;
-		}
 		case DUAL_HALF_DUPLEX_TX:
 		{
 			SPI_ERR("dual half duplex tx -> by dma (not support now)\n");
@@ -1033,6 +1049,7 @@ static int sunxi_spi_xfer(struct spi_device *spi, struct spi_transfer *t)
 	} else {
 		switch(sspi->mode_type) {
 		case SINGLE_HALF_DUPLEX_RX:
+		case DUAL_HALF_DUPLEX_RX:
 		{
 			unsigned int poll_time = 0x7ffff;
 			SPI_DBG(" rx -> by ahb\n");
@@ -1105,11 +1122,6 @@ static int sunxi_spi_xfer(struct spi_device *spi, struct spi_transfer *t)
 			}
 			break;
 		}
-		case DUAL_HALF_DUPLEX_RX:
-		{
-			SPI_ERR("dual half duplex rx -> by ahb (not support now)\n");
-			break;
-		}
 		case DUAL_HALF_DUPLEX_TX:
 		{
 			SPI_ERR("dual half duplex tx -> by ahb (not support now)\n");
@@ -1143,7 +1155,7 @@ static void sunxi_spi_work(struct work_struct *work)
 {
 	struct sunxi_spi *sspi = container_of(work, struct sunxi_spi, work);
 	unsigned long flags = 0;
-	
+
 	spin_lock_irqsave(&sspi->lock, flags);
 	sspi->busy = SPI_BUSY;
 	/*
@@ -1188,7 +1200,7 @@ static void sunxi_spi_work(struct work_struct *work)
 			 * wait for done completion in this function, wakup in the irq hanlder
 			 */
 			status = sunxi_spi_xfer(spi, t);
-	
+
 			if (status)
 				break;/* fail quit, zero means succeed */
 			/* accmulate the value in the message */
@@ -1231,7 +1243,7 @@ static irqreturn_t sunxi_spi_handler(int irq, void *dev_id)
 
 	spin_lock_irqsave(&sspi->lock, flags);
 
-	status = spi_qry_irq_pending(base_addr);	
+	status = spi_qry_irq_pending(base_addr);
 	spi_clr_irq_pending(status, base_addr);//write 1 to clear 0.
 	SPI_DBG("[spi-%d]: irq status = %x \n", sspi->master->bus_num, status);
 
@@ -1365,7 +1377,7 @@ static int sunxi_spi_request_gpio(struct sunxi_spi *sspi)
 
 	if (!sunxi_spi_chan_is_enable(bus_no))
 		return -1;
-	
+
 	SPI_DBG("Pinctrl init %d ... [%s]\n", bus_no, sspi->pdev->dev.init_name);
 
 	sspi->pctrl = devm_pinctrl_get(&sspi->pdev->dev);
@@ -1383,8 +1395,6 @@ static void sunxi_spi_release_gpio(struct sunxi_spi *sspi)
 	sspi->pctrl = NULL;
 }
 
-#ifdef CONFIG_EVB_PLATFORM
-
 static int sunxi_spi_clk_init(struct sunxi_spi *sspi, u32 mod_clk)
 {
 	int ret = 0;
@@ -1392,21 +1402,21 @@ static int sunxi_spi_clk_init(struct sunxi_spi *sspi, u32 mod_clk)
 
 	sspi->pclk = of_clk_get(sspi->pdev->dev.of_node, 0);
 	if (IS_ERR_OR_NULL(sspi->pclk)) {
-		SPI_ERR("[spi-%d] Unable to acquire module clock '%s', return %x\n", 
+		SPI_ERR("[spi-%d] Unable to acquire module clock '%s', return %x\n",
 				sspi->master->bus_num, sspi->dev_name, PTR_RET(sspi->pclk));
 		return -1;
 	}
 
 	sspi->mclk = of_clk_get(sspi->pdev->dev.of_node, 1);
 	if (IS_ERR_OR_NULL(sspi->mclk)) {
-		SPI_ERR("[spi-%d] Unable to acquire module clock '%s', return %x\n", 
+		SPI_ERR("[spi-%d] Unable to acquire module clock '%s', return %x\n",
 				sspi->master->bus_num, sspi->dev_name, PTR_RET(sspi->mclk));
 		return -1;
 	}
 
 	ret = clk_set_parent(sspi->mclk, sspi->pclk);
 	if (ret != 0) {
-		SPI_ERR("[spi-%d] clk_set_parent() failed! return %d\n", 
+		SPI_ERR("[spi-%d] clk_set_parent() failed! return %d\n",
 				sspi->master->bus_num, ret);
 		return -1;
 	}
@@ -1436,7 +1446,7 @@ static int sunxi_spi_clk_exit(struct sunxi_spi *sspi)
 		SPI_ERR("[spi-%d] SPI mclk handle is invalid!\n", sspi->master->bus_num);
 		return -1;
 	}
-	
+
 	//sunxi_periph_reset_assert(sspi->mclk);
 	clk_disable_unprepare(sspi->mclk);
 	clk_put(sspi->mclk);
@@ -1445,20 +1455,6 @@ static int sunxi_spi_clk_exit(struct sunxi_spi *sspi)
 	sspi->pclk = NULL;
 	return 0;
 }
-
-#else
-
-static int sunxi_spi_clk_init(struct sunxi_spi *sspi, u32 mod_clk)
-{
-	return 24000000;
-}
-
-static int sunxi_spi_clk_exit(struct sunxi_spi *sspi)
-{
-	return 0;
-}
-
-#endif
 
 static int sunxi_spi_hw_init(struct sunxi_spi *sspi, struct sunxi_spi_platform_data *pdata)
 {
@@ -1477,7 +1473,7 @@ static int sunxi_spi_hw_init(struct sunxi_spi *sspi, struct sunxi_spi_platform_d
         	SPI_ERR("[spi-%d] Request GPIO failed!\n", sspi->master->bus_num);
         	return -1;
 	}
-	
+
 	ret = of_property_read_u32(sspi->pdev->dev.of_node, "clock-frequency", &sclk_freq_def);
 	if (ret) {
 		SPI_ERR("[spi-%d] Get clock-frequency property failed\n", sspi->master->bus_num);
@@ -1526,10 +1522,10 @@ static int sunxi_spi_hw_exit(struct sunxi_spi *sspi, struct sunxi_spi_platform_d
 	/* disable module clock */
 	sunxi_spi_clk_exit(sspi);
 	sunxi_spi_release_gpio(sspi);
-	
+
 	spi_regulator_disable(pdata);
 	spi_regulator_release(pdata);
-	
+
 	return 0;
 }
 
@@ -1539,7 +1535,7 @@ static ssize_t sunxi_spi_info_show(struct device *dev,
 	struct platform_device *pdev = container_of(dev, struct platform_device, dev);
 	struct sunxi_spi_platform_data *pdata = dev->platform_data;
 
-	return snprintf(buf, PAGE_SIZE, 
+	return snprintf(buf, PAGE_SIZE,
 		"pdev->id   = %d \n"
 		"pdev->name = %s \n"
 		"pdev->num_resources = %u \n"
@@ -1561,9 +1557,9 @@ static ssize_t sunxi_spi_status_show(struct device *dev,
 {
 	struct spi_master *master = dev_get_drvdata(dev);
 	struct sunxi_spi *sspi = (struct sunxi_spi *)&master[1];
-	char *spi_mode[] = {"Single mode, half duplex read", 
-						"Single mode, half duplex write", 
-						"Single mode, full duplex read and write", 
+	char *spi_mode[] = {"Single mode, half duplex read",
+						"Single mode, half duplex write",
+						"Single mode, full duplex read and write",
 						"Dual mode, half duplex read",
 						"Dual mode, half duplex write",
 						"Null"};
@@ -1576,7 +1572,7 @@ static ssize_t sunxi_spi_status_show(struct device *dev,
 	if (master == NULL)
 		return snprintf(buf, PAGE_SIZE, "%s\n", "spi_master is NULL!");
 
-	return snprintf(buf, PAGE_SIZE, 
+	return snprintf(buf, PAGE_SIZE,
 		"master->bus_num = %d \n"
 		"master->num_chipselect = %d \n"
 		"master->dma_alignment  = %d \n"
@@ -1589,7 +1585,7 @@ static ssize_t sunxi_spi_status_show(struct device *dev,
 #ifdef CONFIG_DMA_ENGINE
 		"sspi->dma_tx.dir = %d [%s] \n"
 		"sspi->dma_rx.dir = %d [%s] \n"
-#endif		
+#endif
 		"sspi->busy = %d [%s] \n"
 		"sspi->result = %d [%s] \n"
 		"sspi->base_addr = 0x%p, the SPI control register: \n"
@@ -1598,16 +1594,16 @@ static ssize_t sunxi_spi_status_show(struct device *dev,
 		"[FSR] 0x%02x = 0x%08x, [WCR] 0x%02x = 0x%08x, [CCR] 0x%02x = 0x%08x \n"
 		"[BCR] 0x%02x = 0x%08x, [TCR] 0x%02x = 0x%08x, [BCC] 0x%02x = 0x%08x \n"
 		"[DMA] 0x%02x = 0x%08x, [TXR] 0x%02x = 0x%08x, [RXD] 0x%02x = 0x%08x \n",
-		master->bus_num, master->num_chipselect, master->dma_alignment, 
-		master->mode_bits, master->flags, master->bus_lock_flag,	   	
+		master->bus_num, master->num_chipselect, master->dma_alignment,
+		master->mode_bits, master->flags, master->bus_lock_flag,
 		master->busy, master->running, master->rt,
 		sspi->mode_type, spi_mode[sspi->mode_type],
-		sspi->irq, sspi->dev_name, sspi->cs_bitmap, 
+		sspi->irq, sspi->dev_name, sspi->cs_bitmap,
 #ifdef CONFIG_DMA_ENGINE
 		sspi->dma_tx.dir, dma_dir[sspi->dma_tx.dir],
 		sspi->dma_rx.dir, dma_dir[sspi->dma_rx.dir],
 #endif
-		sspi->busy, busy_state[sspi->busy], 
+		sspi->busy, busy_state[sspi->busy],
 		sspi->result, result_str[sspi->result],
 		sspi->base_addr,
 		SPI_VER_REG, readl(sspi->base_addr + SPI_VER_REG),
@@ -1640,7 +1636,7 @@ static void sunxi_spi_sysfs(struct platform_device *_pdev)
 
 static int sunxi_spi_probe(struct platform_device *pdev)
 {
-	struct device_node *np = pdev->dev.of_node; 
+	struct device_node *np = pdev->dev.of_node;
 	struct resource	*mem_res;
 	struct sunxi_spi *sspi;
 	struct sunxi_spi_platform_data *pdata;
@@ -1700,7 +1696,7 @@ static int sunxi_spi_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err0;
 	}
- 
+
 	/* create spi master */
 	master = spi_alloc_master(&pdev->dev, sizeof(struct sunxi_spi));
 	if (master == NULL) {
@@ -1844,7 +1840,6 @@ static int sunxi_spi_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 static int sunxi_spi_suspend(struct device *dev)
 {
-#ifdef CONFIG_EVB_PLATFORM
 	struct platform_device *pdev = to_platform_device(dev);
 	struct spi_master *master = spi_master_get(platform_get_drvdata(pdev));
 	struct sunxi_spi *sspi = spi_master_get_devdata(master);
@@ -1863,15 +1858,13 @@ static int sunxi_spi_suspend(struct device *dev)
 	sunxi_spi_select_gpio_state(sspi->pctrl, PINCTRL_STATE_SLEEP, master->bus_num);
 	spi_regulator_disable(dev->platform_data);
 
-	SPI_INF("[spi-%d]: suspend okay.. \n", master->bus_num);
-#endif
+	SPI_INF("[spi-%d]: suspend okay..\n", master->bus_num);
 
 	return 0;
 }
 
 static int sunxi_spi_resume(struct device *dev)
 {
-#ifdef CONFIG_EVB_PLATFORM
 	struct platform_device *pdev = to_platform_device(dev);
 	struct spi_master *master = spi_master_get(platform_get_drvdata(pdev));
 	struct sunxi_spi  *sspi = spi_master_get_devdata(master);
@@ -1882,8 +1875,8 @@ static int sunxi_spi_resume(struct device *dev)
 	spin_lock_irqsave(&sspi->lock, flags);
 	sspi->busy = SPI_FREE;
 	spin_unlock_irqrestore(&sspi->lock, flags);
-	SPI_INF("[spi-%d]: resume okay.. \n", master->bus_num);
-#endif
+	SPI_INF("[spi-%d]: resume okay..\n", master->bus_num);
+
 	return 0;
 }
 

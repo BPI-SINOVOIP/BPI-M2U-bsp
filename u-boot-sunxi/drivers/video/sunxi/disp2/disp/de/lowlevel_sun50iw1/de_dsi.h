@@ -188,6 +188,7 @@ s32 dsi_gen_wr_5para(u32 sel,u8 cmd,u8 para1,u8 para2,u8 para3,u8 para4,u8 para5
 s32 dsi_dphy_cfg_0data(u32 sel,u32 code);
 s32 dsi_dphy_cfg_1data(u32 sel,u32 code,u32 data);
 s32 dsi_dphy_cfg_2data(u32 sel,u32 code,u32 data0,u32 data1);
+s32 dsi_mode_switch(u32 sel, u32 en);
 
 extern u32  dsi_pixel_bits[4];
 extern u32  dsi_lane_den[4];

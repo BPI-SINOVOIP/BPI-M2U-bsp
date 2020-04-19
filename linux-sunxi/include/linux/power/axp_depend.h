@@ -11,6 +11,16 @@
 #ifndef __AXP_DEPEND_H__
 #define __AXP_DEPEND_H__
 
+#include <linux/types.h>
+
+/*
+ * AXP status:
+ * */
+typedef enum AW_AXP_STATUS {
+	AXP_NOTREADY = 0,
+	AXP_READY,
+} aw_axp_status_e;
+
 /*
  * PMU ID:
  * */
@@ -208,7 +218,7 @@ enum VDD_BIT
 	VDD_TEST_BIT,
 	VDD_RES1_BIT,
 	VDD_RES2_BIT,
-#if (defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW11))
+#if (defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW11) || defined(CONFIG_ARCH_SUN50IW6P1))
 	VCC_PC_BIT,
 #else
 	VDD_RES3_BIT,
@@ -224,6 +234,7 @@ typedef struct {
 #define AXP_GPIO_IRQF_TRIGGER_RISING	0x00000001
 #define AXP_GPIO_IRQF_TRIGGER_FALLING	0x00000002
 
+extern struct raw_notifier_head axp_regu_notifier;
 extern int axp_gpio_irq_request(int pmu_num, int gpio_no,
 		u32 (*handler)(int, void *), void *data);
 extern int axp_gpio_irq_enable(int pmu_num, int gpio_no);
@@ -256,5 +267,6 @@ extern int is_sys_pwr_dm_active(unsigned int bitmap);
 extern char *get_sys_pwr_dm_id(unsigned int bitmap);
 extern void get_pwr_regu_tree(unsigned int *p);
 extern ssize_t parse_pwr_dm_map(char *s, size_t size, unsigned int bitmap);
+extern int axp_usb_is_connected(void);
 #endif /* __AXP_DEPEND_H__ */
 

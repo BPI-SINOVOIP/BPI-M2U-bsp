@@ -177,6 +177,8 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
 	spear320-evb.dtb \
 	spear320-hmi.dtb
 dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+dtb-$(CONFIG_ARCH_SUN8IW5P1) += sun8iw5p1-soc.dtb
+dtb-$(CONFIG_ARCH_SUN8IW8P1) += sun8iw8p1-v3s-perf.dtb
 dtb-$(CONFIG_ARCH_SUN8IW10P1) += sun8iw10p1-fpga.dtb \
 	sun8iw10p1-perf1_v1_0.dtb \
 	sun8iw10p1-perf2_v1_0.dtb \
@@ -188,6 +190,12 @@ dtb-$(CONFIG_ARCH_SUN8IW11P1) += sun8iw11p1-fpga.dtb \
 	sun8iw11p1-soc.dtb \
 	sun8iw11p1-soc-sd.dtb \
 	sun8iw11p1-soc-emmc.dtb
+dtb-$(CONFIG_ARCH_SUN8IW17P1) += sun8iw17p1-fpga.dtb \
+	sun8iw17p1-soc.dtb
+ifeq ($(CONFIG_ARCH_SUN3IW1P1),y)
+dtb-$(CONFIG_ARCH_SUN3IW1P1_C600) += sun3iw1p1-soc.dtb
+dtb-$(CONFIG_ARCH_SUN3IW1P1_R6) += sun3iw1p1-r6-soc.dtb
+endif
 dtb-$(CONFIG_ARCH_SUN50IW1P1) += sun50iw1p1-soc.dtb \
 	sun50iw1p1-perf1_v1_0.dtb
 dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \

@@ -1194,10 +1194,11 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order,
 						int migratetype)
 {
 	struct page *page = NULL;
-
+#ifdef CONFIG_CMA
 	if (IS_ENABLED(CONFIG_CMA) &&
 		migratetype == MIGRATE_MOVABLE && zone->managed_cma_pages)
 		page = __rmqueue_cma(zone, order);
+#endif
 
 retry_reserve:
 	if (!page)
@@ -1735,6 +1736,7 @@ static bool __zone_watermark_ok(struct zone *z, int order, unsigned long mark,
 		min -= min / 2;
 	if (alloc_flags & ALLOC_HARDER)
 		min -= min / 4;
+#ifdef CONFIG_CMA
 	/*
 	 * We don't want to regard the pages on CMA region as free
 	 * on watermark checking, since they cannot be used for
@@ -1743,6 +1745,7 @@ static bool __zone_watermark_ok(struct zone *z, int order, unsigned long mark,
 	 */
 	if (IS_ENABLED(CONFIG_CMA) && z->managed_cma_pages)
 		free_pages -= zone_page_state(z, NR_FREE_CMA_PAGES);
+#endif
 
 	if (free_pages <= min + lowmem_reserve)
 		return false;
@@ -4768,8 +4771,10 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		zone->zone_pgdat = pgdat;
 
 		zone_pcp_init(zone);
+#ifdef CONFIG_CMA
 		if (IS_ENABLED(CONFIG_CMA))
-			zone->managed_cma_pages = 0;		
+			zone->managed_cma_pages = 0;
+#endif
 		lruvec_init(&zone->lruvec);
 		if (!size)
 			continue;
@@ -6366,3 +6371,4 @@ void dump_page(struct page *page)
 	dump_page_flags(page->flags);
 	mem_cgroup_print_bad_page(page);
 }
+

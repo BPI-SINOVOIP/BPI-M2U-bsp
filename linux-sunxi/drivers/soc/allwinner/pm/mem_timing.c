@@ -2,6 +2,55 @@
 #include "./pm.h"
 #include "./pm_i.h"
 
+#ifdef CONFIG_ARCH_SUN3IW1P1 /*sun3i don't have performance management unit */
+
+void standby_delay_loop(__u32 ms)
+{
+	int i;
+
+	for (i = ms; i > 0; i--)
+		;
+
+	return;
+}
+
+void delay_ms(__u32 ms)
+{
+	__u32 cpu_freq = 0;
+	__u32 cpu_ms_loopcnt = 0;
+
+	cpu_freq = mem_clk_get_cpu_freq();
+
+	cpu_ms_loopcnt = cpu_freq;
+
+	standby_delay_loop(ms * cpu_ms_loopcnt);
+}
+
+void delay_us(__u32 us)
+{
+	__u32 cpu_freq = 0;
+	__u32 cpu_us_loopcnt = 0;
+
+	cpu_freq = mem_clk_get_cpu_freq();
+
+	cpu_us_loopcnt = cpu_freq / 1000;
+
+	standby_delay_loop(us * cpu_us_loopcnt);
+}
+
+
+void init_perfcounters(__u32 do_reset, __u32 enable_divider)
+{
+	return;
+}
+
+
+void change_runtime_env(void)
+{
+	return;
+}
+
+#else
 static __u32 cpu_freq;
 static __u32 overhead;
 static __u32 backup_perf_counter_ctrl_reg;
@@ -292,3 +341,4 @@ int get_event_counter(enum counter_type_e type)
 
 	return event_cnt;
 }
+#endif

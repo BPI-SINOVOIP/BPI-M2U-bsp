@@ -361,6 +361,15 @@ config SUNXI_DMA
 	  Support the DMA engine found on Sunxi family SOCs.
 	  This DMA engine can only be used with on-chip devices.
 
+config SUN3I_DMA
+	tristate "Sun3i SOC DMA support"
+	depends on ARCH_SUN3I
+	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
+	help
+	  Support the DMA engine of Sun3i on Sunxi family SOCs.
+	  This DMA engine can only be used with on-chip devices.
+
 config SUNXI_RDMA
 	tristate "Sunxi SOC R_DMA support"
 	depends on ARCH_SUN9I

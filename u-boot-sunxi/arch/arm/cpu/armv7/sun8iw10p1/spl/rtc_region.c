@@ -135,23 +135,23 @@ probe_super_standby_flag (void)
 void
 handler_super_standby (void)
 {
-  if (probe_super_standby_flag ()) {
-      timer_exit();
-      ppm_dram_para =
-	(pm_dram_para_t *) (&(pextended_standby->soc_dram_state));
-      if (standby_dram_crc_enable (ppm_dram_para)) {
-	  before_crc = readl(DRAM_CRC_REG_ADDR);
-	  after_crc = standby_dram_crc (ppm_dram_para);
-	  if (after_crc != before_crc) {
-	      printf ("before_crc = 0x%x, after_crc = 0x%x.\n", before_crc,
-		      after_crc);
-	      printf ("dram crc error...\n");
-	      asm ("b .");
-	    }
+	if (probe_super_standby_flag ()) {
+		ppm_dram_para =
+		(pm_dram_para_t *) (&(pextended_standby->soc_dram_state));
+		if (standby_dram_crc_enable (ppm_dram_para)) {
+			before_crc = readl(DRAM_CRC_REG_ADDR);
+			after_crc = standby_dram_crc (ppm_dram_para);
+			if (after_crc != before_crc) {
+			printf ("before_crc = 0x%x, after_crc = 0x%x.\n", before_crc,
+			after_crc);
+			printf ("dram crc error...\n");
+			asm ("b .");
+			}
+		}
+		dram_enable_all_master();
+		timer_exit();
+		printf ("find standby flag,jump to addr 0x%x \n",
+		readl (RTC_STANDBY_SOFT_ENTRY_REG));
+		boot0_jmp_other (readl (RTC_STANDBY_SOFT_ENTRY_REG));
 	}
-      dram_enable_all_master();
-      printf ("find standby flag,jump to addr 0x%x \n",
-	      readl (RTC_STANDBY_SOFT_ENTRY_REG));
-      boot0_jmp_other (readl (RTC_STANDBY_SOFT_ENTRY_REG));
-    }
 }

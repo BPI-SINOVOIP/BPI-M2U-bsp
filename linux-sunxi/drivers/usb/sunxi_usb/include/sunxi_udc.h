@@ -83,7 +83,8 @@ struct sw_udc_fifo{
 	u8  double_fifo;
 };
 
-#if defined(CONFIG_ARCH_SUN50IW1)
+#if defined(CONFIG_ARCH_SUN50IW1) || defined(CONFIG_ARCH_SUN8IW6) \
+	|| defined(CONFIG_ARCH_SUN8IW5) || defined(CONFIG_ARCH_SUN50IW3)
 //fifo 8k
 
 /*
@@ -256,6 +257,8 @@ typedef struct sunxi_udc {
 #endif
 	u32				stoped;		/* controller stop work	*/
 	u32 				irq_no;		/* usb irq no */
+
+	struct work_struct		vbus_det_work;
 }sunxi_udc_t;
 
 enum sunxi_udc_cmd_e {

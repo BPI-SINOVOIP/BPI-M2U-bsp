@@ -21,6 +21,9 @@
  * Description:
  *	This file can be applied to following platforms:
  *	CONFIG_PLATFORM_ARM_SUNxI
+ *	CONFIG_PLATFORM_ARM_SUN6I
+ *	CONFIG_PLATFORM_ARM_SUN7I
+ *	CONFIG_PLATFORM_ARM_SUN8I
  */
 #include <drv_types.h>
 #ifdef CONFIG_GPIO_WAKEUP
@@ -48,15 +51,18 @@ extern unsigned int oob_irq;
 int platform_wifi_power_on(void)
 {
 	int ret = 0;
+	int wlan_bus_index = 0;
 
 #ifdef CONFIG_MMC
 {
 
+	printk("platform_wifi_power_on!\n");
 #if defined(CONFIG_PLATFORM_ARM_SUNxI)
-	int wlan_bus_index = sunxi_wlan_get_bus_index();
-	if(wlan_bus_index < 0)
+	wlan_bus_index = sunxi_wlan_get_bus_index();
+	if(wlan_bus_index < 0){
+		printk("platform_wifi_power_on:wlan_bus_index < 0! index=%d\n",wlan_bus_index);
 		return wlan_bus_index;
-
+	}
 	sunxi_wlan_set_power(1);
 	mdelay(100);
 	sunxi_mmc_rescan_card(wlan_bus_index);
@@ -76,9 +82,11 @@ int platform_wifi_power_on(void)
 
 void platform_wifi_power_off(void)
 {
+	int wlan_bus_index = 0;
 #ifdef CONFIG_MMC
 #if defined(CONFIG_PLATFORM_ARM_SUNxI)
-	int wlan_bus_index = sunxi_wlan_get_bus_index();
+	printk("platform_wifi_power_off!\n");
+	wlan_bus_index = sunxi_wlan_get_bus_index();
 	if(wlan_bus_index < 0)
 		return;
 

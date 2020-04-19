@@ -196,8 +196,16 @@ static void axp20_wakeup_event(void)
 static s32 axp20_usb_det(void)
 {
 	u8 value = 0;
+	int ret = 0;
+
 	axp_regmap_read(axp20_pm_power->regmap, AXP20_STATUS, &value);
-	return (value & 0x10) ? 1 : 0;
+
+	if (value & 0x10) {
+		axp_usb_connect = 1;
+		ret = 1;
+	}
+
+	return ret;
 }
 
 static s32 axp20_usb_vbus_output(int high)

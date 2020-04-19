@@ -37,6 +37,7 @@
 #include  "usb_hw_scan.h"
 #include  "usb_msg_center.h"
 
+
 int usb_hw_scan_debug = 0;
 
 extern struct usb_cfg g_usb_cfg;
@@ -53,6 +54,10 @@ static ssize_t device_chose(struct device * dev,struct device_attribute * attr,c
 	hw_rmmod_usb_host();
 	hw_rmmod_usb_device();
 	usb_msg_center(&g_usb_cfg);
+
+#ifdef CONFIG_IO_EXPAND
+	gpio_set_value_cansleep(g_usb_drv_det_pin, g_usb_board_sel ? 0 : 1);
+#endif
 
 	hw_insmod_usb_device();
 	usb_msg_center(&g_usb_cfg);
@@ -74,6 +79,9 @@ static ssize_t host_chose(struct device * dev,struct device_attribute * attr,cha
 	hw_rmmod_usb_device();
 	usb_msg_center(&g_usb_cfg);
 
+#ifdef CONFIG_IO_EXPAND
+	gpio_set_value_cansleep(g_usb_drv_det_pin, g_usb_board_sel ? 1 : 0);
+#endif
 	hw_insmod_usb_host();
 	usb_msg_center(&g_usb_cfg);
 

@@ -1322,6 +1322,27 @@ int probe_drm_configure(long unsigned int *drm_base, long unsigned int *drm_size
 }
 EXPORT_SYMBOL(probe_drm_configure);
 
+int ss_kl_smc_call(u32 cmd, u32 args)
+{
+	struct smc_param param = { 0 };
+
+	param.a0 = TEESMC32_CALL_SS_KL_CTL;
+	param.a1 = cmd;
+
+	if (args)
+		param.a2 = (u32)args;
+
+	tee_smc_call(&param);
+
+	if (param.a0 != TEESMC_RETURN_OK) {
+		pr_err("kl smc call cmd(%d) fail,ret: %X", cmd, (uint)param.a0);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(ss_kl_smc_call);
+
 static struct of_device_id tz_tee_match[] = {
 	{
 	 .compatible = "stm,armv7sec",

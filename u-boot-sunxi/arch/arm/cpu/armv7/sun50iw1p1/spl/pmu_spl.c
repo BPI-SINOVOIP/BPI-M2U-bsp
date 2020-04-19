@@ -200,7 +200,7 @@ int set_pll_voltage(int set_vol)
 	return -1;
 }
 
-int pmu_init(void)
+int pmu_init(u8 power_mode)
 {
 	if(sunxi_rsb_init(0))
 		return -1;

@@ -1,5 +1,6 @@
 #ifndef _MCTL_HAL_H
 #define  _MCTL_HAL_H
+#include <linux/printk.h>
 /**********************
 验证平台宏定义
 1.FPGA_VERIFY --- FPGA验证打开
@@ -100,5 +101,9 @@ standby唤醒不走boot流程
 #define dram_dbg_auto(fmt, args...)
 #endif
 
+#ifdef SYSTEM_VERIFY
+extern void change_runtime_env(void);
+extern void delay_us(unsigned int us);
+#endif
 
 #endif	/*_MCTL_HAL_H*/

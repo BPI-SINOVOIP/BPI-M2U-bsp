@@ -92,7 +92,7 @@ extern struct tv_info_t g_tv_info;
 static inline bool is_vga_mode(enum disp_tv_mode mode)
 {
 	if ((mode >= DISP_VGA_MOD_640_480P_60)
-		&& (mode <= DISP_VGA_MOD_1920_1200P_60))
+		&& (mode <= DISP_VGA_MOD_MAX_NUM))
 		return true;
 
 	return false;

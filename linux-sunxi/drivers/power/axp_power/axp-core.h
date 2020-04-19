@@ -154,6 +154,7 @@ extern void set_nmi_trigger(u32 trigger);
 
 extern int axp_suspend_flag;
 extern int axp_num;
+extern int axp_usb_connect;
 extern const char *axp_name[AXP_ONLINE_SUM];
 extern const char *get_pmu_cur_name(int pmu_num);
 

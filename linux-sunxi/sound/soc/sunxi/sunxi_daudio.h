@@ -17,6 +17,61 @@
 #ifndef	__SUNXI_DAUDIO_H_
 #define	__SUNXI_DAUDIO_H_
 
+/*
+ *             I2S(0..)        HDMI_NUM         MODE
+ * sun8iw10	  2		 none		 B
+ * sun8iw11	  3		  2		 A
+ * sun8iw17	  3		 none		 B
+ * sun50iw1	  3		  2		 A
+ * sun50iw2	  3		  2		 A
+ * sun50iw3	  3		 none		 B
+ * sun50iw6	  4		  1		 B
+ */
+
+/* DAUDIO chans diff config, Mode A support 8 chans, Mode B support 16 chans */
+#if defined(CONFIG_ARCH_SUN8IW10) || defined(CONFIG_ARCH_SUN8IW17) ||	\
+	defined(CONFIG_ARCH_SUN50IW3) || defined(CONFIG_ARCH_SUN50IW6)
+#define SUNXI_DAUDIO_MODE_B
+#else
+#undef	SUNXI_DAUDIO_MODE_B
+#endif
+
+/* HDMI Daudio Module define */
+#if defined(CONFIG_ARCH_SUN8IW11) || defined(CONFIG_ARCH_SUN50IW2) || \
+	defined(CONFIG_ARCH_SUN50IW1) || defined(CONFIG_ARCH_SUN50IW6)
+#define SUNXI_DAUDIO_HDMI
+#else
+#undef	SUNXI_DAUDIO_HDMI
+#endif
+
+/* I2S group max number define */
+#if defined(CONFIG_ARCH_SUN8IW10)
+#define	SUNXI_DAUDIO_NUM_TWO
+#elif defined(CONFIG_ARCH_SUN8IW11) || defined(CONFIG_ARCH_SUN8IW17) || \
+	defined(CONFIG_ARCH_SUN50IW1) || defined(CONFIG_ARCH_SUN50IW2) || \
+	defined(CONFIG_ARCH_SUN50IW3)
+#define SUNXI_DAUDIO_NUM_TWO
+#define	SUNXI_DAUDIO_NUM_THREE
+#elif defined(CONFIG_ARCH_SUN50IW6)
+#define SUNXI_DAUDIO_NUM_TWO
+#define SUNXI_DAUDIO_NUM_THREE
+#define SUNXI_DAUDIO_NUM_FOUR
+#endif
+
+/* fix ugly dma drq type define in sun50iw2 */
+#ifdef CONFIG_ARCH_SUN50IW2
+#define DRQSRC_DAUDIO_2_RX DRQDST_DAUDIO_2_TX
+#endif
+
+/* hdmi daudio num define */
+#if defined(SUNXI_DAUDIO_HDMI)
+#if defined(CONFIG_ARCH_SUN50IW6)
+#define DRQDST_DAUDIO_HDMI_TX	DRQDST_DAUDIO_1_TX
+#else
+#define DRQDST_DAUDIO_HDMI_TX	DRQDST_DAUDIO_2_TX
+#endif	/* CONFIG_ARCH_SUN50IW6 */
+#endif	/* SUNXI_DAUDIO_HDMI */
+
 /* DAUDIO register definition */
 #define	SUNXI_DAUDIO_CTL	0x00
 #define	SUNXI_DAUDIO_FMT0	0x04
@@ -36,7 +91,7 @@
 #define	SUNXI_DAUDIO_TX2CHSEL	0x3C
 #define	SUNXI_DAUDIO_TX3CHSEL	0x40
 
-#if	defined(CONFIG_ARCH_SUN8IW10)
+#if	defined(SUNXI_DAUDIO_MODE_B)
 #define	SUNXI_DAUDIO_TX0CHMAP0	0x44
 #define	SUNXI_DAUDIO_TX0CHMAP1	0x48
 #define	SUNXI_DAUDIO_TX1CHMAP0	0x4C
@@ -49,6 +104,20 @@
 #define	SUNXI_DAUDIO_RXCHMAP0	0x68
 #define	SUNXI_DAUDIO_RXCHMAP1	0x6C
 #define	SUNXI_DAUDIO_DEBUG		0x70
+#elif defined(CONFIG_ARCH_SUN8IW17)
+#define	SUNXI_DAUDIO_TX0CHMAP0	0x44
+#define	SUNXI_DAUDIO_TX0CHMAP1	0x48
+#define	SUNXI_DAUDIO_TX1CHMAP0	0x4C
+#define	SUNXI_DAUDIO_TX1CHMAP1	0x50
+#define	SUNXI_DAUDIO_TX2CHMAP0	0x54
+#define	SUNXI_DAUDIO_TX2CHMAP1	0x58
+#define	SUNXI_DAUDIO_TX3CHMAP0	0x5C
+#define	SUNXI_DAUDIO_TX3CHMAP1	0x60
+#define	SUNXI_DAUDIO_RXCHSEL	0x64
+#define	SUNXI_DAUDIO_RXCHMAP	0x68
+#define	SUNXI_DAUDIO_RXCHMAP1	0x6C
+#define	SUNXI_DAUDIO_DEBUG		0x70
+
 #else
 #define	SUNXI_DAUDIO_TX0CHMAP0	0x44
 #define	SUNXI_DAUDIO_TX1CHMAP0	0x48
@@ -59,7 +128,6 @@
 
 #define	SUNXI_DAUDIO_DEBUG	0x5C
 #endif
-
 /* SUNXI_DAUDIO_CTL:0x00 */
 #define	BCLK_OUT		18
 #define	LRCK_OUT		17
@@ -138,7 +206,7 @@
 #define	TX_SLOT_NUM		0
 
 /* SUNXI_DAUDIO_TXnCHSEL:0X34+n*0x04 */
-#if	defined(CONFIG_ARCH_SUN8IW10)
+#if	defined(SUNXI_DAUDIO_MODE_B)
 #define	TX_OFFSET		20
 #define	TX_CHSEL		16
 #define	TX_CHEN			0
@@ -149,7 +217,7 @@
 #endif
 
 /* SUNXI_DAUDIO_RXCHSEL */
-#if	defined(CONFIG_ARCH_SUN8IW10)
+#if	defined(SUNXI_DAUDIO_MODE_B)
 #define	RX_OFFSET		20
 #define	RX_CHSEL		16
 #else
@@ -258,12 +326,13 @@
 #define	SUNXI_DAUDIO_TX_CHSEL_MASK		7
 
 /* SUNXI_DAUDIO_RXCHSEL */
-#ifndef	CONFIG_ARCH_SUN8IW10
+#ifndef	SUNXI_DAUDIO_MODE_B
 #define SUNXI_DAUDIO_RX_OFFSET_MASK		1
+#define SUNXI_DAUDIO_RX_CHSEL_MASK		0xF
 #else
 #define SUNXI_DAUDIO_RX_OFFSET_MASK		3
+#define SUNXI_DAUDIO_RX_CHSEL_MASK		7
 #endif
-#define	SUNXI_DAUDIO_RX_CHSEL_MASK		7
 
 #define	SND_SOC_DAIFMT_SIG_SHIFT		8
 #define	SND_SOC_DAIFMT_MASTER_SHIFT		12
@@ -272,6 +341,8 @@
 #define SUNXI_DAUDIO_LRCK			1
 #define SUNXI_DAUDIO_MCLK			2
 #define SUNXI_DAUDIO_GEN 			3
+
+
 extern int daudio_set_clk_onoff(struct snd_soc_dai *dai, u32 mask, u32 onoff);
 
 #ifndef	CONFIG_SND_SUNXI_SOC_HDMIAUDIO

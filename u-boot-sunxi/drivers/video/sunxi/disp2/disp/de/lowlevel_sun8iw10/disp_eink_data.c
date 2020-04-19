@@ -751,7 +751,7 @@ int init_eink_ctrl_data_8(unsigned long wavedata_buf, struct eink_timing_param *
 	A13_WAVEDATA *global_ctrl_buffer = NULL;
 
 	A13_WAVEDATA *src = NULL;
-	B100_WAVEDATA_8 *dest = NULL;
+	WAVEDATA_8 *dest = NULL;
 
 	if ((0 == wavedata_buf) || (NULL == eink_timing_info)) {
 		printk(KERN_ERR "%s: input param is null\n", __func__);
@@ -821,7 +821,7 @@ int init_eink_ctrl_data_8(unsigned long wavedata_buf, struct eink_timing_param *
 	}
 
 	src = global_ctrl_buffer;
-	dest = (B100_WAVEDATA_8 *)wavedata_buf;
+	dest = (WAVEDATA_8 *)wavedata_buf;
 
 	for (row = 0; row < wav_height; row++) {
 		for (col = 0; col < wav_width; col++) {
@@ -867,7 +867,7 @@ int init_eink_ctrl_data_16(unsigned long wavedata_buf, struct eink_timing_param 
 	A13_WAVEDATA *global_ctrl_buffer = NULL;
 
 	A13_WAVEDATA *src = NULL;
-	B100_WAVEDATA_16 *dest = NULL;
+	WAVEDATA_16 *dest = NULL;
 
 	if ((0 == wavedata_buf) || (NULL == eink_timing_info)) {
 		printk(KERN_ERR "%s: input param is null\n", __func__);
@@ -938,7 +938,7 @@ int init_eink_ctrl_data_16(unsigned long wavedata_buf, struct eink_timing_param 
 
 	//convert to new format
 	src = global_ctrl_buffer;
-	dest = (B100_WAVEDATA_16 *)wavedata_buf;
+	dest = (WAVEDATA_16 *)wavedata_buf;
 	for (row = 0; row < wav_height; row++) {
 		for (col = 0; col < wav_width; col++) {
 			dest->bits.mode = src->bits.mode;

@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2013-2016
+ * (C) Copyright 2013-20
  * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
  *
  * SPDX-License-Identifier:     GPL-2.0+
@@ -71,6 +71,6 @@
 #define DRAM_START_ADDR				(0x40000000)
 
 
-#define DRIVER_VER  "2016-07-01 17:20"
+#define DRIVER_VER  "2017-9-26 13:50"
 
 #endif /* _MMC_H_ */

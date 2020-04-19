@@ -1186,11 +1186,11 @@ static int nvme_configure_admin_queue(struct nvme_dev *dev)
 	result = nvme_enable_ctrl(dev, cap);
 	if (result)
 		goto free_q;
-
+#ifndef CONFIG_PCIE_SUNXI
 	result = queue_request_irq(dev, nvmeq, "nvme admin");
 	if (result)
 		goto free_q;
-
+#endif
 	dev->queues[0] = nvmeq;
 	return result;
 
@@ -2053,6 +2053,7 @@ static const struct pci_error_handlers nvme_err_handler = {
 
 static DEFINE_PCI_DEVICE_TABLE(nvme_id_table) = {
 	{ PCI_DEVICE_CLASS(PCI_CLASS_STORAGE_EXPRESS, 0xffffff) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0xf1a5) },
 	{ 0, }
 };
 MODULE_DEVICE_TABLE(pci, nvme_id_table);

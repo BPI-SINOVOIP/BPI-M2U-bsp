@@ -132,7 +132,7 @@ int sunxi_card_sprite_main(int workmode, char *name)
 
 	tick_printf("sunxi sprite begin\n");
 	//获取当前是量产介质是nand或者卡
-	production_media = uboot_spare_head.boot_data.storage_type;
+	production_media = get_boot_storage_type();
 	//启动动画显示
 	sprite_cartoon_create();
 	//检查固件合法性

@@ -423,7 +423,8 @@ static int axp15_gpio_probe(struct platform_device *pdev)
 	int i, irq, err;
 
 	axp15_pin = axp_pinctrl_register(&pdev->dev,
-			axp_dev, &axp15_pinctrl_pins_desc, &axp15_gpio_ops);
+				axp_dev, &axp15_pinctrl_pins_desc,
+				&axp15_gpio_ops, axp_dev->pmu_num);
 	if (IS_ERR_OR_NULL(axp15_pin))
 		goto fail;
 

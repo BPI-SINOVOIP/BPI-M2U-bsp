@@ -32,6 +32,17 @@ s32 sunxi_lcd_delay_us(u32 us);
  */
 void sunxi_lcd_tcon_enable(u32 screen_id);
 
+/**
+ * sunxi_lcd_dsi_close - stop dsi transition
+ * @screen_id: The index of screen.
+ */
+void sunxi_lcd_dsi_close(u32 screen_id);
+
+/**
+ * sunxi_lcd_dsi_open - start dsi transition
+ * @screen_id: The index of screen.
+ */
+void sunxi_lcd_dsi_open(u32 screen_id);
 
 /**
  * sunxi_lcd_tcon_disable - disable timing controller.
@@ -80,13 +91,20 @@ s32 sunxi_lcd_pwm_enable(u32 pwm_channel);
 s32 sunxi_lcd_pwm_disable(u32 pwm_channel);
 
 /**
+*
+* sunxi_lcd_cpu_set_auto_mode
+* @screen_id: The index of screen.
+ */
+s32 sunxi_lcd_cpu_set_auto_mode(u32 screen_id);
+
+/**
  * sunxi_lcd_cpu_write - write command and para to cpu panel.
  * @scree_id: The index of screen.
  * @command: Command to be transfer.
  * @para: The pointer to para
  * @para_num: The number of para
  */
-s32 sunxi_lcd_cpu_write(u32 scree_id, u32 command, u32 *para, u32 para_num);
+s32 sunxi_lcd_cpu_write(u32 screen_id, u32 index, u32 data);
 
 /**
  * sunxi_lcd_cpu_write_index - write command to cpu panel.
@@ -123,6 +141,8 @@ s32 sunxi_lcd_dsi_dcs_write_2para(u32 scree_id, u8 command, u8 para1, u8 para2);
 s32 sunxi_lcd_dsi_dcs_write_3para(u32 scree_id, u8 command, u8 para1, u8 para2, u8 para3);
 s32 sunxi_lcd_dsi_dcs_write_4para(u32 scree_id, u8 command, u8 para1, u8 para2, u8 para3, u8 para4);
 s32 sunxi_lcd_dsi_dcs_write_5para(u32 scree_id, u8 command, u8 para1, u8 para2, u8 para3, u8 para4, u8 para5);
+s32 sunxi_lcd_dsi_dcs_write_6para(u32 scree_id, u8 command, u8 para1, u8 para2,
+				  u8 para3, u8 para4, u8 para5, u8 para6);
 
 /**
  * sunxi_lcd_dsi_gen_write - write command and para to mipi panel(GEN type).

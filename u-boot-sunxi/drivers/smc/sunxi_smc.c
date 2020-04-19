@@ -80,12 +80,12 @@ u32 sunxi_smc_call(ulong arg0, ulong arg1, ulong arg2, ulong arg3, ulong pResult
 
 int arm_svc_set_cpu_on(int cpu, uint entry)
 {
-	return sunxi_smc_call(SUNXI_CPU_ON_AARCH32, cpu, entry, 0, 0);
+	return sunxi_smc_call(PSCI_CPU_ON_AARCH32, cpu, entry, 0, 0);
 }
 
 int arm_svc_set_cpu_off(int cpu)
 {
-	return sunxi_smc_call(SUNXI_CPU_OFF_AARCH32, cpu, 0, 0, 0);
+	return sunxi_smc_call(PSCI_CPU_OFF, cpu, 0, 0, 0);
 }
 
 int arm_svc_set_cpu_wfi(void)
@@ -214,7 +214,7 @@ int smc_efuse_writel(void *key_buf)
 
 int smc_init(void)
 {
-	if(sunxi_probe_secure_monitor())
+	if ((sunxi_get_securemode() == SUNXI_SECURE_MODE_WITH_SECUREOS) || sunxi_probe_secure_monitor())
 	{
 		smc_readl_pt = arm_svc_read_sec_reg;
 		smc_writel_pt = arm_svc_write_sec_reg;
@@ -486,3 +486,23 @@ int smc_tee_keybox_store(const char *name, char *in_buf, int len)
 
 	return 0;
 }
+
+int smc_tee_probe_drm_configure(ulong *drm_base, ulong *drm_size)
+{
+	struct smc_param param = { 0 };
+
+	param.a0 = TEESMC32_CALL_GET_DRM_INFO;
+	param.a1 = TEESMC_DRM_PHY_INFO;
+	tee_smc_call(&param);
+
+	if (param.a0 != 0) {
+		printf("drm config service not available: %X", (uint)param.a0);
+		return -1;
+	}
+
+	*drm_base = param.a1;
+	*drm_size = param.a2;
+
+	return 0;
+}
+

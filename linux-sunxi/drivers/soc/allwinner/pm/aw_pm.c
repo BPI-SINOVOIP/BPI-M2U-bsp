@@ -27,24 +27,25 @@ unsigned int show_gpio_config(char *s, unsigned int size)
 		end = s + size;
 	}
 
-	uk_printf(s, end - s, "\t SUNXI_BANK_SIZE bit 0x%x \n",
-		  SUNXI_BANK_SIZE);
-	uk_printf(s, end - s, "\t SUNXI_PA_BASE   bit 0x%x \n", SUNXI_PA_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PB_BASE   bit 0x%x \n", SUNXI_PB_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PC_BASE   bit 0x%x \n", SUNXI_PC_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PD_BASE   bit 0x%x \n", SUNXI_PD_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PE_BASE   bit 0x%x \n", SUNXI_PE_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PF_BASE   bit 0x%x \n", SUNXI_PF_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PG_BASE   bit 0x%x \n", SUNXI_PG_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PH_BASE   bit 0x%x \n", SUNXI_PH_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PI_BASE   bit 0x%x \n", SUNXI_PI_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PJ_BASE   bit 0x%x \n", SUNXI_PJ_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PK_BASE   bit 0x%x \n", SUNXI_PK_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PL_BASE   bit 0x%x \n", SUNXI_PL_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PM_BASE   bit 0x%x \n", SUNXI_PM_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PN_BASE   bit 0x%x \n", SUNXI_PN_BASE);
-	uk_printf(s, end - s, "\t SUNXI_PO_BASE   bit 0x%x \n", SUNXI_PO_BASE);
-	uk_printf(s, end - s, "\t AXP_PIN_BASE    bit 0x%x \n", AXP_PIN_BASE);
+	uk_printf(s, end - s, "\t SUNXI_BANK_SIZE bit 0x%x\n", SUNXI_BANK_SIZE);
+	uk_printf(s, end - s, "\t SUNXI_PA_BASE   bit 0x%x\n", SUNXI_PA_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PB_BASE   bit 0x%x\n", SUNXI_PB_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PC_BASE   bit 0x%x\n", SUNXI_PC_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PD_BASE   bit 0x%x\n", SUNXI_PD_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PE_BASE   bit 0x%x\n", SUNXI_PE_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PF_BASE   bit 0x%x\n", SUNXI_PF_BASE);
+#ifndef CONFIG_ARCH_SUN3IW1P1
+	uk_printf(s, end - s, "\t SUNXI_PG_BASE   bit 0x%x\n", SUNXI_PG_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PH_BASE   bit 0x%x\n", SUNXI_PH_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PI_BASE   bit 0x%x\n", SUNXI_PI_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PJ_BASE   bit 0x%x\n", SUNXI_PJ_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PK_BASE   bit 0x%x\n", SUNXI_PK_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PL_BASE   bit 0x%x\n", SUNXI_PL_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PM_BASE   bit 0x%x\n", SUNXI_PM_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PN_BASE   bit 0x%x\n", SUNXI_PN_BASE);
+	uk_printf(s, end - s, "\t SUNXI_PO_BASE   bit 0x%x\n", SUNXI_PO_BASE);
+	uk_printf(s, end - s, "\t AXP_PIN_BASE    bit 0x%x\n", AXP_PIN_BASE);
+#endif
 
 	return s - start;
 

@@ -294,6 +294,48 @@ static struct disp_video_timings video_timing[] = {
 	},
 	{
 		.vic = 0,
+		.tv_mode = DISP_VGA_MOD_1024_768P_60,
+		.pixel_clk = 65000000,
+		.pixel_repeat = 0,
+		.x_res = 1024,
+		.y_res = 768,
+		.hor_total_time = 1344,
+		.hor_back_porch = 160,
+		.hor_front_porch = 24,
+		.hor_sync_time = 136,
+		.ver_total_time = 806,
+		.ver_back_porch = 29,
+		.ver_front_porch = 3,
+		.ver_sync_time = 6,
+		.hor_sync_polarity = 0,/* 0: negative, 1: positive */
+		.ver_sync_polarity = 0,/* 0: negative, 1: positive */
+		.b_interlace = 0,
+		.vactive_space = 0,
+		.trd_mode = 0,
+	},
+	{
+		.vic = 0,
+		.tv_mode = DISP_VGA_MOD_1280_720P_60,
+		.pixel_clk = 74250000,
+		.pixel_repeat = 0,
+		.x_res = 1280,
+		.y_res = 720,
+		.hor_total_time = 1650,
+		.hor_back_porch = 220,
+		.hor_front_porch = 110,
+		.hor_sync_time = 40,
+		.ver_total_time = 750,
+		.ver_back_porch = 20,
+		.ver_front_porch = 5,
+		.ver_sync_time = 5,
+		.hor_sync_polarity = 1,/* 0: negative, 1: positive */
+		.ver_sync_polarity = 1,/* 0: negative, 1: positive */
+		.b_interlace = 0,
+		.vactive_space = 0,
+		.trd_mode = 0,
+	},
+	{
+		.vic = 0,
 		.tv_mode = DISP_VGA_MOD_1920_1080P_60,
 		.pixel_clk = 14850000,
 		.pixel_repeat = 0,
@@ -861,7 +903,7 @@ s32 tv_enable(u32 sel)
 
 		tve_clk_config(sel, g_tv_info.screen[sel].tv_mode);
 		tve_low_set_tv_mode(sel, g_tv_info.screen[sel].tv_mode,
-					g_tv_info.screen[sel].sid);
+					cali);
 		tve_low_dac_enable(sel);
 		tve_low_open(sel);
 		mutex_lock(&g_tv_info.screen[sel].mlock);

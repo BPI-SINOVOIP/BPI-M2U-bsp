@@ -11,14 +11,20 @@
 
 #define IR_FIFO_SIZE		(64) /* 64Bytes */
 
-#define IR_SIMPLE_UNIT		(42000) 	/* simple in ns */
-#define IR_CLK			(3000000) 	/* 3Mhz */
-#define IR_SAMPLE_DEV		(0x1<<0) 	/* 3MHz/128 =23437Hz (~42us) */
-#define IR_RXFILT_VAL		(((8)&0x3f)<<2) /* Filter Threshold = 8*42us = 336us < 500us */
-#define IR_RXIDLE_VAL		(((2)&0xff)<<8) /* Idle Threshold = (2+1)*128clock*42us = 16ms > 9ms */
-#define IR_ACTIVE_T		((0&0xff)<<16)  /* Active Threshold (0+1)*128clock*42us = 5.3ms */
-#define IR_ACTIVE_T_C		(1<<23)   	/* Active Threshold */
+#define IR_SIMPLE_UNIT		(21000) 	/* simple in ns */
+#define IR_CLK			(24000000) 	/* 24Mhz */
+#define IR_SAMPLE_DEV		(0x3<<0) 	/* 24MHz/512 =46875Hz (~21us) */
 
+
+#define IR_ACTIVE_T		((0&0xff)<<16)  /* Active Threshold (0+1)*128clock*21us = 2.6ms */
+
+#define IR_RXFILT_VAL		(((0x10)&0x3f)<<2) /* Filter Threshold = 16*21us = 336us < 500us */
+
+#define IR_RXFILT_VAL_RC5	(((0x16)&0x3f)<<2) /* Filter Threshold = 22*21us = 336us < 500us */
+#define IR_RXIDLE_VAL		(((5)&0xff)<<8) /* Idle Threshold = (5+1)*128clock*21us = 16ms > 9ms */
+#define IR_ACTIVE_T_SAMPLE	((16&0xff)<<16)  /* Active Threshold (0+1)*128clock*21us = 2.6ms */
+
+#define IR_ACTIVE_T_C		(1<<23)		/* Active Threshold */
 #define IR_CIR_MODE		(0x3<<4)         /* CIR mode enable */
 #define IR_ENTIRE_ENABLE 	(0x3<<0)         /* IR entire enable */
 #define IR_FIFO_20       	(((20)-1)<<8)
@@ -62,6 +68,7 @@ enum ir_sample_config {
 	IR_FILTER_TH,
 	IR_IDLE_TH,
 	IR_ACTIVE_TH,
+	IR_ACTIVE_TH_SAMPLE,
 };
 enum ir_irq_config {
 	IR_IRQ_STATUS_CLEAR,
@@ -84,6 +91,7 @@ struct sunxi_ir_data{
 	int irq_num;
 	u32 ir_addr_cnt;
 	u32 ir_addr[MAX_ADDR_NUM];
+	u32 ir_protocol_used;
 };
 
 int init_rc_map_sunxi(u32 *addr, u32 addr_num);

@@ -23,6 +23,11 @@
 #include <linux/init.h>
 #include <linux/nmi.h>
 #include <linux/console.h>
+#include <linux/cpu.h>
+#include <linux/cpumask.h>
+#include <linux/arisc/arisc.h>
+
+#include <asm/cacheflush.h>
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
@@ -180,6 +185,26 @@ void panic(const char *fmt, ...)
 		disabled_wait(caller);
 	}
 #endif
+
+#if defined(CONFIG_SUNXI_DUMP)
+	flush_cache_all();
+	{
+		unsigned int i;
+
+		for (i = 0; i < num_possible_cpus(); i++) {
+			if (i == smp_processor_id())
+				continue;
+
+			while (1) {
+				if (!cpu_online(i))
+					break;
+				mdelay(10);
+			}
+		}
+		arisc_set_crashdump_mode();
+	}
+#endif
+
 	local_irq_enable();
 	for (i = 0; ; i += PANIC_TIMER_STEP) {
 		touch_softlockup_watchdog();

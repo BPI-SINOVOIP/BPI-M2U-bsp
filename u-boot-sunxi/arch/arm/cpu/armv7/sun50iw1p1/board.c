@@ -54,90 +54,48 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int power_source_init(void)
 {
-//	int pll_cpux;
-//	uint32_t dcdc_vol = 0;
-//	int cpu_vol = 0;
-//	int nodeoffset=0;
-	int pmu_id;
+	int pll_cpux;
+	int axp_exist = 0;
 
-//	sunxi_arisc_probe();
-	sunxi_arisc_wait_ready();
-	pmu_id = uboot_spare_head.boot_ext[0].data[0];
-	printf("pmu type = 0x%x\n", pmu_id);
-
-	axp_probe_id(0);
-	if (pmu_id > 0) {
-
-		printf("factory\n");
-		axp_probe_factory_mode();
+	sunxi_arisc_probe();
+	axp_exist =  axp_probe();
+	if(axp_exist)
+	{
 		gd->pmu_saved_status = axp_probe_pre_sys_mode();
-		printf("axp end\n");
-
-		return 0;
+		axp_probe_factory_mode();
+		if(axp_probe_power_supply_condition())
+		{
+			printf("axp_probe_power_supply_condition error\n");
+		}
+	}
+	else
+	{
+		printf("axp_probe error\n");
 	}
 
-//	//PMU_SUPPLY_DCDC2 is for cpua
-//	nodeoffset =  fdt_path_offset(working_fdt,FDT_PATH_POWER_SPLY);
-//	if(nodeoffset >=0)
-//	{
-//		fdt_getprop_u32(working_fdt, nodeoffset, "dcdc2_vol", &dcdc_vol);
-//	}
-//	if(!dcdc_vol)
-//	{
-//		cpu_vol = 900;
-//	}
-//	else
-//	{
-//		cpu_vol = dcdc_vol%10000;
-//	}
-//
-//	if(!axp_probe(0))
-//	axp_probe_id(0);
-//	{
-//		axp_probe_factory_mode();
-//		if(!axp_probe_power_supply_condition())
-//		{
-//			//PMU_SUPPLY_DCDC2 is for cpua
-//			if(!axp_set_supply_status(0, PMU_SUPPLY_DCDC2, cpu_vol, -1))
-//			{
-//				tick_printf("PMU: dcdc2 %d\n", cpu_vol);
-//				sunxi_clock_set_corepll(uboot_spare_head.boot_data.run_clock);
-//			}
-//			else
-//			{
-//				printf("axp_set_dcdc2 fail\n");
-//			}
-//		}
-//		else
-//		{
-//			printf("axp_probe_power_supply_condition error\n");
-//		}
-//	}
-//	else
-//	{
-//		printf("axp_probe error\n");
-//	}
-//
-//	pll_cpux = sunxi_clock_get_corepll();
-//	tick_printf("PMU: cpux %d Mhz,AXI=%d Mhz\n", pll_cpux,sunxi_clock_get_axi());
-//	printf("PLL6=%d Mhz,AHB1=%d Mhz, APB1=%dMhz AHB2=%dMhz MBus=%dMhz\n", sunxi_clock_get_pll6(),
-//		sunxi_clock_get_ahb(),
-//		sunxi_clock_get_apb(),
-//		sunxi_clock_get_ahb2(),
-//		sunxi_clock_get_mbus());
-#if 0
 	if(axp_exist)
 	{
 		axp_set_charge_vol_limit();
 		axp_set_all_limit();
 		axp_set_hardware_poweron_vol();
 		axp_set_power_supply_output();
-		//power_config_gpio_bias();
 		power_limit_init();
 	}
-#endif
+
+	//sunxi_clock_set_corepll(uboot_spare_head.boot_data.run_clock);
+
+	pll_cpux = sunxi_clock_get_corepll();
+	tick_printf("PMU: cpux %d Mhz,AXI=%d Mhz\n", pll_cpux,sunxi_clock_get_axi());
+	printf("PLL6=%d Mhz,AHB1=%d Mhz, APB1=%dMhz AHB2=%dMhz MBus=%dMhz\n", sunxi_clock_get_pll6(),
+		sunxi_clock_get_ahb(),
+		sunxi_clock_get_apb(),
+		sunxi_clock_get_ahb2(),
+		sunxi_clock_get_mbus());
+
 	return 0;
 }
+
+
 /*
 ************************************************************************************************************
 *
@@ -241,7 +199,8 @@ int sunxi_set_secure_mode(void)
 {
 	int mode;
 
-	if((gd->securemode == SUNXI_NORMAL_MODE) && (gd->bootfile_mode = SUNXI_BOOT_FILE_TOC))
+	if ((gd->securemode == SUNXI_NORMAL_MODE) &&
+		(gd->bootfile_mode == SUNXI_BOOT_FILE_TOC))
 	{
 		mode = sid_probe_security_mode();
 		if(!mode)
@@ -252,31 +211,6 @@ int sunxi_set_secure_mode(void)
 	}
 
 	return 0;
-}
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
-int sunxi_get_securemode(void)
-{
-	return gd->securemode;
-}
-
-int sunxi_probe_secure_monitor(void)
-{
-	return uboot_spare_head.boot_data.secureos_exist == SUNXI_SECURE_MODE_USE_SEC_MONITOR?1:0;
 }
 
 

@@ -7,12 +7,32 @@
 #include <common.h>
 #include <image.h>
 #include <android_image.h>
+#include <malloc.h>
+#include <errno.h>
+
 
 static char andr_tmp_str[ANDR_BOOT_ARGS_SIZE + 1];
 
+
+/**
+ * android_image_get_kernel() - processes kernel part of Android boot images
+ * @hdr:	Pointer to image header, which is at the start
+ *			of the image.
+ * @verify:	Checksum verification flag. Currently unimplemented.
+ * @os_data:	Pointer to a ulong variable, will hold os data start
+ *			address.
+ * @os_len:	Pointer to a ulong variable, will hold os data length.
+ *
+ * This function returns the os image's start address and length. Also,
+ * it appends the kernel command line to the bootargs env variable.
+ *
+ * Return: Zero, os start address and length on success,
+ *		otherwise on failure.
+ */
 int android_image_get_kernel(const struct andr_img_hdr *hdr, int verify,
 			     ulong *os_data, ulong *os_len)
 {
+
 	/*
 	 * Not all Android tools use the id field for signing the image with
 	 * sha1 (or anything) so we don't check it. It is not obvious that the
@@ -28,9 +48,27 @@ int android_image_get_kernel(const struct andr_img_hdr *hdr, int verify,
 	strncpy(andr_tmp_str, hdr->cmdline, ANDR_BOOT_ARGS_SIZE);
 	andr_tmp_str[ANDR_BOOT_ARGS_SIZE] = '\0';
 	if (strlen(andr_tmp_str)) {
+		int len = strlen(andr_tmp_str);
+		char *bootargs = getenv("bootargs");
+		char *newbootargs = NULL;
 		printf("Kernel command line: %s\n", andr_tmp_str);
-		setenv("bootargs", andr_tmp_str);
+		if(bootargs != NULL)
+			len += strlen(bootargs);
+		newbootargs = malloc(len + 2);
+		if (!newbootargs){
+			printf("%s: malloc fail\n",__func__);
+			return -ENOMEM;
+		}
+		memset(newbootargs,0, len+2);
+
+		if (bootargs) {
+			strcpy(newbootargs, bootargs);
+			strcat(newbootargs, " ");
+		}
+		strcat(newbootargs, andr_tmp_str);
+		setenv("bootargs", newbootargs);
 	}
+
 	if (hdr->ramdisk_size)
 		printf("RAM disk load addr 0x%08x size %u KiB\n",
 		       hdr->ramdisk_addr,

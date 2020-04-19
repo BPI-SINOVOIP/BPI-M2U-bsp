@@ -20,11 +20,7 @@ obj-$(CONFIG_POWER_SPI) += power_spi.o
 
 obj-y += sunxi/axp_null.o sunxi/axp_supply_null.o
 
-ifdef CONFIG_SUNXI_MULITCORE_BOOT
-obj-y += sunxi/axp_smp.o
-else
 obj-y += sunxi/axp.o
-endif
 ifdef CONFIG_SUNXI_MODULE_AXP
 obj-$(CONFIG_SUNXI_AXP81X) += sunxi/axp81X.o
 obj-$(CONFIG_SUNXI_AXP81X) += sunxi/axp81X_supply.o
@@ -36,4 +32,12 @@ obj-$(CONFIG_SUNXI_AXP22) += sunxi/axp22.o
 obj-$(CONFIG_SUNXI_AXP22) += sunxi/axp22_supply.o
 obj-$(CONFIG_SUNXI_AXP806) += sunxi/axp806.o
 obj-$(CONFIG_SUNXI_AXP806) += sunxi/axp806_supply.o
+obj-$(CONFIG_SUNXI_AXP809) += sunxi/axp809.o
+obj-$(CONFIG_SUNXI_AXP809) += sunxi/axp809_supply.o
+obj-$(CONFIG_SUNXI_AXP259) += sunxi/axp259.o
+obj-$(CONFIG_SUNXI_AXP259) += sunxi/axp259_supply.o
+obj-$(CONFIG_SUNXI_AXP858) += sunxi/axp858.o
+obj-$(CONFIG_SUNXI_AXP858) += sunxi/axp858_supply.o
+obj-$(CONFIG_SUNXI_AXP2585) += sunxi/axp2585.o
+obj-$(CONFIG_SUNXI_AXP2585) += sunxi/axp2585_supply.o
 endif

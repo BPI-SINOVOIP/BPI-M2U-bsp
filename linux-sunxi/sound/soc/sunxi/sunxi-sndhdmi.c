@@ -75,14 +75,22 @@ static int sunxi_sndhdmi_hw_params(struct snd_pcm_substream *substream,
 	case 48000:
 	case 96000:
 	case 192000:
+#ifdef CONFIG_AHUB_FREQ_REQ
+		freq = 98304000;
+#else
 		freq = 24576000;
+#endif
 		break;
 	case	11025:
 	case	22050:
 	case	44100:
 	case	88200:
 	case	176400:
+#ifdef CONFIG_AHUB_FREQ_REQ
+		freq = 90316800;
+#else
 		freq = 22579200;
+#endif
 		break;
 	default:
 		dev_err(card->dev, "unsupport freq\n");
@@ -152,6 +160,16 @@ static int sunxi_sndhdmi_dev_probe(struct platform_device *pdev)
 
 	card->dev = &pdev->dev;
 	sunxi_tdmhdmi.hdmi_format = 1;
+#ifdef CONFIG_SND_SUNXI_SOC_AHUB
+	sunxi_sndhdmi_dai_link.cpu_dai_name = NULL;
+	sunxi_sndhdmi_dai_link.cpu_of_node = of_parse_phandle(np,
+					"sunxi,cpudai-controller", 0);
+	if (!sunxi_sndhdmi_dai_link.cpu_of_node) {
+		dev_err(&pdev->dev, "Property 'sunxi,cpudai-controller' missing or invalid\n");
+		return -EINVAL;
+	}
+	sunxi_sndhdmi_dai_link.platform_name = "snd-soc-dummy";
+#else
 	if (np) {
 		sunxi_sndhdmi_dai_link.cpu_dai_name = NULL;
 		sunxi_sndhdmi_dai_link.cpu_of_node = of_parse_phandle(np,
@@ -167,6 +185,7 @@ static int sunxi_sndhdmi_dev_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev,"hdmi dt node missing or invalid\n");
 		ret = -EINVAL;
 	}
+#endif
 
 	snd_soc_card_set_drvdata(card, &sunxi_tdmhdmi);
 	ret = snd_soc_register_card(card);

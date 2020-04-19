@@ -59,6 +59,21 @@ extern int nand_uboot_flush(void);
 
 extern int NAND_Uboot_Force_Erase(void);
 
+extern int sunxi_chk_ubifs_sb(void *sb_buf);
+extern uint sunxi_nand_mtd_ubi_write(uint start_block, uint nblock,
+	void *buffer);
+extern uint sunxi_nand_mtd_ubi_read(uint start, uint sectors, void *buffer);
+extern uint sunxi_nand_mtd_ubi_cap(void);
+extern int sunxi_nand_download_boot0(uint length, void *buffer);
+extern int sunxi_nand_download_uboot(uint length, void *buffer);
+extern int sunxi_nand_uboot_erase(int user_erase);
+extern int sunxi_nand_uboot_probe(void);
+extern int sunxi_nand_uboot_force_erase(void);
+extern uint sunxi_nand_uboot_get_flash_info(void *buffer, uint length);
+extern int sunxi_nand_uboot_init(int boot_mode);
+extern int sunxi_nand_uboot_exit(int force);
+extern int sunxi_open_ubifs_interface(void);
+extern int sunxi_get_mtd_ubi_mode_status(void);
 
 #endif
 

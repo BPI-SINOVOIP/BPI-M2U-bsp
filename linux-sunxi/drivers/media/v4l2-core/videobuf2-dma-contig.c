@@ -25,12 +25,14 @@ struct vb2_dc_conf {
 	struct device		*dev;
 };
 
+#if !defined(CONFIG_SUNXI_IOMMU)
 #define SUNXI_MEM
+#endif
 
 #ifdef SUNXI_MEM
-#include <linux/ion.h>          //for all "ion api"
-#include <linux/ion_sunxi.h>    //for import global variable "sunxi_ion_client_create"
-#include <linux/dma-mapping.h>  //just include"PAGE_SIZE" macro
+#include <linux/ion.h>
+#include <linux/ion_sunxi.h>
+#include <linux/dma-mapping.h>
 char *ion_name = "ion_video_buf";
 struct vb2_dc_buf {
 	struct device			*dev;
@@ -60,59 +62,54 @@ static int ion_alloc_coherent(struct vb2_dc_buf *mem)
 	unsigned int flags = ION_FLAG_CACHED | ION_FLAG_CACHED_NEEDS_SYNC;
 
 	mem->client = sunxi_ion_client_create(ion_name);
-	if (IS_ERR_OR_NULL(mem->client))
-	{
-		printk("sunxi_ion_client_create failed!!");
+	if (IS_ERR_OR_NULL(mem->client)) {
+		dev_err(mem->dev, "sunxi_ion_client_create failed!!");
+		return -ENOMEM;
 	}
 	mem->handle = ion_alloc(mem->client, mem->size, PAGE_SIZE,
-				ION_HEAP_CARVEOUT_MASK,	flags);
-
-	if (IS_ERR_OR_NULL(mem->handle)) {
-		printk("ion_alloc carveout failed!!\n");
-		mem->handle = ion_alloc(mem->client, mem->size, PAGE_SIZE,
+				ION_HEAP_CARVEOUT_MASK |
 				ION_HEAP_TYPE_DMA_MASK,	flags);
-		if (IS_ERR_OR_NULL(mem->handle)) {
-			printk("ion_alloc dma failed!!\n");
-			goto err_alloc;
-		}
+	if (IS_ERR_OR_NULL(mem->handle)) {
+		dev_err(mem->dev, "ion_alloc failed!!");
+		goto err_alloc;
 	}
 
 	mem->vaddr = ion_map_kernel(mem->client, mem->handle);
-	if (IS_ERR_OR_NULL(mem->vaddr))
-	{
-		printk("ion_map_kernel failed!!\n");
+	if (IS_ERR_OR_NULL(mem->vaddr))	{
+		dev_err(mem->dev, "ion_map_kernel failed!!\n");
 		goto err_map_kernel;
 	}
-	if(ion_phys(mem->client, mem->handle, (ion_phys_addr_t *)&mem->dma_addr, (size_t *)&mem->size ))
-	{
-		printk("ion_phys failed!!\n");
+
+	if (ion_phys(mem->client, mem->handle, (ion_phys_addr_t *)&mem->dma_addr,
+	   (size_t *)&mem->size)) {
+		dev_err(mem->dev, "ion_phys failed!!\n");
 		goto err_phys;
 	}
 
 	mem->dmabuf = ion_share_dma_buf(mem->client, mem->handle);
 	if (IS_ERR(mem->dmabuf)) {
-		printk("ion_share_dma_buf failed!!\n");
+		dev_err(mem->dev, "ion_share_dma_buf failed!!\n");
 		goto err_phys;
 	}
 
 	return 0;
-err_phys:	
-	ion_unmap_kernel( mem->client, mem->handle);
+err_phys:
+	ion_unmap_kernel(mem->client, mem->handle);
 err_map_kernel:
 	ion_free(mem->client, mem->handle);
 err_alloc:
 	ion_client_destroy(mem->client);
-	return -ENOMEM;	
+	return -ENOMEM;
 }
-static int ion_free_coherent(struct vb2_dc_buf *mem)
+static void ion_free_coherent(struct vb2_dc_buf *mem)
 {
-	if (IS_ERR_OR_NULL(mem->client )||IS_ERR_OR_NULL(mem->handle)||IS_ERR_OR_NULL(mem->vaddr))
-		return -1;	
+	if (IS_ERR_OR_NULL(mem->client) || IS_ERR_OR_NULL(mem->handle)
+	   || IS_ERR_OR_NULL(mem->vaddr))
+		return;
 	dma_buf_put(mem->dmabuf);
-	ion_unmap_kernel(mem->client , mem->handle);
-	ion_free(mem->client , mem->handle);
-	ion_client_destroy(mem->client );
-	return 0;
+	ion_unmap_kernel(mem->client, mem->handle);
+	ion_free(mem->client, mem->handle);
+	ion_client_destroy(mem->client);
 }
 
 static int ion_mmap_coherent(struct vb2_dc_buf *mem,
@@ -267,6 +264,7 @@ static void *vb2_dc_alloc(void *alloc_ctx, unsigned long size, gfp_t gfp_flags)
 
 #ifdef SUNXI_MEM
 	buf->size = size;
+	buf->dev = get_device(dev);
 	ion_alloc_coherent(buf);
 #else
 	buf->vaddr = dma_alloc_coherent(dev, size, &buf->dma_addr,

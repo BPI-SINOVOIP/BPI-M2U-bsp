@@ -49,11 +49,12 @@ int device_insmod_delay = 0;
 static void (*__usb_hw_scan) (struct usb_scan_info *);
 
 #ifndef  SUNXI_USB_FPGA
+#ifndef CONFIG_IO_EXPAND
 static __u32 get_pin_data(struct usb_gpio *usb_gpio)
 {
 	return __gpio_get_value(usb_gpio->gpio_set.gpio.gpio);
 }
-
+#endif
 #if defined(CONFIG_USB_G_ANDROID) || defined(CONFIG_USB_MASS_STORAGE)
 static int get_usb_gadget_functions(void)
 {
@@ -78,6 +79,7 @@ static int get_usb_gadget_functions(void)
 }
 #endif
 
+#ifndef CONFIG_IO_EXPAND
 /*
  * filter the PIO burr
  * @usb_gpio: .
@@ -186,6 +188,8 @@ static u32 get_detect_vbus_state(struct usb_scan_info *info)
 
 	return det_vbus_state;
 }
+#endif
+
 static u32 get_dp_dm_status(struct usb_scan_info *info)
 {
 	u32 ret  = 0;
@@ -408,7 +412,12 @@ static __u32 get_vbus_id_state(struct usb_scan_info *info)
 static __u32 get_vbus_id_state(struct usb_scan_info *info)
 {
 	u32 state = 0;
-
+#ifdef CONFIG_IO_EXPAND
+	if (gpio_get_value_cansleep(g_usb_drv_det_pin) != 0)
+		state = 0;
+	else
+		state = 0x03;
+#else
 	if (get_id_state(info) == USB_DEVICE_MODE) {
 		x_set_bit(state, 0);
 	}
@@ -416,7 +425,7 @@ static __u32 get_vbus_id_state(struct usb_scan_info *info)
 	if (get_detect_vbus_state(info) == USB_DET_VBUS_VALID) {
 		x_set_bit(state, 1);
 	}
-
+#endif
 	return state;
 }
 #endif

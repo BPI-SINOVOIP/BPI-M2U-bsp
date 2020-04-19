@@ -34,6 +34,8 @@
 *
 ************************************************************************************************************************
 */
+
+
 #ifndef __NAND_LOGIC_H__
 #define __NAND_LOGIC_H__
 
@@ -41,110 +43,110 @@
 #include "nand_physic.h"
 
 
-//==============================================================================
-//  define the logical architecture export parameter
-//==============================================================================
+/* ============================================================================== */
+/*  define the logical architecture export parameter */
+/* ============================================================================== */
 
-//define the count of the sectors in the logical page
+/* define the count of the sectors in the logical page */
 #define SECTOR_CNT_OF_LOGIC_PAGE    SECTOR_CNT_OF_SUPER_PAGE
 
-//define the full bitmap of sector in the logical page
+/* define the full bitmap of sector in the logical page */
 #define FULL_BITMAP_OF_LOGIC_PAGE   FULL_BITMAP_OF_SUPER_PAGE
 
-//define the count of the pages in a logical block
+/* define the count of the pages in a logical block */
 #define PAGE_CNT_OF_LOGIC_BLK       (NandDriverInfo.LogicalArchitecture->PageCntPerLogicBlk)
 
-//define the count of the pages in a super physical block, size is same as the logical block
+/* define the count of the pages in a super physical block, size is same as the logical block */
 #define PAGE_CNT_OF_SUPER_BLK       PAGE_CNT_OF_LOGIC_BLK
 
-//define the count of the data block in a zone, the value is based on the ration of the invalid blocks
+/* define the count of the data block in a zone, the value is based on the ration of the invalid blocks */
 #define DATA_BLK_CNT_OF_ZONE        (NandDriverInfo.LogicalArchitecture->LogicBlkCntPerZone)
 
-//define the count of the free block item in a free block table of a zone
+/* define the count of the free block item in a free block table of a zone */
 #define FREE_BLK_CNT_OF_ZONE        (BLOCK_CNT_OF_ZONE - DATA_BLK_CNT_OF_ZONE - 1)
 
 
-//define the count of the log block in a zone, the value is configurable, recommended value is 8
+/* define the count of the log block in a zone, the value is configurable, recommended value is 8 */
 #define LOG_BLK_CNT_OF_ZONE         MAX_LOG_BLK_CNT
 
-//define the count of the free block in a zone
+/* define the count of the free block in a zone */
 #define FREE_BLK_CNT_OF_ZONE        (BLOCK_CNT_OF_ZONE - DATA_BLK_CNT_OF_ZONE - 1)
 
-//define the count of the zone in a die
+/* define the count of the zone in a die */
 #define ZONE_CNT_OF_DIE             (NandDriverInfo.LogicalArchitecture->ZoneCntPerDie)
 
-//define the total count of inter-leave banks
+/* define the total count of inter-leave banks */
 #define INTERLEAVE_BANK_CNT         (PAGE_CNT_OF_LOGIC_BLK / NandDriverInfo.NandStorageInfo->PageCntPerPhyBlk)
 
-//define the buffer for cache data when write loigcal sector
+/* define the buffer for cache data when write loigcal sector */
 
-//define the buffer for processing the data of mapping table
+/* define the buffer for processing the data of mapping table */
 #define LML_PROCESS_TBL_BUF         (NandDriverInfo.PageCachePool->PageCache2)
 
-//define the buffer for copy page data or process other data
+/* define the buffer for copy page data or process other data */
 #define LML_TEMP_BUF                (NandDriverInfo.PageCachePool->PageCache0)
 #define LML_WRITE_PAGE_CACHE        (NandDriverInfo.PageCachePool->PageCache1)
 
 #define LML_SPARE_BUF               (NandDriverInfo.PageCachePool->SpareCache)
 
-//==============================================================================
-//  define the mapping table access export parameter
-//==============================================================================
+/* ============================================================================== */
+/*  define the mapping table access export parameter */
+/* ============================================================================== */
 
-//define the pointer for block mapping table cache pool accessing
+/* define the pointer for block mapping table cache pool accessing */
 #define BLK_MAP_CACHE_POOL          (NandDriverInfo.BlkMapTblCachePool)
 
-//define the counter of the super block erase, for do wear-levelling
+/* define the counter of the super block erase, for do wear-levelling */
 #define BLK_ERASE_CNTER             (BLK_MAP_CACHE_POOL->SuperBlkEraseCnt)
 
-//define the log block access timer for set log block access age
+/* define the log block access timer for set log block access age */
 #define LOG_ACCESS_TIMER            (BLK_MAP_CACHE_POOL->LogBlkAccessTimer)
 
-//define the log block access age array
+/* define the log block access age array */
 #define LOG_ACCESS_AGE              (BLK_MAP_CACHE_POOL->LogBlkAccessAge)
 
-//define the pointer for active block mapping table accessing
+/* define the pointer for active block mapping table accessing */
 #define BLK_MAP_CACHE               (BLK_MAP_CACHE_POOL->ActBlkMapTbl)
 
-//define the free block position that get free block last time
+/* define the free block position that get free block last time */
 #define LAST_FREE_BLK_PST           (BLK_MAP_CACHE->LastFreeBlkPst)
 
-//define the pointer for active data block table accessing
+/* define the pointer for active data block table accessing */
 #define DATA_BLK_TBL                (BLK_MAP_CACHE->DataBlkTbl)
 
-//define the pointer for active log block table accessing
+/* define the pointer for active log block table accessing */
 #define LOG_BLK_TBL                 (BLK_MAP_CACHE->LogBlkTbl)
 
-//define the pointer for active free block table accessing
+/* define the pointer for active free block table accessing */
 #define FREE_BLK_TBL                (BLK_MAP_CACHE->FreeBlkTbl)
 
-//define the zone number of the active block mapping table
+/* define the zone number of the active block mapping table */
 #define CUR_MAP_ZONE                (BLK_MAP_CACHE->ZoneNum)
 
-//define the pointer for page mapping table cahce pool accessing
+/* define the pointer for page mapping table cahce pool accessing */
 #define PAGE_MAP_CACHE_POOL         (NandDriverInfo.PageMapTblCachePool)
 
-//define the pointer for active page mapping table cache accessing
+/* define the pointer for active page mapping table cache accessing */
 #define PAGE_MAP_CACHE              (NandDriverInfo.PageMapTblCachePool->ActPageMapTbl)
 
-//define the pointer for active page mapping table accessing
+/* define the pointer for active page mapping table accessing */
 #define PAGE_MAP_TBL                (PAGE_MAP_CACHE->PageMapTbl)
 
-//define the type of merger operation
-#define NORMAL_MERGE_MODE       0x00                //normal merge mode, there is not enough log item
-#define SPECIAL_MERGE_MODE      0x01                //special merge mode, there is not enough log page
+/* define the type of merger operation */
+#define NORMAL_MERGE_MODE       0x00                /* normal merge mode, there is not enough log item */
+#define SPECIAL_MERGE_MODE      0x01                /* special merge mode, there is not enough log page */
 
-//define the invalid page number
+/* define the invalid page number */
 #define INVALID_PAGE_NUM        0xffff
 
-//define the type for get free block from free block table
+/* define the type for get free block from free block table */
 #define LOWEST_EC_TYPE          0x00
 #define HIGHEST_EC_TYPE         0x01
 
 
-//==============================================================================
-//  define the function interface for logic manage module
-//==============================================================================
+/* ============================================================================== */
+/*  define the function interface for logic manage module */
+/* ============================================================================== */
 
 /*
 ************************************************************************************************************************
@@ -193,7 +195,7 @@ __s32 LML_Exit(void);
 *               = -1    read failed.
 ************************************************************************************************************************
 */
-__s32 LML_Read(__u32 nLba, __u32 nLength, void* pBuf);
+__s32 LML_Read(__u32 nLba, __u32 nLength, void *pBuf);
 
 
 /*
@@ -211,7 +213,7 @@ __s32 LML_Read(__u32 nLba, __u32 nLength, void* pBuf);
 *               = -1    write failed.
 ************************************************************************************************************************
 */
-__s32 LML_Write(__u32 nLba, __u32 nLength, void* pBuf);
+__s32 LML_Write(__u32 nLba, __u32 nLength, void *pBuf);
 
 
 /*
@@ -246,7 +248,7 @@ __s32 LML_FlushPageCache(void);
 *               < 0     read failed.
 ************************************************************************************************************************
 */
-__s32 LML_PageRead(__u32 nPage, __u32 nBitmap, void* pBuf);
+__s32 LML_PageRead(__u32 nPage, __u32 nBitmap, void *pBuf);
 
 
 /*
@@ -265,7 +267,7 @@ __s32 LML_PageRead(__u32 nPage, __u32 nBitmap, void* pBuf);
 *               < 0     write failed.
 ************************************************************************************************************************
 */
-__s32 LML_PageWrite(__u32 nPage, __u32 nBitmap, void* pBuf);
+__s32 LML_PageWrite(__u32 nPage, __u32 nBitmap, void *pBuf);
 
 
 /*
@@ -567,9 +569,9 @@ __s32 BMM_SetLogBlk(__u32 nLogicBlk, struct __LogBlkType_t *pLogBlk);
 __u32 PMM_GetLogPage(__u32 nBlk, __u32 nPage, __u8 nMode);
 void PMM_ClearCurMapTbl(void);
 __u32 PMM_GetCurMapPage(__u16 nLogicalPage);
-void PMM_SetCurMapPage(__u16 nLogicalPage,__u16 nPhysicPage);
+void PMM_SetCurMapPage(__u16 nLogicalPage, __u16 nPhysicPage);
 __s32 LML_VirtualBlkErase(__u32 nZone, __u32 nSuperBlk);
-__s32 LML_VirtualPageWrite( struct __PhysicOpPara_t *pVirtualPage);
+__s32 LML_VirtualPageWrite(struct __PhysicOpPara_t *pVirtualPage);
 __s32 LML_VirtualPageRead(struct __PhysicOpPara_t *pVirtualPage);
 
 __s32 NAND_CacheFlush(void);
@@ -580,9 +582,9 @@ __s32 NAND_CacheOpen(void);
 __s32 NAND_CacheClose(void);
 
 
-// 2010-12-04 modified
+/* 2010-12-04 modified */
 __u32 NAND_GetDiskSize(void);
 
 
-#endif  //ifndef __NAND_LOGIC_H__
+#endif  /* ifndef __NAND_LOGIC_H__ */
 

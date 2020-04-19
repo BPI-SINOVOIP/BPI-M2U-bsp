@@ -18,6 +18,12 @@
 #ifndef __MEM_TIMING_H__
 #define __MEM_TIMING_H__
 
+#ifdef CONFIG_SUN3IW1P1
+void init_perfcounters(__u32 do_reset, __u32 enable_divider);
+void change_runtime_env(void);
+void delay_us(__u32 us);
+void delay_ms(__u32 ms);
+#else
 __u32 get_cyclecount(void);
 void backup_perfcounter(void);
 void init_perfcounters(__u32 do_reset, __u32 enable_divider);
@@ -30,5 +36,6 @@ void delay_ms(__u32 ms);
 void init_event_counter(__u32 do_reset, __u32 enable_divider);
 void set_event_counter(enum counter_type_e type);
 int get_event_counter(enum counter_type_e type);
+#endif
 
 #endif				/* __MEM_TIMING_H__ */

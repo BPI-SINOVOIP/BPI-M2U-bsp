@@ -602,7 +602,12 @@ static void adb_closed_callback(void)
 	mutex_unlock(&dev->mutex);
 }
 #endif
+
+#ifdef CONFIG_USB_SUNXI_UDC0
+#define MAX_ACM_INSTANCES 1
+#else
 #define MAX_ACM_INSTANCES 4
+#endif
 struct acm_function_config {
 	int instances;
 	int instances_on;
@@ -683,6 +688,7 @@ err_usb_add_function:
 	return ret;
 }
 
+#ifndef CONFIG_USB_SUNXI_UDC0
 static void acm_function_unbind_config(struct android_usb_function *f,
 				       struct usb_configuration *c)
 {
@@ -692,6 +698,7 @@ static void acm_function_unbind_config(struct android_usb_function *f,
 	for (i = 0; i < config->instances_on; i++)
 		usb_remove_function(c, config->f_acm[i]);
 }
+#endif
 
 static ssize_t acm_instances_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -727,7 +734,9 @@ static struct android_usb_function acm_function = {
 	.init		= acm_function_init,
 	.cleanup	= acm_function_cleanup,
 	.bind_config	= acm_function_bind_config,
+#ifndef CONFIG_USB_SUNXI_UDC0
 	.unbind_config	= acm_function_unbind_config,
+#endif
 	.attributes	= acm_function_attributes,
 };
 

@@ -10,12 +10,17 @@ struct disp_lcd_private_data
 	disp_lcd_panel_fun        lcd_panel_fun;
 	bool                      enabling;
 	bool                      disabling;
+	bool                      bl_enabled;
 	u32                       irq_no;
 	u32                       irq_no_dsi;
 	u32                       irq_no_edp;
 	u32                       enabled;
 	u32                       power_enabled;
 	u32                       bl_need_enabled;
+	u32                       frame_per_sec;
+	u32                       usec_per_line;
+	u32                       judge_line;
+	u32                       tri_finish_fail;
 	struct {
 		uintptr_t               dev;
 		u32                     channel;
@@ -26,8 +31,7 @@ struct disp_lcd_private_data
 	}pwm_info;
 	struct clk *clk;
 	struct clk *lvds_clk;
-	struct clk *dsi_clk0;
-	struct clk *dsi_clk1;
+	struct clk *dsi_clk[CLK_DSI_NUM];
 	struct clk *edp_clk;
 	struct clk *clk_parent;
 };
@@ -222,6 +226,10 @@ static s32 lcd_parse_panel_para(u32 disp, disp_panel_para * info)
         info->lcd_cpu_te = value;
     }
 
+	ret = disp_sys_script_get_item(primary_key, "lcd_cpu_mode", &value, 1);
+	if (ret == 1)
+		info->lcd_cpu_mode = value;
+
     ret = disp_sys_script_get_item(primary_key, "lcd_frm", &value, 1);
     if (ret == 1)
     {
@@ -257,6 +265,40 @@ static s32 lcd_parse_panel_para(u32 disp, disp_panel_para * info)
     {
         info->lcd_dsi_te = value;
     }
+
+	ret = disp_sys_script_get_item(primary_key, "lcd_dsi_port_num",
+				       &value, 1);
+	if (ret == 1)
+		info->lcd_dsi_port_num = value;
+
+	ret = disp_sys_script_get_item(primary_key, "lcd_tcon_mode", &value, 1);
+	if (ret == 1)
+		info->lcd_tcon_mode = value;
+
+	ret = disp_sys_script_get_item(primary_key, "lcd_slave_tcon_num",
+				       &value, 1);
+	if (ret == 1)
+		info->lcd_slave_tcon_num = value;
+
+	ret = disp_sys_script_get_item(primary_key, "lcd_slave_stop_pos",
+				       &value, 1);
+	if (ret == 1)
+		info->lcd_slave_stop_pos = value;
+
+	ret = disp_sys_script_get_item(primary_key, "lcd_sync_pixel_num",
+				       &value, 1);
+	if (ret == 1)
+		info->lcd_sync_pixel_num = value;
+
+	ret = disp_sys_script_get_item(primary_key, "lcd_sync_line_num",
+				       &value, 1);
+	if (ret == 1)
+		info->lcd_sync_line_num = value;
+
+	ret = disp_sys_script_get_item(primary_key, "lcd_tcon_en_odd_even_div",
+				       &value, 1);
+	if (ret == 1)
+		info->lcd_tcon_en_odd_even = value;
 
     ret = disp_sys_script_get_item(primary_key, "lcd_edp_rate", &value, 1);
     if (ret == 1)
@@ -655,7 +697,7 @@ static void lcd_get_sys_config(u32 disp, disp_lcd_cfg *lcd_cfg)
 	}
 
 //lcd_gpio
-    for (i=0; i<4; i++)
+	for (i = 0; i < (LCD_GPIO_NUM - 2); i++)
     {
         sprintf(sub_name, "lcd_gpio_%d", i);
 
@@ -756,11 +798,12 @@ static s32 lcd_clk_exit(struct disp_device* lcd)
 
 static s32 lcd_clk_config(struct disp_device* lcd)
 {
-#if 0
 	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
 	struct lcd_clk_info clk_info;
 	unsigned long pll_rate = 297000000, lcd_rate = 33000000, dclk_rate = 33000000, dsi_rate = 0;//hz
 	unsigned long pll_rate_set = 297000000, lcd_rate_set = 33000000, dclk_rate_set = 33000000, dsi_rate_set = 0;//hz
+	u32 i = 0, j = 0;
+	u32 dsi_num = 0;
 
 	if ((NULL == lcd) || (NULL == lcdp)) {
 		DE_WRN("NULL hdl!\n");
@@ -793,8 +836,32 @@ static s32 lcd_clk_config(struct disp_device* lcd)
 	if (LCD_IF_DSI == lcdp->panel_info.lcd_if) {
 		dsi_rate_set = pll_rate_set / clk_info.dsi_div;
 		dsi_rate_set = (0 == clk_info.dsi_rate)? dsi_rate_set:clk_info.dsi_rate;
-		clk_set_rate(lcdp->dsi_clk0, dsi_rate_set);
-		//disp_sys_clk_set_rate(lcdp->dsi_clk1, dsi_rate_set);//FIXME, dsi clk0 = dsi clk1(rate)
+		dsi_num =
+		    (lcdp->panel_info.lcd_tcon_mode == DISP_TCON_DUAL_DSI) ? 2
+									   : 1;
+		dsi_rate_set /= dsi_num;
+
+		dsi_rate = dsi_rate_set;
+		/* total number of dsi clk for current disp device*/
+		dsi_num *= CLK_NUM_PER_DSI;
+		/* In the case of CLK_NUM_PER_DSI equal to 2
+		 * even index mean hs clk which need to be seted
+		 * odd index mean lp clk which no need to be seted*/
+		for (i = dsi_num * lcd->disp, j = 0; i < CLK_DSI_NUM;
+		     i += CLK_NUM_PER_DSI) {
+			if (lcdp->dsi_clk[i]) {
+				clk_set_rate(lcdp->dsi_clk[i], dsi_rate_set);
+				DE_INF(
+				    "clk_set_rate:dsi's %d th clk with %ld\n",
+				    i, dsi_rate_set);
+				j += CLK_NUM_PER_DSI;
+				dsi_rate_set = clk_get_rate(lcdp->dsi_clk[i]);
+			}
+			if (j == dsi_num)
+				break;
+		}
+		/*FIXME, dsi clk0 = dsi clk1(rate)*/
+		/*disp_sys_clk_set_rate(lcdp->dsi_clk[1], dsi_rate_set);*/
 	}
 	dclk_rate_set = lcd_rate_set / clk_info.tcon_div;
 	if ((pll_rate_set != pll_rate) || (lcd_rate_set != lcd_rate)
@@ -802,47 +869,7 @@ static s32 lcd_clk_config(struct disp_device* lcd)
 			DE_WRN("disp %d, clk: pll(%ld),clk(%ld),dclk(%ld) dsi_rate(%ld)\n     clk real:pll(%ld),clk(%ld),dclk(%ld) dsi_rate(%ld)\n",
 				lcd->disp, pll_rate, lcd_rate, dclk_rate, dsi_rate, pll_rate_set, lcd_rate_set, dclk_rate_set, dsi_rate_set);
 	}
-#else
-	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
-	struct lcd_clk_info clk_info;
-	unsigned long pll_rate, lcd_rate, dclk_rate, dsi_rate = 0;//hz
-	unsigned long pll_rate_set, lcd_rate_set, dclk_rate_set, dsi_rate_get = 0, dsi_rate_set = 0;//hz
 
-	if((NULL == lcd) || (NULL == lcdp)) {
-		DE_WRN("NULL hdl!\n");
-		return -1;
-	}
-	memset(&clk_info, 0, sizeof(struct lcd_clk_info));
-	disp_al_lcd_get_clk_info(lcd->disp, &clk_info, &lcdp->panel_info);
-	dclk_rate = lcdp->panel_info.lcd_dclk_freq * 1000000;//Mhz -> hz
-	lcd_rate = dclk_rate * clk_info.tcon_div;
-	pll_rate = lcd_rate * clk_info.lcd_div;
-	dsi_rate = pll_rate / clk_info.dsi_div;
-
-	printf("lcdp->clk_parent->name: %s\n", lcdp->clk_parent->name);
-	printf("lcdp->clk->name: %s\n", lcdp->clk->name);
-	printf("lcdp->dsi_clk0->name: %s\n", lcdp->dsi_clk0->name);
-	printf("lcdp->dsi_clk0->parent->name: %s\n", lcdp->dsi_clk0->parent->name);
-
-	clk_set_rate(lcdp->clk_parent, pll_rate);
-	pll_rate_set = clk_get_rate(lcdp->clk_parent);
-	lcd_rate_set = pll_rate_set / clk_info.lcd_div;
-	clk_set_rate(lcdp->clk, lcd_rate_set);
-	lcd_rate_set = clk_get_rate(lcdp->clk);
-	if(LCD_IF_DSI == lcdp->panel_info.lcd_if) {
-		dsi_rate_set = pll_rate_set / clk_info.dsi_div;
-		dsi_rate_set = (0 == clk_info.dsi_rate)? dsi_rate_set:clk_info.dsi_rate;
-		clk_set_rate(lcdp->dsi_clk0, dsi_rate_set);
-		dsi_rate_get = clk_get_rate(lcdp->dsi_clk0);
-		//disp_sys_clk_set_rate(lcdp->dsi_clk1, dsi_rate_set);//FIXME, dsi clk0 = dsi clk1(rate)
-	}
-	dclk_rate_set = lcd_rate_set / clk_info.tcon_div;
-	if((pll_rate_set != pll_rate) || (lcd_rate_set != lcd_rate)
-		|| (dclk_rate_set != dclk_rate)) {
-			DE_WRN("disp %d, clk: pll(%ld),clk(%ld),dclk(%ld) dsi_rate(%ld)\n     clk real:pll(%ld),clk(%ld),dclk(%ld) dsi_rate(%ld) dsi_rate_get(%ld)\n",
-				lcd->disp, pll_rate, lcd_rate, dclk_rate, dsi_rate, pll_rate_set, lcd_rate_set, dclk_rate_set, dsi_rate_set, dsi_rate_get);
-	}
-#endif
 	return 0;
 }
 
@@ -850,6 +877,8 @@ static s32 lcd_clk_enable(struct disp_device* lcd)
 {
 	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
 	int ret = 0;
+	u32 i = 0, j = 0;
+	u32 dsi_num = 0;
 
 	if ((NULL == lcd) || (NULL == lcdp)) {
 		DE_WRN("NULL hdl!\n");
@@ -864,28 +893,36 @@ static s32 lcd_clk_enable(struct disp_device* lcd)
 	}
 
 	if (LCD_IF_LVDS == lcdp->panel_info.lcd_if) {
-		ret = clk_prepare_enable(lcdp->lvds_clk);
+		if (lcdp->lvds_clk)
+			ret = clk_prepare_enable(lcdp->lvds_clk);
+		else
+			ret = clk_prepare_enable(lcdp->clk);
 		if (0 != ret) {
 			DE_WRN("fail enable lvds's clock!\n");
 			goto exit;
 		}
 	} else if (LCD_IF_DSI == lcdp->panel_info.lcd_if) {
-		if (lcdp->dsi_clk0) {
-			ret = clk_prepare_enable(lcdp->dsi_clk0);
-			if (0 != ret) {
-				DE_WRN("fail enable dsi's clock0!\n");
+		dsi_num = (lcdp->panel_info.lcd_tcon_mode == DISP_TCON_DUAL_DSI)
+			      ? 2
+			      : 1;
+		/*the num of dsi clk to use for current disp*/
+		dsi_num *= CLK_NUM_PER_DSI;
+
+		for (i = dsi_num * lcd->disp, j = 0; i < CLK_DSI_NUM; ++i) {
+			if (lcdp->dsi_clk[i]) {
+				ret = clk_prepare_enable(lcdp->dsi_clk[i]);
+				if (0 != ret) {
+					DE_WRN("fail enable dsi's clock%d!\n",
+					       i);
+					goto exit;
+				}
+				++j;
+			} else {
+				DE_WRN("dsi's clock%d is NULL!\n", i);
 				goto exit;
 			}
-		} else {
-			DE_WRN("dsi's clock0 is NULL!\n");
-			goto exit;
-		}
-		if (lcdp->dsi_clk1) {
-			ret = clk_prepare_enable(lcdp->dsi_clk1);
-			if (0 != ret) {
-				DE_WRN("fail enable dsi's clock1!\n");
-				goto exit;
-			}
+			if (j == dsi_num)
+				break;
 		}
 	} else if (LCD_IF_EDP == lcdp->panel_info.lcd_if) {
 		ret = clk_prepare_enable(lcdp->edp_clk);
@@ -900,7 +937,10 @@ exit:
 }
 
 static s32 lcd_clk_disable(struct disp_device* lcd)
-{	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
+{
+	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
+	u32 i = 0, j = 0;
+	u32 dsi_num = 0;
 
 	if ((NULL == lcd) || (NULL == lcdp)) {
 		DE_WRN("NULL hdl!\n");
@@ -910,16 +950,65 @@ static s32 lcd_clk_disable(struct disp_device* lcd)
 	if (LCD_IF_LVDS == lcdp->panel_info.lcd_if) {
 		clk_disable(lcdp->lvds_clk);
 	} else if (LCD_IF_DSI == lcdp->panel_info.lcd_if) {
-		if (lcdp->dsi_clk1)
-			clk_disable(lcdp->dsi_clk1);
-		if (lcdp->dsi_clk0)
-			clk_disable(lcdp->dsi_clk0);
+		dsi_num = (lcdp->panel_info.lcd_tcon_mode == DISP_TCON_DUAL_DSI)
+			      ? 2
+			      : 1;
+		/*the num of dsi clk to use for current disp*/
+		dsi_num *= CLK_NUM_PER_DSI;
+		for (i = dsi_num * lcd->disp, j = 0; i < CLK_DSI_NUM; ++i) {
+			if (lcdp->dsi_clk[i])
+				clk_disable(lcdp->dsi_clk[i]);
+			++j;
+			if (j == dsi_num)
+				break;
+		}
 	} else if (LCD_IF_EDP == lcdp->panel_info.lcd_if) {
 		clk_disable(lcdp->edp_clk);
 	}
 	clk_disable(lcdp->clk);
 
 	return	DIS_SUCCESS;
+}
+
+static int lcd_calc_judge_line(struct disp_device *lcd)
+{
+	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
+
+	if ((NULL == lcd) || (NULL == lcdp)) {
+		DE_WRN("NULL hdl!\n");
+		return -1;
+	}
+
+	if (lcdp->usec_per_line == 0) {
+		disp_panel_para *panel_info = &lcdp->panel_info;
+		/*
+		 * usec_per_line = 1 / fps / vt * 1000000
+		 *               = 1 / (dclk * 1000000 / vt / ht) / vt * 1000000
+		 *               = ht / dclk(Mhz)
+		 */
+		lcdp->frame_per_sec = panel_info->lcd_dclk_freq * 1000000
+		    / panel_info->lcd_ht / panel_info->lcd_vt
+		    * (panel_info->lcd_interlace + 1);
+		lcdp->usec_per_line = panel_info->lcd_ht
+		    / panel_info->lcd_dclk_freq;
+	}
+
+	if (lcdp->judge_line == 0) {
+		int start_delay = disp_al_lcd_get_start_delay(lcd->hwdev_index,
+		    &lcdp->panel_info);
+		int usec_start_delay = start_delay * lcdp->usec_per_line;
+		int usec_judge_point;
+
+		if (usec_start_delay <= 200)
+			usec_judge_point = usec_start_delay * 3 / 7;
+		else if (usec_start_delay <= 400)
+			usec_judge_point = usec_start_delay / 2;
+		else
+			usec_judge_point = 200;
+		lcdp->judge_line = usec_judge_point / lcdp->usec_per_line;
+	}
+
+	return 0;
 }
 
 static s32 disp_lcd_tcon_enable(struct disp_device *lcd)
@@ -950,7 +1039,7 @@ static s32 disp_lcd_pin_cfg(struct disp_device *lcd, u32 bon)
 {
 	int  i;
 	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
-	char dev_name[25];
+	/*char dev_name[25];*/
 
 	if ((NULL == lcd) || (NULL == lcdp)) {
 		DE_WRN("NULL hdl!\n");
@@ -966,8 +1055,12 @@ static s32 disp_lcd_pin_cfg(struct disp_device *lcd, u32 bon)
 		}
 	}
 
+	/* bpi, this call will request and set all the gpios in lcd0 node, include panel power/rst/bl_en gpio,
+	 * so the a obvious issue is backlight on before panel initial, that cause a blank screen, so do not
+	 * set these gpios sate here.
 	sprintf(dev_name, "lcd%d", lcd->disp);
 	disp_sys_pin_set_state(dev_name, (1==bon)? DISP_PIN_STATE_ACTIVE:DISP_PIN_STATE_SLEEP);
+	*/
 
 	disp_al_lcd_io_cfg(lcd->hwdev_index, bon, &lcdp->panel_info);
 
@@ -1279,6 +1372,7 @@ static s32 disp_lcd_event_proc(void *parg)
 	struct disp_lcd_private_data *lcdp = NULL;
 	struct disp_manager *mgr = NULL;
 	u32 hwdev_index;
+	u32 irq_flag = 0;
 
 	if (NULL == lcd)
 		return DISP_IRQ_RETURN;
@@ -1297,13 +1391,43 @@ static s32 disp_lcd_event_proc(void *parg)
 		if (NULL == mgr)
 			return DISP_IRQ_RETURN;
 
-		if (cur_line <= (start_delay-4)) {
+		if (cur_line <= (start_delay - lcdp->judge_line)) {
 			sync_event_proc(mgr->disp, false);
 		} else {
 			sync_event_proc(mgr->disp, true);
 		}
+	} else {
+		irq_flag = disp_al_lcd_query_irq(hwdev_index,
+		    LCD_IRQ_TCON0_CNTR, &lcdp->panel_info);
+		irq_flag |= disp_al_lcd_query_irq(hwdev_index,
+		    LCD_IRQ_TCON0_TRIF, &lcdp->panel_info);
+
+		if (0 == irq_flag)
+			goto exit;
+
+		if (disp_al_lcd_tri_busy(hwdev_index, &lcdp->panel_info)) {
+			/* if lcd is still busy when tri/cnt irq coming,
+			 * take it as failture, record failture times,
+			 * when it reach 2 times, clear counter
+			 */
+			lcdp->tri_finish_fail++;
+			lcdp->tri_finish_fail = (2 == lcdp->tri_finish_fail) ?
+			    0 : lcdp->tri_finish_fail;
+		} else
+			lcdp->tri_finish_fail = 0;
+
+		mgr = lcd->manager;
+		if (NULL == mgr)
+			return DISP_IRQ_RETURN;
+
+		if (0 == lcdp->tri_finish_fail) {
+			sync_event_proc(mgr->disp, false);
+			disp_al_lcd_tri_start(hwdev_index, &lcdp->panel_info);
+		} else
+			sync_event_proc(mgr->disp, true);
 	}
 
+exit:
 	return DISP_IRQ_RETURN;
 }
 
@@ -1338,10 +1462,13 @@ static s32 disp_lcd_pre_enable(struct disp_device* lcd)
 		}
 	}
 
+#if defined(SUPPORT_DSI) && defined(DSI_VERSION_40)
 	if ((LCD_IF_DSI == lcdp->panel_info.lcd_if) && (0 != lcdp->irq_no_dsi)) {
 		disp_sys_register_irq(lcdp->irq_no_dsi,0,disp_lcd_event_proc,(void*)lcd,0,0);
 		disp_sys_enable_irq(lcdp->irq_no_dsi);
-	} else {
+	} else
+#endif
+	{
 		disp_sys_register_irq(lcdp->irq_no,0,disp_lcd_event_proc,(void*)lcd,0,0);
 		disp_sys_enable_irq(lcdp->irq_no);
 	}
@@ -1440,10 +1567,13 @@ static s32 __disp_lcd_enable(struct disp_device* lcd, bool fake)
 		}
 	}
 
+#if defined(SUPPORT_DSI) && defined(DSI_VERSION_40)
 	if ((LCD_IF_DSI == lcdp->panel_info.lcd_if) && (0 != lcdp->irq_no_dsi)) {
 		disp_sys_register_irq(lcdp->irq_no_dsi,0,disp_lcd_event_proc,(void*)lcd,0,0);
 		disp_sys_enable_irq(lcdp->irq_no_dsi);
-	} else {
+	} else
+#endif
+	{
 		disp_sys_register_irq(lcdp->irq_no,0,disp_lcd_event_proc,(void*)lcd,0,0);
 		disp_sys_enable_irq(lcdp->irq_no);
 	}
@@ -1462,6 +1592,7 @@ static s32 __disp_lcd_enable(struct disp_device* lcd, bool fake)
 		return DIS_FAIL;
 
 	disp_al_lcd_cfg(lcd->hwdev_index, &lcdp->panel_info, &lcdp->panel_extend_info);
+	lcd_calc_judge_line(lcd);
 	lcdp->open_flow.func_num = 0;
 	if (lcdp->lcd_panel_fun.cfg_open_flow)	{
 		lcdp->lcd_panel_fun.cfg_open_flow(lcd->disp);
@@ -1718,11 +1849,15 @@ static s32 disp_lcd_sw_enable(struct disp_device* lcd)
 	lcdp->bl_need_enabled = 1;
 	spin_unlock_irqrestore(&lcd_data_lock, flags);
 
+	lcd_calc_judge_line(lcd);
 	disp_al_lcd_disable_irq(lcd->hwdev_index, LCD_IRQ_TCON0_VBLK, &lcdp->panel_info);
+#if defined(SUPPORT_DSI) && defined(DSI_VERSION_40)
 	if ((LCD_IF_DSI == lcdp->panel_info.lcd_if) && (0 != lcdp->irq_no_dsi)) {
 		disp_sys_register_irq(lcdp->irq_no_dsi,0,disp_lcd_event_proc,(void*)lcd,0,0);
 		disp_sys_enable_irq(lcdp->irq_no_dsi);
-	} else {
+	} else
+#endif
+	{
 		disp_sys_register_irq(lcdp->irq_no,0,disp_lcd_event_proc,(void*)lcd,0,0);
 		disp_sys_enable_irq(lcdp->irq_no);
 	}
@@ -1999,6 +2134,85 @@ static s32 disp_lcd_get_status(struct disp_device *lcd)
 	return disp_al_device_get_status(lcd->hwdev_index);
 }
 
+static s32 disp_lcd_set_gamma_tbl(struct disp_device *lcd,
+			unsigned int *gamma_table, unsigned int size)
+{
+	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
+	int ret;
+
+	if ((NULL == lcd) || (NULL == lcdp)
+	    || (NULL == gamma_table)) {
+		DE_WRN("NULL hdl!\n");
+		return 0;
+	}
+
+	size = (size > LCD_GAMMA_TABLE_SIZE) ?
+	    LCD_GAMMA_TABLE_SIZE : size;
+	memcpy(lcdp->panel_extend_info.lcd_gamma_tbl, gamma_table, size);
+
+	if (lcdp->panel_extend_info.lcd_gamma_en == 1)
+		ret = disp_al_lcd_cfg_ext(lcd->disp,
+					  &lcdp->panel_extend_info);
+	else
+		ret = 0;
+
+	return ret;
+}
+
+static s32 disp_lcd_enable_gamma(struct disp_device *lcd)
+{
+	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
+	int ret;
+
+	if ((NULL == lcd) || (NULL == lcdp)) {
+		DE_WRN("NULL hdl!\n");
+		return 0;
+	}
+
+	if (lcdp->panel_extend_info.lcd_gamma_en == 0) {
+		lcdp->panel_extend_info.lcd_gamma_en = 1;
+		ret = disp_al_lcd_cfg_ext(lcd->disp,
+					  &lcdp->panel_extend_info);
+	} else {
+		ret = 0;
+	}
+
+	return ret;
+}
+
+static s32 disp_lcd_disable_gamma(struct disp_device *lcd)
+{
+	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
+	int ret;
+
+	if ((NULL == lcd) || (NULL == lcdp)) {
+		DE_WRN("NULL hdl!\n");
+		return 0;
+	}
+
+	if (lcdp->panel_extend_info.lcd_gamma_en == 1) {
+		lcdp->panel_extend_info.lcd_gamma_en = 0;
+		ret = disp_al_lcd_cfg_ext(lcd->disp,
+					  &lcdp->panel_extend_info);
+	} else {
+		ret = 0;
+	}
+
+	return ret;
+}
+
+
+static s32 disp_lcd_get_fps(struct disp_device *lcd)
+{
+	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
+
+	if ((NULL == lcd) || (NULL == lcdp)) {
+		DE_WRN("NULL hdl!\n");
+		return 0;
+	}
+
+	return lcdp->frame_per_sec;
+}
 static s32 disp_lcd_init(struct disp_device* lcd)
 {
 	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
@@ -2014,6 +2228,16 @@ static s32 disp_lcd_init(struct disp_device* lcd)
 		struct disp_video_timings *timmings;
 		disp_panel_para *panel_info;
 		lcd_parse_panel_para(lcd->disp, &lcdp->panel_info);
+		if (lcdp->panel_info.lcd_if == LCD_IF_DSI &&
+		    lcdp->panel_info.lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+		    lcdp->panel_info.lcd_dsi_port_num ==
+			DISP_LCD_DSI_SINGLE_PORT) {
+			lcdp->panel_info.lcd_ht *= 2;
+			lcdp->panel_info.lcd_hspw *= 2;
+			lcdp->panel_info.lcd_x *= 2;
+			lcdp->panel_info.lcd_hbp *= 2;
+			lcdp->panel_info.lcd_dclk_freq *= 2;
+		}
 		timmings = &lcd->timings;
 		panel_info = &lcdp->panel_info;
 		timmings->pixel_clk = panel_info->lcd_dclk_freq * 1000;
@@ -2061,6 +2285,48 @@ static s32 disp_lcd_init(struct disp_device* lcd)
 	return 0;
 }
 
+static bool disp_lcd_check_config_dirty(struct disp_device *lcd,
+					struct disp_device_config *config)
+{
+	bool ret = false;
+	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
+
+	if ((lcd == NULL) || (lcdp == NULL)) {
+		DE_WRN("NULL hdl!\n");
+		goto exit;
+	}
+
+	if (lcdp->enabled == 0)
+		ret = true;
+
+exit:
+	return ret;
+}
+
+static s32 disp_lcd_set_static_config(struct disp_device *lcd,
+			       struct disp_device_config *config)
+{
+	return 0;
+}
+
+static s32 disp_lcd_get_static_config(struct disp_device *lcd,
+					struct disp_device_config *config)
+{
+	int ret = 0;
+	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
+
+	if ((lcd == NULL) || (lcdp == NULL)) {
+		DE_WRN("NULL hdl!\n");
+		ret = -1;
+		goto exit;
+	}
+
+	config->type = lcd->type;
+	config->format = DISP_CSC_TYPE_RGB;
+exit:
+	return ret;
+}
+
 static s32 disp_lcd_exit(struct disp_device* lcd)
 {
 	struct disp_lcd_private_data *lcdp = disp_lcd_get_priv(lcd);
@@ -2083,6 +2349,9 @@ s32 disp_init_lcd(disp_bsp_init_para * para)
 	struct disp_lcd_private_data *lcdp;
 	u32 hwdev_index = 0;
 	u32 num_devices_support_lcd = 0;
+#if defined(SUPPORT_DSI)
+	u32 i = 0;
+#endif
 
 	DE_INF("disp_init_lcd\n");
 
@@ -2126,9 +2395,10 @@ s32 disp_init_lcd(disp_bsp_init_para * para)
 		lcdp->clk = para->mclk[DISP_MOD_LCD0 + hwdev_index];
 		lcdp->lvds_clk = para->mclk[DISP_MOD_LVDS];
 #if defined(SUPPORT_DSI)
-		lcdp->irq_no_dsi = para->irq_no[DISP_MOD_DSI0];
-		lcdp->dsi_clk0 = para->mclk[DISP_MOD_DSI0];
-		lcdp->dsi_clk1 = para->mclk[DISP_MOD_DSI1];
+		lcdp->irq_no_dsi = para->irq_no[DISP_MOD_DSI0 + disp];
+		for (i = 0; i < CLK_DSI_NUM; ++i)
+			lcdp->dsi_clk[i] = para->mclk[DISP_MOD_DSI0 + i];
+		DE_INF("total number of clk in dsi:%d\n", CLK_DSI_NUM);
 #endif
 		DE_INF("lcd %d, irq_no=%d, irq_no_dsi=%d\n", disp, lcdp->irq_no, lcdp->irq_no_dsi);
 
@@ -2145,6 +2415,9 @@ s32 disp_init_lcd(disp_bsp_init_para * para)
 		lcd->get_bright = disp_lcd_get_bright;
 		lcd->set_bright_dimming = disp_lcd_set_bright_dimming;
 		lcd->get_panel_info = disp_lcd_get_panel_info;
+		lcd->set_static_config = disp_lcd_set_static_config;
+		lcd->get_static_config = disp_lcd_get_static_config;
+		lcd->check_config_dirty = disp_lcd_check_config_dirty;
 
 		lcd->set_panel_func = disp_lcd_set_panel_funs;
 		lcd->set_open_func = disp_lcd_set_open_func;
@@ -2164,6 +2437,10 @@ s32 disp_init_lcd(disp_bsp_init_para * para)
 		lcd->gpio_set_direction = disp_lcd_gpio_set_direction;
 		lcd->get_dimensions = disp_lcd_get_dimensions;
 		lcd->get_status = disp_lcd_get_status;
+		lcd->set_gamma_tbl = disp_lcd_set_gamma_tbl;
+		lcd->enable_gamma = disp_lcd_enable_gamma;
+		lcd->disable_gamma = disp_lcd_disable_gamma;
+		lcd->get_fps = disp_lcd_get_fps;
 
 		lcd->init = disp_lcd_init;
 		lcd->exit = disp_lcd_exit;
@@ -2175,4 +2452,3 @@ s32 disp_init_lcd(disp_bsp_init_para * para)
 
 	return 0;
 }
-

@@ -40,6 +40,7 @@ static char *spinor_store_buffer;
 static char *spinor_write_cache;
 static int   spinor_cache_block = -1;
 static int   spinor_4bytes_addr_mode = 0;
+static int spi_freq = 0;
 
 #define ENABLE_4BYTES	1
 #define DISABLE_4BYTES  0
@@ -48,11 +49,86 @@ static int   spinor_4bytes_addr_mode = 0;
 #define  NPAGE_IN_1SYSPAGE       (SYSTEM_PAGE_SIZE/SPINOR_PAGE_SIZE)
 #define  SPINOR_BLOCK_BYTES      (64 * 1024)
 #define  SPINOR_BLOCK_SECTORS    (SPINOR_BLOCK_BYTES/512)
+#define SPINOR_FREAD_DUAL_OUT    0x3b // sclk <= 75MHz
+#define SPI_NORMAL_FRQ	(40000000)
+#define SPINOR_FREAD_QUAD_OUT	0x6b
 
-extern uint sunxi_sprite_generate_checksum(void *buffer, uint length, uint src_sum);
-extern int sunxi_sprite_verify_checksum(void *buffer, uint length, uint src_sum);
 static void spinor_enter_4bytes_addr(int);
 static void spinor_config_addr_mode(u8 *sdata, uint page_addr, uint *num, u8 cmd);
+
+#ifdef CONFIG_SPI_QUAD_MODE
+static int quad_flag;
+static int quad_state;
+static int check_mbr_flag;
+#define QUAD_READ_ERR	(-1)
+static int set_quad_mode(u8 cmd1, u8 cmd2);
+static int spi_nor_fast_read_quad_output(uint start, uint sector_cnt, void *buf);
+
+struct spinor_info {
+	uint		id;
+	u8		mode_cmd1;
+	u8		mode_cmd2;
+	u16		flags;
+	#define QUAD_ENABLE 0x01
+};
+
+struct spinor_info spi_nor_ids[] = {
+/* spinor_id, mode_cmd1, mode_cmd2, flags */
+
+	/* -- Macronix -- */
+	{0x1820c2, 0x40, 0x00, QUAD_ENABLE},
+	{0x1020c2, 0x40, 0x00},
+	{0x1220c2, 0x40, 0x00},
+	{0x1320c2, 0x40, 0x00},
+	{0x1420c2, 0x40, 0x00},
+	{0x1520c2, 0x40, 0x00},
+	{0x1620c2, 0x40, 0x00},
+	{0x169ec2, 0x40, 0x00},
+	{0x1720c2, 0x40, 0x00},
+	{0x3725c2, 0x40, 0x00},
+	{0x1826c2, 0x40, 0x00},
+	{0x1920c2, 0x40, 0x00},
+	{0x1926c2, 0x40, 0x00},
+	{0x1a20c2, 0x40, 0x00, QUAD_ENABLE},
+	{0x1b26c2, 0x40, 0x00, QUAD_ENABLE},
+
+	/* -- Winbond -- */
+	{0x1840ef, 0x00, 0x02, QUAD_ENABLE},
+	{0x1030ef, 0x00, 0x02},
+	{0x1130ef, 0x00, 0x02},
+	{0x1230ef, 0x00, 0x02},
+	{0x1330ef, 0x00, 0x02},
+	{0x1430ef, 0x00, 0x02},
+	{0x1530ef, 0x00, 0x02},
+	{0x1630ef, 0x00, 0x02},
+	{0x1640ef, 0x00, 0x02},
+	{0x1660ef, 0x00, 0x02, QUAD_ENABLE},
+	{0x1730ef, 0x00, 0x02},
+	{0x1740ef, 0x00, 0x02},
+	{0x1760ef, 0x00, 0x02, QUAD_ENABLE},
+	{0x1860ef, 0x00, 0x02, QUAD_ENABLE},
+	{0x1450ef, 0x00, 0x02},
+	{0x1440ef, 0x00, 0x02},
+	{0x1940ef, 0x00, 0x02},
+
+	/* -- Atmel -- */
+	{0x01661f, 0x80, 0x00},
+	{0x04661f, 0x80, 0x00},
+	{0x01441f, 0x80, 0x00},
+	{0x01471f, 0x80, 0x00},
+	{0x00481f, 0x80, 0x00},
+	{0x00041f, 0x80, 0x00},
+	{0x01451f, 0x80, 0x00},
+	{0x01461f, 0x80, 0x00},
+	{0x00471f, 0x80, 0x00},
+	{0x00251f, 0x80, 0x00},
+
+	/* -- ISSI -- */
+	{0x209d7f, 0x40, 0x00},
+};
+
+#endif
+
 /*
 ************************************************************************************************************
 *
@@ -101,7 +177,7 @@ static int __spinor_rdsr(u8 *reg)
 	u8 sdata = SPINOR_RDSR;
 	int ret = -1;
 	int  txnum ;
-	
+
 	txnum = 1;
 	spic_config_dual_mode(0, 0, 0, txnum);
 	ret = spic_rw(1, (void *)&sdata, 1, (void *)reg);
@@ -120,30 +196,28 @@ static uint __spinor_wrsr(u8 reg)
 	ret = __spinor_wren();
 	if (ret==-1)
 		goto __err_out_;
-		
 	txnum = 2;
 	rxnum = 0;
-	
+
 	sdata[0] = SPINOR_WRSR;
 	sdata[1] = reg;
-	
+
 	spic_config_dual_mode(0, 0, 0, txnum);
 	ret = spic_rw(txnum, (void*)sdata, rxnum, (void*)0);
 	if (ret==-1)
 		goto __err_out_;
-	
+
 	do {
 		ret = __spinor_rdsr( &status);
 		if (ret==-1)
 			goto __err_out_;
-			
 		for(i=0; i<100; i++);
 	} while(status&0x01);
 	printf("_spinor_wrsr status is %d \n",status);
 	ret = 0;
-	
+
 __err_out_:
-	
+
 	return ret;
 }
 
@@ -348,23 +422,8 @@ static int __spinor_read_id(uint *id)
 	spic_config_dual_mode(0, 0, 0, txnum);
 	return spic_rw(1, (void *)&sdata, 3, (void *)id);
 }
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
-static int __spinor_sector_read(uint start, uint sector_cnt, void *buf)
+
+static int spi_nor_fast_read_dual_output(uint start, uint sector_cnt, void *buf)
 {
 	uint page_addr;
 	uint rbyte_cnt;
@@ -372,40 +431,120 @@ static int __spinor_sector_read(uint start, uint sector_cnt, void *buf)
 	int ret = 0;
 	uint tmp_cnt, tmp_offset = 0;
 	void  *tmp_buf;
-	uint txnum = 0;
-	uint rxnum = 0;
-
-
+	uint txnum, rxnum;
+	txnum = 5;
 	while (sector_cnt)
 	{
-		if (sector_cnt > 127)
-		{
-			tmp_cnt = 127;
-		}
-		else
-		{
-			tmp_cnt = sector_cnt;
-		}
+	    if (sector_cnt > 127)
+	    {
+	        tmp_cnt = 127;
+	    }
+	    else
+	    {
+	        tmp_cnt = sector_cnt;
+	    }
 
-		page_addr = (start + tmp_offset) * SYSTEM_PAGE_SIZE;
-		rbyte_cnt = tmp_cnt * SYSTEM_PAGE_SIZE;
-		spinor_config_addr_mode(sdata,page_addr,&txnum,SPINOR_READ);
-		rxnum   = rbyte_cnt;
-		tmp_buf = (u8 *)buf + (tmp_offset << 9);
+	    page_addr = (start + tmp_offset) * SYSTEM_PAGE_SIZE;
+	    rbyte_cnt = tmp_cnt * SYSTEM_PAGE_SIZE;
+
+	    sdata[0]  =  SPINOR_FREAD_DUAL_OUT;
+	    sdata[1]  = (page_addr >> 16) & 0xff;
+	    sdata[2]  = (page_addr >> 8 ) & 0xff;
+	    sdata[3]  =  page_addr        & 0xff;
+	    sdata[4]  = 0 ;
+
+	    rxnum   = rbyte_cnt;
+	    tmp_buf = (u8 *)buf + (tmp_offset << 9);
+
+		spic_config_dual_mode(0, 1, 0, txnum);
+
+	//		flush_cache(tmp_buf,rxnum);  // guoyingyang debug
+	    if (spic_rw(txnum, (void *)sdata, rxnum, tmp_buf))
+	    {
+	        ret = -1;
+	        break;
+	    }
+
+	    sector_cnt -= tmp_cnt;
+	    tmp_offset += tmp_cnt;
+	}
+	spic_config_dual_mode(0, 0, 0, 0);
+
+	spic_config_dual_mode(0, 0, 0, 0);
+
+	return ret;
+}
+
+static int __spinor_sector_normal_read(uint start, uint sector_cnt, void *buf)
+{
+	uint page_addr;
+	uint rbyte_cnt;
+	u8   sdata[4] = {0};
+	int ret = 0;
+	uint tmp_cnt, tmp_offset = 0;
+	void  *tmp_buf;
+	uint txnum, rxnum;
+	txnum = 4;
+	while (sector_cnt)
+	{
+	    if (sector_cnt > 127)
+	    {
+	        tmp_cnt = 127;
+	    }
+	    else
+	    {
+	        tmp_cnt = sector_cnt;
+	    }
+
+	    page_addr = (start + tmp_offset) * SYSTEM_PAGE_SIZE;
+	    rbyte_cnt = tmp_cnt * SYSTEM_PAGE_SIZE;
+	    sdata[0]  =  SPINOR_READ;
+	    sdata[1]  = (page_addr >> 16) & 0xff;
+	    sdata[2]  = (page_addr >> 8 ) & 0xff;
+	    sdata[3]  =  page_addr        & 0xff;
+
+	    rxnum   = rbyte_cnt;
+	    tmp_buf = (u8 *)buf + (tmp_offset << 9);
 
 		spic_config_dual_mode(0, 0, 0, txnum);
-		if (spic_rw(txnum, (void *)sdata, rxnum, tmp_buf))
-		{
-			ret = -1;
-			break;
-		}
 
-		sector_cnt -= tmp_cnt;
-		tmp_offset += tmp_cnt;
+	    if (spic_rw(txnum, (void *)sdata, rxnum, tmp_buf))
+	    {
+	        ret = -1;
+	        break;
+	    }
+
+	    sector_cnt -= tmp_cnt;
+	    tmp_offset += tmp_cnt;
 	}
 
-    return ret;
+	return ret;
+
 }
+
+static int __spinor_sector_read(uint start, uint sector_cnt, void *buf)
+{
+	int ret = 0;
+
+#ifdef CONFIG_SPI_QUAD_MODE
+	if (quad_flag == 1) {
+		ret = spi_nor_fast_read_quad_output(start, sector_cnt, buf);
+		if (ret == -1)
+			ret = spi_nor_fast_read_dual_output(start, sector_cnt, buf);
+		if (ret == -1)
+			ret = __spinor_sector_normal_read(start, sector_cnt, buf);
+		return ret;
+	}
+#endif
+
+	if (spi_freq >= SPI_NORMAL_FRQ)
+		ret = spi_nor_fast_read_dual_output(start, sector_cnt, buf);
+	else
+		ret = __spinor_sector_normal_read(start, sector_cnt, buf);
+
+	return ret;
+}
+
 /*
 ************************************************************************************************************
 *
@@ -430,7 +569,7 @@ static int __spinor_sector_write(uint sector_start, uint sector_cnt, void *buf)
 	int ret = -1;
 
 	printf("start = 0x%x, cnt=0x%x\n", sector_start, sector_cnt);
-	printf("nor_page_cnt=%d\n", nor_page_cnt);
+//	printf("nor_page_cnt=%d\n", nor_page_cnt);
 	for (i = 0; i < nor_page_cnt; i++)
 	{
 //		//printf("spinor program page : 0x%x\n", page_addr + SPINOR_PAGE_SIZE * i);
@@ -465,29 +604,39 @@ static int __spinor_sector_write(uint sector_start, uint sector_cnt, void *buf)
 */
 int spinor_init(int stage)
 {
+#ifdef CONFIG_SPI_QUAD_MODE
+	int i, id_size;
+#endif
 	int spi_size = 0;
+	u32 id = 0;
 
 	spi_size = spinor_size();
 	if(spinor_flash_inited)
 	{
-		puts("sunxi spinor is already inited\n");
+		printf("sunxi spinor is already inited\n");
                 return 0;
 	}
 	else
 	{
-		puts("sunxi spinor is initing...");
+		printf("sunxi spinor is initing...");
 		if(spic_init(0))
 		{
-			puts("Fail\n");
+			printf("Fail\n");
 
 			return -1;
 		}
 		else
 		{
-			puts("OK\n");
+			printf("OK\n");
 		}
 
 	}
+	__spinor_read_id(&id);
+	if(!id)
+		return -1;
+
+	printf("spinor id:0x%x\n",id);
+
 	spinor_flash_inited ++;
 
 	if(spi_size > 16*1024*1024/512)
@@ -501,7 +650,7 @@ int spinor_init(int stage)
 		spinor_store_buffer  = (char *)malloc(SPINOR_STORE_BUFFER_SIZE);
 		if(!spinor_store_buffer)
 		{
-			puts("memory malloced fail for store buffer\n");
+			printf("memory malloced fail for store buffer\n");
 
 			return -1;
 		}
@@ -509,7 +658,7 @@ int spinor_init(int stage)
 	spinor_write_cache  = (char *)malloc_noncache(64 * 1024);
 	if(!spinor_write_cache)
 	{
-		puts("memory malloced fail for spinor data buffer\n");
+		printf("memory malloced fail for spinor data buffer\n");
 
 		if(spinor_store_buffer)
 		{
@@ -518,6 +667,23 @@ int spinor_init(int stage)
 			return -1;
 		}
 	}
+
+#ifdef CONFIG_SPI_QUAD_MODE
+	if (quad_state != QUAD_READ_ERR) {
+		id_size = ARRAY_SIZE(spi_nor_ids);
+		for (i = 0; i < id_size; i++) {
+			if ((id == spi_nor_ids[i].id) && (spi_nor_ids[i].flags & QUAD_ENABLE)) {
+				quad_flag = 1;
+				if (set_quad_mode(spi_nor_ids[i].mode_cmd1, spi_nor_ids[i].mode_cmd2))
+					quad_flag = 0;
+				break;
+			}
+		}
+	}
+#endif
+	if (script_parser_fetch("boot_spi_board0", "boot_spi_speed_hz", &spi_freq, 1) < 0)
+		spi_freq = SPI_DEFAULT_CLK;
+	printf("spi_freq = %d\n", spi_freq);
 
 	return 0;
 }
@@ -583,8 +749,10 @@ int spinor_exit(int force)
 		//		ret = -1;
 		//	}
 		//}
-		//这里关闭spinor控制器
 		//spic_exit(0);
+		free(spinor_store_buffer);
+		free_noncache(spinor_write_cache);
+		spic_exit(0);
 	}
 
 	return ret;
@@ -866,18 +1034,19 @@ static int __spinor_sprite_sector_write(uint start,uint nsector,void* buffer)
 	   return -1;
 	}
 
-	/* verify */
-	if (__spinor_sector_read(start, nsector, spinor_store_buffer))
-	{
-	    printf("spinor read  sector fail\n");
-	   return -1;
-	}
-	if (memcmp(spinor_store_buffer,buffer,nsector*512))
-	{
-	    printf("***write 0x%x sector fail***\n",sector_index*SPINOR_BLOCK_SECTORS);
-	    return -1;
-	}
-
+#ifdef SPINOR_DEBUG
+   /* verify */
+   if (__spinor_sector_read(start, nsector, spinor_store_buffer))
+   {
+       printf("spinor read  sector fail\n");
+      return -1;
+   }
+   if (memcmp(spinor_store_buffer,buffer,nsector*512))
+   {
+       printf("***write 0x%x sector fail***\n",sector_index*SPINOR_BLOCK_SECTORS);
+       return -1;
+   }
+#endif
 	return SPINOR_BLOCK_SECTORS;
 }
 
@@ -910,6 +1079,9 @@ int spinor_sprite_write(uint start, uint nblock, void *buffer)
 
 	for (start_sector =start+nsector;start_sector<start+nblock;start_sector+= SPINOR_BLOCK_SECTORS)
 	{
+		if (start+nblock - start_sector < SPINOR_BLOCK_SECTORS)
+			sector_once_write = start+nblock - start_sector;
+
 		ret = __spinor_sprite_sector_write(start_sector,sector_once_write, (void *)((uint)buffer + (start_sector -start) * 512));
 		if (ret < 0)
 		{
@@ -964,7 +1136,7 @@ int update_boot0_dram_para(char *buffer)
 		printf("sunxi sprite: boot0 magic is error\n");
 		return -1;
 	}
-	if(sunxi_sprite_verify_checksum((void *)buffer, boot0->boot_head.length, boot0->boot_head.check_sum))
+	if(sunxi_verify_checksum((void *)buffer, boot0->boot_head.length, boot0->boot_head.check_sum))
 	{
 		printf("sunxi sprite: boot0 checksum is error\n");
 
@@ -978,9 +1150,9 @@ int update_boot0_dram_para(char *buffer)
 	memcpy((void *)&boot0->prvt_head.dram_para, (void *)DRAM_PARA_STORE_ADDR, 32 * 4);
 	set_boot_dram_update_flag(boot0->prvt_head.dram_para);
 	/* regenerate check sum */
-	boot0->boot_head.check_sum = sunxi_sprite_generate_checksum(buffer, boot0->boot_head.length, boot0->boot_head.check_sum);
+	boot0->boot_head.check_sum = sunxi_generate_checksum(buffer, boot0->boot_head.length, boot0->boot_head.check_sum);
 	//校验数据是否正确
-	if(sunxi_sprite_verify_checksum((void *)buffer, boot0->boot_head.length, boot0->boot_head.check_sum))
+	if(sunxi_verify_checksum((void *)buffer, boot0->boot_head.length, boot0->boot_head.check_sum))
 	{
 		printf("sunxi sprite: boot0 checksum is error\n");
 		return -1;
@@ -993,6 +1165,11 @@ int update_boot0_dram_para(char *buffer)
 int spinor_download_uboot(uint length, void *buffer)
 {
 	int ret = -1;
+	if(spinor_flash_inited==0)
+	{
+		printf("warning:spinor need init\n");
+		sunxi_sprite_init(0);
+	}
 	ret = spinor_sprite_write(UBOOT_START_SECTOR_IN_SPINOR, length/512, buffer);
 	if (ret < 0)
 	{
@@ -1112,24 +1289,26 @@ s32 spi_nor_rw_test(u32 spi_no)
 	if(spinor_init(0))
 	{
 		printf("spinor init failed \n");
+		goto _free_mem;
 		return -1;
 	}
 	if(__spinor_read_id(&id))
 	{
 		printf("spinor read id failed \n");
+		goto _free_mem;
 		return -1;
 	}
 	__spinor_wrsr(0);
 	printf("the id is %x\n",id);
 	printf("bfeore spi_nor_rw_test\n");
-	
+
 	__spinor_sector_read(0, 1, rbuf);
 
 	for(i = 0; i < 256; i+=4)
 	{
 		printf("verify rbuf=0x%x\n",*(u32 *)(rbuf+i));
 	}
-	
+
 	printf("before erase all \n");
 	ret = __spinor_erase_all();
 	printf("after erase all \n");
@@ -1137,29 +1316,31 @@ s32 spi_nor_rw_test(u32 spi_no)
 
 	if (!wbuf || !rbuf) {
 		printf("spi %d malloc buffer failed\n", spi_no);
+		goto _free_mem;
 		return -1;
 	}
 
 	for (i=0; i<test_len; i++)
 		wbuf[i] = i;
-	
-	
+
+
 	i = 0;
 	ret = __spinor_sector_read( i, 1, rbuf);
  	if (ret) {
  		printf("spi %d read page %d failed\n", spi_no,i);
- 			return -1;
+		goto _free_mem;
+		return -1;
  	}
 
-	for (i = 0; i < (test_len >> 8)/4; i++) 
+	for (i = 0; i < (test_len >> 8)/4; i++)
 	printf("verify rbuf=[0x%x]\n",*(u32 *)(rbuf+i*4));
-	
+
 //	ret = __spinor_erase_block(0);	//erase 64K
 //	if (ret) {
 //		printf("spi erase ss1 nor failed\n");
 //		return -1;
 //	}
-	
+
     for (i=0; i<10; i++)
 	printf("b rbuf=[0x%x]\n",*(u32 *)(rbuf));
     for (i = 0; i < (test_len >> 8); i++) {
@@ -1167,6 +1348,7 @@ s32 spi_nor_rw_test(u32 spi_no)
 		ret = __spinor_sector_write(i, 1, wbuf);
 		if (ret) {
 			printf("spi %d write page %d failed\n", spi_no,i);
+			goto _free_mem;
 			return -1;
 		}
 		printf("end to write \n");
@@ -1175,6 +1357,7 @@ s32 spi_nor_rw_test(u32 spi_no)
 		ret = __spinor_sector_read(i, 1, rbuf);
 		if (ret) {
 			printf("spi %d read page %d failed\n", spi_no,i);
+			goto _free_mem;
 			return -1;
 		}
 		printf("end to read \n");
@@ -1182,13 +1365,17 @@ s32 spi_nor_rw_test(u32 spi_no)
 		if (memcmp(wbuf, rbuf, 256)) {
 			printf("spi %d page %d read/write failed\n", spi_no, i);
 			while(1);
+			goto _free_mem;
 			return -1;
 		} else
 			printf("spi %d page %d read/write ok\n", spi_no, i);
-		
+
 	}
-	free(wbuf);
-	free(rbuf);
+
+	_free_mem:
+		free(wbuf);
+		free(rbuf);
+
 	return 0;
 }
 #endif
@@ -1196,7 +1383,7 @@ s32 spi_nor_rw_test(u32 spi_no)
 
 u32 try_spi_nor(u32 spino)
 {
-	uint id =0xffff;
+	uint id =0;
 	if(spinor_init(spino))
 	{
 		printf("spinor init failed \n");
@@ -1207,7 +1394,7 @@ u32 try_spi_nor(u32 spino)
 		printf("spinor read id failed \n");
 		return -1;
 	}
-	if(id == 0xfffff)
+	if(id == 0)
 	{
 		return -1;
 	}
@@ -1258,3 +1445,115 @@ static void spinor_config_addr_mode(u8 *sdata, uint page_addr, uint *num, u8 cmd
 
 }
 
+#ifdef CONFIG_SPI_QUAD_MODE
+static int set_quad_mode(u8 cmd1, u8 cmd2)
+{
+	u8 i = 0;
+	int ret = 0;
+	u8 reg[2] = {0};
+	u8 sdata[3] = {0};
+	uint txnum, rxnum;
+
+	txnum = 3;
+	rxnum = 0;
+
+	ret = __spinor_wren();
+	if (ret == -1)
+		goto __err_out_;
+
+	sdata[0] = SPINOR_WRSR;
+	sdata[1] = cmd1;
+	sdata[2] = cmd2;
+
+	spic_config_dual_mode(0, 0, 0, txnum);
+	ret = spic_rw(txnum, (void *)sdata, rxnum, (void *)0);
+	if (ret == -1)
+		goto __err_out_;
+
+	do {
+		ret = __spinor_rdsr(&reg[0]);
+		if (ret == RET_FAIL)
+			goto __err_out_;
+
+		mdelay(5);
+		i++;
+		if (i > 4)
+			goto __err_out_;
+	} while (reg[0] & SPINOR_WRSR);
+
+	ret = __spinor_rdsr(&reg[1]);
+	if ((!ret) & (reg[1] & (cmd2 | cmd1)))
+		printf("Quad Mode Enable OK...\n");
+	else
+		goto __err_out_;
+
+	return 0;
+
+__err_out_:
+
+	return ret;
+}
+
+static int spi_nor_fast_read_quad_output(uint start, uint sector_cnt, void *buf)
+{
+	uint page_addr;
+	uint rbyte_cnt;
+	int ret = 0;
+	u8 sdata[5] = {0};
+	uint tmp_cnt, tmp_offset = 0;
+	void  *tmp_buf;
+	uint txnum, rxnum;
+	sunxi_mbr_t	*mbr;
+	txnum = 5;
+
+	while (sector_cnt) {
+		if (sector_cnt > 127)
+			tmp_cnt = 127;
+		else
+			tmp_cnt = sector_cnt;
+
+		page_addr = (start + tmp_offset) * SYSTEM_PAGE_SIZE;
+		rbyte_cnt = tmp_cnt * SYSTEM_PAGE_SIZE;
+
+		sdata[0]  =  SPINOR_FREAD_QUAD_OUT;
+		sdata[1]  = (page_addr >> 16) & 0xff;
+		sdata[2]  = (page_addr >> 8) & 0xff;
+		sdata[3]  =  page_addr        & 0xff;
+		sdata[4]  = 0;
+
+		rxnum   = rbyte_cnt;
+		tmp_buf = (u8 *)buf + (tmp_offset << 9);
+
+		spic_config_dual_mode(0, 2, 0, txnum);
+
+		if (spic_rw(txnum, (void *)sdata, rxnum, (void *)tmp_buf)) {
+			ret = -1;
+			break;
+		}
+
+		sector_cnt -= tmp_cnt;
+		tmp_offset += tmp_cnt;
+	}
+	mbr = (sunxi_mbr_t *)buf;
+	if (check_mbr_flag == 0) {
+		if (!strncmp((const char *)mbr->magic, SUNXI_MBR_MAGIC, 8)) {
+				int crc = 0;
+				crc = crc32(0, (const unsigned char *)&mbr->version, SUNXI_MBR_SIZE-4);
+				if (crc != mbr->crc32) {
+					quad_flag = 0;
+					ret = -1;
+				}
+		} else {
+			quad_flag = 0;
+			ret = -1;
+		}
+		check_mbr_flag = 1;
+	}
+	spic_config_dual_mode(0, 0, 0, 0);
+
+	if (ret == -1)
+		quad_state = QUAD_READ_ERR;
+
+	return ret;
+}
+#endif

@@ -100,6 +100,20 @@ typedef struct extended_standby_manager{
 	unsigned long wakeup_gpio_group;
 }extended_standby_manager_t;
 
+#if defined(CONFIG_ARCH_SUN8IW5P1)
+typedef struct scene_extended_standby {
+	extended_standby_t extended_standby_data;
+
+	/*
+	 * scene type of extended standby
+	 */
+	aw_power_scene_e scene_type;
+
+	struct list_head list; /* list of all extended standby */
+
+	char *name;
+} scene_extended_standby_t;
+#else
 typedef struct scene_extended_standby {
 	/*
 	 * scene type of extended standby
@@ -113,6 +127,7 @@ typedef struct scene_extended_standby {
 	struct list_head list; /* list of all extended standby */
 } scene_extended_standby_t;
 int extended_standby_set_pmu_id(unsigned int num, unsigned int pmu_id);
+#endif
 
 extern scene_extended_standby_t extended_standby[];
 extern int extended_standby_cnt;

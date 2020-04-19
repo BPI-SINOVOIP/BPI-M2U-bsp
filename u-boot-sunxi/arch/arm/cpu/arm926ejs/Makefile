@@ -5,8 +5,10 @@
 # SPDX-License-Identifier:	GPL-2.0+
 #
 
-extra-y	= start.o
-obj-y	= cpu.o cache.o
+extra-y    := start.o
+extra-y    += spare_head.o
+extra-y    += uboot_hash.o
+obj-y       = cpu.o cache.o
 
 ifdef	CONFIG_SPL_BUILD
 ifdef	CONFIG_SPL_NO_CPU_SUPPORT_CODE

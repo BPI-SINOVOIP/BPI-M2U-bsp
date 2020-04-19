@@ -73,4 +73,6 @@ int cci_rd_0_16(unsigned int sel, unsigned short *data, unsigned char slv);
 int cci_wr_a16_d8_continuous(unsigned int sel, unsigned short reg,
 			     unsigned char *data, unsigned char slv, int size);
 
+void cci_s_power(unsigned int sel, int on_off);
+
 #endif /*__BSP_CCI__H__*/

@@ -8,7 +8,13 @@ GCOV_PROFILE=no
 
 #use "-Os" flags.
 #Don't use "-O2" flags.
+
+ifneq ($(strip $(CONFIG_ARCH_SUN3IW1P1)),)
+KBUILD_CFLAGS := -g -c -nostdlib -march=armv5te -D__LINUX_ARM_ARCH__=5 -marm -fno-unwind-tables -fno-jump-tables -fno-asynchronous-unwind-tables -mlittle-endian -O2 -Idrivers/soc/allwinner/pm
+else
 KBUILD_CFLAGS := -g -c -nostdlib -march=armv7-a -D__LINUX_ARM_ARCH__=7 -marm -fno-unwind-tables -fno-jump-tables -fno-asynchronous-unwind-tables -mlittle-endian -O2 -mno-unaligned-access -Idrivers/soc/allwinner/pm
+endif
+
 KBUILD_AFLAGS += -Idrivers/soc/allwinner/pm
 
 #Include the cur dir.
@@ -22,14 +28,29 @@ INCLUDE   = -I. \
        -I$(KDIR)/drivers/soc/allwinner/standby/include \
        -I$(KDIR)/drivers/soc/allwinner/pm
 
-standby-y := common.o                    \
-             standby_twi.o               \
+standby-y := common.o
+
+ifneq ($(strip $(CONFIG_AW_AXP)),)
+standby-y += standby_twi.o               \
              power/axp_power.o           \
              power/axp15_power.o         \
              power/axp22_power.o         \
              power/axp20_power.o         \
-             power/standby_power.o       \
-             standby_clock.o             \
+             power/standby_power.o
+endif
+
+ifneq ($(strip $(CONFIG_ARCH_SUN3I)),)
+standby-y += standby_clock.o             \
+             standby_debug.o             \
+             standby_divlib.o            \
+             standby_dram.o            \
+             mem_mmu_pc_asm.o       \
+             mem_divlibc.o          \
+             mem_clk.o              \
+             mem_timing.o           \
+             main.o
+else
+standby-y += standby_clock.o             \
              standby_debug.o             \
              standby_divlib.o            \
              standby_dram.o            \
@@ -40,6 +61,11 @@ standby-y := common.o                    \
              mem_serial.o           \
              mem_printk.o           \
              main.o
+endif
+
+ifneq ($(strip $(CONFIG_ARCH_SUN3IW1P1)),)
+standby-y += dram/sun3iw1p1/mctl_standby-sun3iw1.o
+endif
 
 ifneq ($(strip $(CONFIG_ARCH_SUN8IW11)),)
 standby-y += dram/sun8iw11p1/mctl_standby-sun8iw11.o

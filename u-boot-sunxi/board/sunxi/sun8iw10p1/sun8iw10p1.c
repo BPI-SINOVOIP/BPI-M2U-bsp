@@ -69,7 +69,6 @@ int board_init(void)
 {
 	gd->bd->bi_arch_number = LINUX_MACHINE_ID;
 	gd->bd->bi_boot_params = (PHYS_SDRAM_1 + 0x100);
-	debug("board_init storage_type = %d\n",uboot_spare_head.boot_data.storage_type);
 
 	//
 	if(uboot_spare_head.boot_data.work_mode != WORK_MODE_USB_PRODUCT) {
@@ -231,6 +230,8 @@ int cpu0_set_detected_paras(void)
 
 extern int axp22_probe(void);
 extern int axp15_probe(void);
+extern int axp259_probe(void);
+
 
 int platform_axp_probe(sunxi_axp_dev_t  *sunxi_axp_dev_pt[], int max_dev)
 {
@@ -247,6 +248,17 @@ int platform_axp_probe(sunxi_axp_dev_t  *sunxi_axp_dev_pt[], int max_dev)
 		/* pmu type AXP15X */
 		tick_printf("PMU: AXP15X found\n");
 		sunxi_axp_dev_pt[0] = &sunxi_axp_15;
+
+		if(!axp259_probe())
+		{
+			/* pmu type AXP259 */
+			tick_printf("PMU: AXP259 found\n");
+			sunxi_axp_dev_pt[1] = &sunxi_axp_259;
+		}
+		else
+		{
+			sunxi_axp_dev_pt[1] = &sunxi_axp_null;
+		}
 		return 0;
 	}
 

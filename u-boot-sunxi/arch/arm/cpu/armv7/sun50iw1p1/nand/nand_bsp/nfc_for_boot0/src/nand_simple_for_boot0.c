@@ -22,6 +22,12 @@
 #include "../include/nand_physic.h"
 #include "../include/nfc.h"
 
+extern __s32 NFC_GetFeature(NFC_CMD_LIST  *cmd, __u8 *buf);
+extern __s32 NFC_SetFeature(NFC_CMD_LIST  *cmd, __u8 *buf);
+extern __s32 NFC_Is_Toggle_Interface(void);
+extern __s32 NFC_Set_Legacy_Interface(void);
+extern __s32 NFC_Set_Toggle_Interface(void);
+
 struct __NandStorageInfo_t  NandStorageInfo;
 struct __NandPageCachePool_t PageCachePool;
 
@@ -219,21 +225,24 @@ __s32 _read_single_page(struct boot_physical_param *readop,__u8 read_mode)
 			random_seed = _cal_random_seed(readop->page);
 			NFC_SetRandomSeed(random_seed);
 			NFC_RandomEnable();
-			ret = NFC_Read(cmd_list, readop->mainbuf, sparebuf, read_mode , NFC_PAGE_MODE);
+			ret = NFC_Read(cmd_list, readop->mainbuf, sparebuf, read_mode, NFC_PAGE_MODE);
 			NFC_RandomDisable();
 
-			if((ret != -ERR_ECC)||(k==READ_RETRY_CYCLE))
+			if ((ret != -ERR_ECC) || (k == READ_RETRY_CYCLE))
 			{
-			    if((READ_RETRY_MODE>=0x10)&&(READ_RETRY_MODE<0x20))  //toshiba mode
+				/*toshiba mode*/
+			    if ((READ_RETRY_MODE >= 0x10) && (READ_RETRY_MODE < 0x20))
 			    {
-    			    //exit toshiba readretry
+					/*exit toshiba readretry*/
     				PHY_ResetChip(readop->chip);
 			    }
-			    else if((READ_RETRY_MODE>=0x20)&&(READ_RETRY_MODE<0x30))   //samsung mode
+				/*samsung mode*/
+			    else if ((READ_RETRY_MODE >= 0x20) && (READ_RETRY_MODE < 0x30))
 			    {
 			        NFC_SetDefaultParam(readop->chip, default_value, READ_RETRY_TYPE);
 			    }
-			    else if((READ_RETRY_MODE>=0x40)&&(READ_RETRY_MODE<0x50))   //micron mode
+				/*micron mode*/
+			    else if ((READ_RETRY_MODE >= 0x40) && (READ_RETRY_MODE < 0x50))
 			    {
 			        NFC_SetDefaultParam(readop->chip, default_value, READ_RETRY_TYPE);
 			    }
@@ -371,8 +380,9 @@ __s32 PHY_GetDefaultParam(__u32 bank)
                 {
                     PHY_DBG("find good otp value in chip %d, block %d \n", nand_op.chip, nand_op.block);
                     break;
-                }
+				}
             }
+
         }
 
         if(otp_ok_flag)
@@ -380,6 +390,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
             pdata = (__u8 *)(PHY_TMP_PAGE_CACHE);
             for(j=0;j<64;j++)
                 default_value[j] = pdata[j];
+
             NFC_GetOTPValue(0, default_value, READ_RETRY_TYPE);
         }
         else
@@ -421,7 +432,6 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 					PHY_DBG("find good otp value in chip %d, block %d \n", nand_op.chip, nand_op.block);
 					break;
 				}
-
 			}
 		}
 		if(otp_ok_flag)
@@ -608,7 +618,87 @@ __s32  PHY_ReadNandId(__s32 nChip, void *pChipID)
 	return ret;
 }
 
+__s32  PHY_GetFeature(__s32 nChip, __u8 *addr, void *value)
+{
+	__s32 ret;
+	NFC_CMD_LIST cmd;
 
+	NFC_SelectChip(nChip);
+
+	_add_cmd_list(&cmd, 0xEE, 1, addr, NFC_DATA_FETCH, NFC_IGNORE, 4, NFC_NO_WAIT_RB);
+
+	ret = NFC_GetFeature(&cmd, value);
+
+	NFC_DeSelectChip(nChip);
+
+
+	return ret;
+}
+
+__s32  PHY_SetFeature(__s32 nChip, __u8 *addr, void *value)
+{
+	__s32 ret;
+	NFC_CMD_LIST cmd;
+
+	NFC_SelectChip(nChip);
+
+	_add_cmd_list(&cmd, 0xEF, 1, addr, NFC_DATA_FETCH, NFC_IGNORE, 4, NFC_WAIT_RB);
+
+	ret = NFC_SetFeature(&cmd, value);
+
+	NFC_DeSelectChip(nChip);
+
+
+	return ret;
+}
+
+/*****************************************************************************
+*Name         :
+*Description  :
+*Parameter    :
+*Return       : 0:ok  -1:fail
+*Note         :
+*****************************************************************************/
+__s32 Setup_Ddr_Nand_Force_To_Sdr_Para(boot_nand_para_t *nand_info)
+{
+	__u8 addr;
+	__u8 p[4];
+	__u8 pr[4]; /*read back value*/
+
+	if ((READ_RETRY_MODE != 0x34) && (READ_RETRY_MODE != 0x35)) {
+		return 0;
+	}
+	/*sandisk/toshiba nand flash*/
+	if ((nand_info->NandChipId[0] == 0x45) ||
+			(nand_info->NandChipId[0] == 0x98)) {
+		/*Sandisk: This address (80h) is a vendor-specific setting used to turn on or turn off Toggle Mode*/
+		addr = 0x80;
+
+#if 1
+		NFC_Set_Legacy_Interface();
+		PHY_GetFeature(0, &addr, pr);
+		/*printf("get feature(addr 0x80) 0x%x 0x%x 0x%x 0x%x!\n",pr[0],pr[1],pr[2],pr[3]);*/
+		if (pr[0] == 0x00) {
+			NFC_Set_Toggle_Interface();
+		} else {
+			NFC_Set_Legacy_Interface();
+		}
+#endif
+		/*disable toggle mode*/
+		p[0] = 0x1;
+		p[1] = 0x0;
+		p[2] = 0x0;
+		p[3] = 0x0;
+		PHY_SetFeature(0, &addr, p);
+		NFC_Set_Legacy_Interface();
+#if 1
+		PHY_GetFeature(0, &addr, pr);
+		/*	printf("get feature(addr 0x80) 0x%x 0x%x 0x%x 0x%x!\n",pr[0],pr[1],pr[2],pr[3]); */
+#endif
+	}
+
+	return 0;
+}
 __s32 PHY_SimpleRead (struct boot_physical_param *readop)
 {
 	return (_read_single_page(readop,0));

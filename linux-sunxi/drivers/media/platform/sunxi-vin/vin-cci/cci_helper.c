@@ -102,8 +102,8 @@ static ssize_t cci_sys_store(struct device *dev,
 	unsigned short reg, value;
 	struct cci_driver *cci_drv = dev_get_drvdata(dev);
 	struct v4l2_subdev *sd = cci_drv->sd;
+
 	val = simple_strtoul(buf, NULL, 16);
-	csi_cci_init_helper(cci_drv->cci_id);
 	reg = (val >> 16) & 0xFFFF;
 	value = val & 0xFFFF;
 	if (0 == cci_drv->read_flag) {
@@ -133,8 +133,10 @@ static int cci_sys_register(struct cci_driver *drv_data)
 	int i, ret;
 	drv_data->cci_device = cci_device_def;
 	dev_set_name(&drv_data->cci_device, drv_data->name);
-	if (device_register(&drv_data->cci_device))
+	if (device_register(&drv_data->cci_device)) {
 		cci_err("error device_register()\n");
+		return -1;
+	}
 	dev_set_drvdata(&drv_data->cci_device, drv_data);
 	/* sysfs entries */
 	for (i = 0; i < ARRAY_SIZE(cci_device_attrs); i++) {
@@ -158,10 +160,29 @@ static int cci_sys_unregister(struct cci_driver *drv_data)
 	return 0;
 }
 
+static int sensor_registered(struct v4l2_subdev *sd)
+{
+	int ret;
+	struct sensor_info *info = to_state(sd);
+
+	mutex_lock(&info->lock);
+
+	v4l2_subdev_call(sd, core, s_power, PWR_ON);
+	ret = v4l2_subdev_call(sd, core, init, 0);
+	v4l2_subdev_call(sd, core, s_power, PWR_OFF);
+	mutex_unlock(&info->lock);
+
+	return ret;
+}
+
+static const struct v4l2_subdev_internal_ops sensor_internal_ops = {
+	.registered = sensor_registered,
+};
+
 static LIST_HEAD(cci_drv_list);
 static int cci_dev_num_id;
 
-void cci_subdev_init(struct v4l2_subdev *sd, struct cci_driver *drv_data,
+static void cci_subdev_init(struct v4l2_subdev *sd, struct cci_driver *drv_data,
 		     const struct v4l2_subdev_ops *ops)
 {
 	cci_dbg(0, "cci_subdev_init!\n");
@@ -179,9 +200,7 @@ void cci_subdev_init(struct v4l2_subdev *sd, struct cci_driver *drv_data,
 		cci_dev_num_id, drv_data->name, drv_data->sd);
 }
 
-EXPORT_SYMBOL_GPL(cci_subdev_init);
-
-void cci_subdev_remove(struct cci_driver *cci_drv_p)
+static void cci_subdev_remove(struct cci_driver *cci_drv_p)
 {
 	if (cci_drv_p->is_registerd == 0) {
 		cci_err("CCI subdev exit: this device is not registerd!\n");
@@ -193,14 +212,11 @@ void cci_subdev_remove(struct cci_driver *cci_drv_p)
 			cci_err("CCI subdev exit: cci_drv_p->sd is NULL!\n");
 		} else {
 			v4l2_set_subdevdata(cci_drv_p->sd, NULL);
-			v4l2_device_unregister_subdev(cci_drv_p->sd);
 		}
 		list_del(&cci_drv_p->cci_list);
 		cci_dev_num_id--;
 	}
 }
-
-EXPORT_SYMBOL_GPL(cci_subdev_remove);
 
 struct v4l2_subdev *cci_bus_match(char *name, unsigned short cci_id,
 				  unsigned short cci_saddr)
@@ -247,57 +263,19 @@ void cci_bus_match_cancel(struct cci_driver *cci_drv_p)
 
 EXPORT_SYMBOL_GPL(cci_bus_match_cancel);
 
-void csi_cci_bus_unmatch_helper(unsigned int sel)
-{
-#ifdef USE_SPECIFIC_CCI
-	struct cci_driver *cci_drv;
-	list_for_each_entry(cci_drv, &cci_drv_list, cci_list) {
-		cci_dbg(0, "try bus unmatch dev name =%s, bus = %d!\n",
-			cci_drv->name, sel);
-		if (cci_drv->is_registerd == 1 && cci_drv->is_matched == 1) {
-			if (cci_drv->cci_id == sel) {
-				cci_drv->is_matched = 0;
-				cci_dbg(0, "bus unmatch %s success!\n",
-					cci_drv->name);
-			} else {
-				cci_dbg(0, "%s is not on this bus %d!\n",
-					cci_drv->name, sel);
-			}
-		} else {
-			cci_dbg(0, "%s is not registerd or not matched!\n",
-				cci_drv->name);
-		}
-	}
-#endif
-}
-
-EXPORT_SYMBOL_GPL(csi_cci_bus_unmatch_helper);
-
 void csi_cci_init_helper(unsigned int sel)
 {
 #ifdef USE_SPECIFIC_CCI
-	bsp_csi_cci_init_helper(sel);
+	cci_s_power(sel, 1);
 #endif
 }
 
 EXPORT_SYMBOL_GPL(csi_cci_init_helper);
 
-/*
-pIRQ_Handler csi_cci_irq()
-{
-	int ret;
-	ret = bsp_cci_irq_process(USE_CH_NUM);
-	if(ret)
-	{
-		cci_init();
-		bsp_cci_bus_error_process(USE_CH_NUM);
-	}
-}
-*/
 void csi_cci_exit_helper(unsigned int sel)
 {
 #ifdef USE_SPECIFIC_CCI
-	bsp_csi_cci_exit(sel);
+	cci_s_power(sel, 0);
 #endif
 }
 
@@ -380,6 +358,8 @@ int cci_dev_probe_helper(struct v4l2_subdev *sd, struct i2c_client *client,
 {
 	if (client) {
 		v4l2_i2c_subdev_init(sd, client, sensor_ops);
+		/*change sd name to sensor driver name*/
+		snprintf(sd->name, sizeof(sd->name), "%s", cci_drv->name);
 		cci_drv->sd = sd;
 		v4l2_set_subdev_hostdata(sd, cci_drv);
 	} else {
@@ -387,6 +367,7 @@ int cci_dev_probe_helper(struct v4l2_subdev *sd, struct i2c_client *client,
 	}
 	sd->grp_id = VIN_GRP_ID_SENSOR;
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
+	sd->internal_ops = &sensor_internal_ops;
 	cci_sys_register(cci_drv);
 	cci_media_entity_init_helper(sd, cci_drv);
 
@@ -403,7 +384,6 @@ struct v4l2_subdev *cci_dev_remove_helper(struct i2c_client *client,
 		sd = i2c_get_clientdata(client);
 		cci_dbg(0, "sd = %p\n", sd);
 		v4l2_set_subdev_hostdata(sd, NULL);
-		v4l2_device_unregister_subdev(sd);
 		cci_dbg(0, "sd = %p\n", sd);
 	} else {
 		sd = cci_drv->sd;
@@ -411,6 +391,7 @@ struct v4l2_subdev *cci_dev_remove_helper(struct i2c_client *client,
 		cci_subdev_remove(cci_drv);
 		cci_dbg(0, "sd = %p\n", sd);
 	}
+	v4l2_device_unregister_subdev(sd);
 	cci_sys_unregister(cci_drv);
 	return sd;
 }

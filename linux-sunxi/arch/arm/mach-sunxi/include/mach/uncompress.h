@@ -26,10 +26,17 @@
 #include <asm/barrier.h>
 #include <linux/bitops.h>
 
+#if defined(CONFIG_ARCH_SUN8IW17P1)
+#define SUNXI_UART0_PBASE	0x05000000
+#define UART_TF		(*(volatile unsigned long*)(SUNXI_UART0_PBASE + 0x00))
+#define UART_SR		(*(volatile unsigned long*)(SUNXI_UART0_PBASE + 0x7C))
+#define TX_BUSY		BIT(1)
+#else
 #define SUNXI_UART0_PBASE	0x01c28000
 #define UART_TF		(*(volatile unsigned long*)(SUNXI_UART0_PBASE + 0x00))
 #define UART_SR		(*(volatile unsigned long*)(SUNXI_UART0_PBASE + 0x7C))
 #define TX_BUSY		BIT(1)
+#endif
 /*
  * put the character through uart
  */

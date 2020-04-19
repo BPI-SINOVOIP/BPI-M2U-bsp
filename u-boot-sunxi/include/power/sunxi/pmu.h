@@ -44,6 +44,13 @@
 #define AXP_VBUS_DCIN_NOT_EXIST		(4)
 #define BATTERY_EXIST 			(0X20)
 
+typedef enum _VBUS_TYPE
+{
+	SUNXI_VBUS_NULL = 0,
+	SUNXI_VBUS_DC,
+	SUNXI_VBUS_PC
+}SUNXI_VBUS_TYPE;
+
 
 #define PMU_SUPPLY_DCDC_TYPE    (0x00010000)
 #define PMU_SUPPLY_DCDC1        (0x00010001)
@@ -142,5 +149,7 @@ extern int axp_probe_supply_pmu_name(char *axpname);
 extern int axp_probe_vbus_cur_limit(void);
 
 extern int axp_set_coulombmeter_onoff(int onoff );
+extern int axp_probe_vbus_type(void);
+extern int set_sunxi_gpio_power_bias(void);
 
 #endif	/* _PMU_H_ */

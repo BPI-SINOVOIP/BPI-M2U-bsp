@@ -1310,8 +1310,11 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		ion_handle_put(handle);
 		if (data.fd.fd < 0)
 			ret = data.fd.fd;
-		ION_DEBUG(ION_INFO, " share dmabuf handle id %d\n", handle->id);
-		trace_ion_map(handle->id, data.fd.fd);
+		else {
+			ION_DEBUG(ION_INFO, " share dmabuf handle id %d\n",
+				handle->id);
+			trace_ion_map(handle->id, data.fd.fd);
+		}
 		break;
 	}
 	case ION_IOC_IMPORT:
@@ -1320,10 +1323,12 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		handle = ion_import_dma_buf(client, data.fd.fd);
 		if (IS_ERR(handle))
 			ret = PTR_ERR(handle);
-		else
+		else {
 			data.handle.handle = handle->id;
-		ION_DEBUG(ION_ALL, " import new handle id %d\n", handle->id);
-		trace_ion_import(handle->id, data.fd.fd);
+			ION_DEBUG(ION_ALL, " import new handle id %d\n",
+				handle->id);
+			trace_ion_import(handle->id, data.fd.fd);
+		}
 		break;
 	}
 	case ION_IOC_SYNC:
@@ -1339,7 +1344,8 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
                if(copy_from_user(&data, (void __user *)arg, sizeof(sunxi_cache_range)))
                        return -EFAULT;
-		if (IS_ERR((void*)data.start) || IS_ERR((void*)data.end))  {
+		if (IS_ERR_OR_NULL((void *)data.start) ||
+		    IS_ERR_OR_NULL((void *)data.end))  {
 			ION_DEBUG(ION_ERR," flush 0x%x ~ 0x%x fault user virtual address!\n",
 				(unsigned int)data.start, (unsigned int)data.end);
 			return -EFAULT;

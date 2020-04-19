@@ -19,12 +19,13 @@
 #include "csi_cci_reg.h"
 
 #include "../utility/vin_io.h"
-unsigned int fifo_last_pt[MAX_CSI];
-volatile void __iomem *csi_cci_base_addr[2];
+
+unsigned int fifo_last_pt[MAX_CSIC_CCI_NUM];
+volatile void __iomem *csi_cci_base_addr[MAX_CSIC_CCI_NUM];
 
 int csi_cci_set_base_addr(unsigned int sel, unsigned long addr)
 {
-	if (sel >= MAX_CSI)
+	if (sel >= MAX_CSIC_CCI_NUM)
 		return -1;
 	csi_cci_base_addr[sel] = (volatile void __iomem *)addr;
 	return 0;

@@ -1,18 +1,15 @@
 /*
- *****************************************************************************
+ * flash subdev driver module
  *
- * sunxi_flash.c
+ * Copyright (c) 2017 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
  *
- * Hawkview ISP - sunxi_flash.c module
+ * Authors:  Zhao Wei <zhaowei@allwinnertech.com>
  *
- * Copyright (c) 2015 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
- *
- * Version        Author                 Date                   Description
- *
- *   3.0                  Zhao Wei      2015/02/27  ISP Tuning Tools Support
- *
- *****************************************************************************
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
+
 #include <linux/platform_device.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
@@ -144,8 +141,9 @@ int io_set_flash_ctrl(struct v4l2_subdev *sd, enum sunxi_flash_ctrl ctrl)
 int sunxi_flash_check_to_start(struct v4l2_subdev *sd,
 			       enum sunxi_flash_ctrl ctrl)
 {
-	struct vin_core *vinc = (sd == NULL) ? NULL : sd_to_vin_core(sd);
-	struct flash_dev *flash = (sd == NULL) ? NULL : v4l2_get_subdevdata(sd);
+	struct modules_config *modules = sd ? sd_to_modules(sd) : NULL;
+	struct flash_dev *flash = sd ? v4l2_get_subdevdata(sd) : NULL;
+	struct v4l2_subdev *sensor = NULL;
 	unsigned int flag, to_flash;
 
 	if (!flash)
@@ -154,8 +152,10 @@ int sunxi_flash_check_to_start(struct v4l2_subdev *sd,
 	if (flash->fl_info.flash_mode == V4L2_FLASH_LED_MODE_FLASH) {
 		to_flash = 1;
 	} else if (flash->fl_info.flash_mode == V4L2_FLASH_LED_MODE_AUTO) {
-		v4l2_subdev_call(vinc->vid_cap.pipe.sd[VIN_IND_SENSOR], core,
-				 ioctl, GET_FLASH_FLAG, &flag);
+		if (!modules)
+			return 0;
+		sensor = modules->modules.sensor[modules->sensors.valid_idx].sd;
+		v4l2_subdev_call(sensor, core, ioctl, GET_FLASH_FLAG, &flag);
 		if (flag)
 			to_flash = 1;
 		else
@@ -313,9 +313,9 @@ static int flash_probe(struct platform_device *pdev)
 		goto ekzalloc;
 	}
 
-	pdev->id = of_alias_get_id(np, "flash");
+	of_property_read_u32(np, "device_id", &pdev->id);
 	if (pdev->id < 0) {
-		vin_err("flash failed to get alias id\n");
+		vin_err("flash failed to get device id\n");
 		ret = -EINVAL;
 		goto freedev;
 	}

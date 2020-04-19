@@ -101,7 +101,7 @@
 
 #define MMU_BASE_ADDRESS		 	     (CONFIG_SYS_SDRAM_BASE + 0x02f00000 )
 
-#define SUNXI_RUN_EFEX_ADDR			     (0x01f00000 + 0x108)
+#define SUNXI_RUN_EFEX_ADDR			     (SUNXI_RTC_BASE+0x108)
 
 //#define CONFIG_VIDEO_SUNXI_V2
 
@@ -150,7 +150,10 @@
 #define CONFIG_SYS_SRAM_BASE             (0x0000)
 #define CONFIG_SYS_SRAMA2_BASE           (0x4000)
 #define CONFIG_SYS_SRAMA2_SIZE           (0x9000)
-#define CONFIG_STACK_BASE                (CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_RAM_SIZE - 0x10)
+#define CONFIG_PRINT_SIZE			(8*1024)
+#define CONFIG_STACK_BASE                (CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_RAM_SIZE - 0x10 -CONFIG_PRINT_SIZE)
+
+#define CONFIG_NORMAL_DEBUG_BASE         (CONFIG_STACK_BASE)
 
 #define CONFIG_HEAP_BASE                 (CONFIG_SYS_SDRAM_BASE + 0x800000)
 #define CONFIG_HEAP_SIZE                 (16 * 1024 * 1024)
@@ -305,7 +308,8 @@
 #define CONFIG_ANDROID_BOOT_IMAGE      /*image is android boot image*/
 #define CONFIG_USBD_HS
 #define BOARD_LATE_INIT		      /* init the fastboot partitions */
-//#define CONFIG_SUNXI_KEY_BURN
+#define CONFIG_SUNXI_KEY_BURN
+#define CONFIG_SUNXI_PRIVATE_KEY
 #define SUNXI_KEY_SUPPORT
 #define CONFIG_SUNXI_KEY_SUPPORT
 //#define CONFIG_SUNXI_SECURE_STORAGE
@@ -353,7 +357,7 @@
 #define CONFIG_CMD_SUNXI_EFEX
 #define CONFIG_CMD_SUNXI_SHUTDOWN
 #define CONFIG_CMD_SUNXI_BMP
-//#define CONFIG_CMD_SUNXI_BURN
+#define CONFIG_CMD_SUNXI_BURN
 #define CONFIG_CMD_SUNXI_MEMTEST
 #define CONFIG_CMD_FDT
 #define CONFIG_SUNXI_DRAGONBOARD_SUPPORT
@@ -395,6 +399,9 @@
 #define CONFIG_AXP_USE_I2C
 #define CONFIG_SUNXI_AXP22
 #define CONFIG_SUNXI_AXP15
+#define CONFIG_SUNXI_AXP259
+//#define CONFIG_CHARGER_PMU
+
 #define PMU_SCRIPT_NAME                 "charger0"
 #define FDT_PATH_REGU                   "regulator0"
 #define CONFIG_SUNXI_AXP_CONFIG_ONOFF

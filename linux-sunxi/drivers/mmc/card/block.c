@@ -1416,7 +1416,10 @@ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
 	mmc_set_data_timeout(&brq->data, card);
 
 	brq->data.sg = mqrq->sg;
-	brq->data.sg_len = mmc_queue_map_sg(mq, mqrq);
+	if (mmc_card_mmc(card))
+		brq->data.sg_len = mmc_queue_map_sg(mq, mqrq);
+	else
+		brq->data.sg_len = sd_mmc_queue_map_sg(mq, mqrq);
 
 	/*
 	 * Adjust the sg list so it is the same size as the
@@ -1643,7 +1646,10 @@ static void mmc_blk_packed_hdr_wrq_prep(struct mmc_queue_req *mqrq,
 	mmc_set_data_timeout(&brq->data, card);
 
 	brq->data.sg = mqrq->sg;
-	brq->data.sg_len = mmc_queue_map_sg(mq, mqrq);
+	if (mmc_card_mmc(card))
+		brq->data.sg_len = mmc_queue_map_sg(mq, mqrq);
+	else
+		brq->data.sg_len = sd_mmc_queue_map_sg(mq, mqrq);
 
 	mqrq->mmc_active.mrq = &brq->mrq;
 	mqrq->mmc_active.err_check = mmc_blk_packed_err_check;

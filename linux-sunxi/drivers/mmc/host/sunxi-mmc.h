@@ -1,3 +1,12 @@
+/*
+ * Driver for sunxi SD/MMC host controllers
+ * (C) Copyright 2012-2017 lixiang <lixiang@allwinnertech.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ */
 #include <linux/clk.h>
 #include <linux/clk/sunxi.h>
 
@@ -26,7 +35,7 @@
 
 
 #define DRIVER_NAME "sunxi-mmc"
-#define DRIVER_RIVISION "v0.59 2016-08-17 15:15"
+#define DRIVER_RIVISION "v0.89 2017-12-5 16:17"
 #define DRIVER_VERSION "SD/MMC/SDIO Host Controller Driver(" DRIVER_RIVISION ")" \
 			" Compiled in " __DATE__ " at " __TIME__""
 
@@ -82,6 +91,7 @@
 #define SDXC_DEBOUNCE_ENABLE_BIT	BIT(8)
 #define SDXC_POSEDGE_LATCH_DATA		BIT(9)
 #define SDXC_DDR_MODE			BIT(10)
+#define SDXC_DTIME_UNIT			BIT(11)
 #define SDXC_MEMORY_ACCESS_DONE		BIT(29)
 #define SDXC_ACCESS_DONE_DIRECT		BIT(30)
 #define SDXC_ACCESS_BY_AHB		BIT(31)
@@ -148,6 +158,9 @@
 #define SDXC_INTERRUPT_DONE_BIT \
 	(SDXC_AUTO_COMMAND_DONE | SDXC_DATA_OVER | \
 	 SDXC_COMMAND_DONE | SDXC_VOLTAGE_CHANGE_DONE)
+#define SDXC_INTERRUPT_DDONE_BIT \
+	(SDXC_AUTO_COMMAND_DONE | SDXC_DATA_OVER)
+
 
 /* status */
 #define SDXC_RXWL_FLAG			BIT(0)
@@ -234,6 +247,18 @@ struct sunxi_mmc_ctrl_regs {
 	u32 imask;
 };
 
+struct sunxi_mmc_host_perf{
+	ktime_t start;
+	int64_t rbytes;
+	int64_t wbytes;
+	ktime_t rtime;
+	ktime_t wtime;
+
+	/***use to compute the time no include busy***/
+	int64_t wbytestran;
+	ktime_t wtimetran;
+};
+
 
 struct sunxi_mmc_host {
 	struct mmc_host	*mmc;
@@ -246,8 +271,9 @@ struct sunxi_mmc_host {
 	struct clk	*clk_ahb;
 	struct clk	*clk_mmc;
 	struct clk	*clk_rst;
-	
+
 	int (*sunxi_mmc_clk_set_rate)(struct sunxi_mmc_host *host, struct mmc_ios *ios);
+	int crypt_flag;
 
 	/* irq */
 	spinlock_t	lock;
@@ -277,6 +303,7 @@ struct sunxi_mmc_host {
 	/* pinctrl handles */
 	struct pinctrl		*pinctrl;
 	struct pinctrl_state	*pins_default;
+	/*represent sleep or uart0 state on dts**/
 	struct pinctrl_state	*pins_sleep;
 
 	/*sys node*/
@@ -288,12 +315,19 @@ struct sunxi_mmc_host {
 	/* backup register structrue */
 	struct sunxi_mmc_ctrl_regs bak_regs;
 	void (*sunxi_mmc_save_spec_reg)(struct sunxi_mmc_host *host);
+
+	void (*sunxi_mmc_set_rdtmout_reg)(struct sunxi_mmc_host *host, u32 tmout_clk,  bool set_time);
+
 	void (*sunxi_mmc_restore_spec_reg)(struct sunxi_mmc_host *host);
 
 	void (*sunxi_mmc_set_acmda)(struct sunxi_mmc_host *host);
 
 	void (*sunxi_mmc_shutdown)(struct platform_device * pdev);
 	int (*sunxi_mmc_oclk_en)(struct sunxi_mmc_host *host , u32 oclk_en);
+	int (*sunxi_mmc_updata_pha)(struct sunxi_mmc_host *host,
+			struct mmc_command *cmd, struct mmc_data *data);
+	void (*sunxi_mmc_on_off_emce)(struct sunxi_mmc_host *host,
+		u32 en_crypt, u32 ac_mode, u32 en_emce);
 
 	/*really controller id,no logic id*/
 	int phy_index;
@@ -306,6 +340,10 @@ struct sunxi_mmc_host {
 	#define NO_REINIT_SHUTDOWN			   0x2
 	#define CARD_PWR_GPIO_HIGH_ACTIVE	   0x4
 	#define SUNXI_SC_EN_RETRY					0x8
+	/**If set this bit,when use sunxi_check_r1_ready_may_sleep,we will wait 0xFFFFFFFF ms, for debug use***/
+	#define SUNXI_R1B_WAIT_MAX					0x10
+	#define SUNXI_MANUAL_READ_DATA_TIMEOUT      0x20
+	#define SUNXI_NO_ERASE				0x80
 	u32 ctl_spec_cap;//control specal function control,for customer need
 
 	int card_pwr_gpio;
@@ -314,9 +352,15 @@ struct sunxi_mmc_host {
 	u32 errno_retry;
 	int (*sunxi_mmc_judge_retry)(struct sunxi_mmc_host *host , struct mmc_command *cmd , u32 rcnt , u32 errno , void *other);
 
+	bool perf_enable;
+	struct device_attribute host_perf;
+	struct sunxi_mmc_host_perf perf;
+
+
 	void *version_priv_dat;
 };
 
 void sunxi_mmc_set_a12a(struct sunxi_mmc_host *host);
 void sunxi_mmc_do_shutdown_com(struct platform_device *pdev);
+extern int sunxi_sel_pio_mode(struct pinctrl *pinctrl, u32 pm_sel);
 #endif

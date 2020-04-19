@@ -14,14 +14,11 @@
 #include <linux/init.h>
 #include <linux/smp.h>
 #include <linux/spinlock.h>
+#include <linux/irqchip/arm-gic.h>
 
 #include <asm/mcpm.h>
 #include <asm/smp.h>
 #include <asm/smp_plat.h>
-
-static void __init simple_smp_init_cpus(void)
-{
-}
 
 static int __cpuinit mcpm_boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
@@ -46,20 +43,11 @@ static int __cpuinit mcpm_boot_secondary(unsigned int cpu, struct task_struct *i
 
 static void __cpuinit mcpm_secondary_init(unsigned int cpu)
 {
-	mcpm_cpu_powered_up();
+	/* mcpm_cpu_powered_up(); */
+	sunxi_gic_secondary_init(0);
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
-
-static int mcpm_cpu_disable(unsigned int cpu)
-{
-	/*
-	 * We assume all CPUs may be shut down.
-	 * This would be the hook to use for eventual Secure
-	 * OS migration requests as described in the PSCI spec.
-	 */
-	return 0;
-}
 
 static void mcpm_cpu_die(unsigned int cpu)
 {
@@ -74,12 +62,13 @@ static void mcpm_cpu_die(unsigned int cpu)
 #endif
 
 static struct smp_operations __initdata mcpm_smp_ops = {
-	.smp_init_cpus		= simple_smp_init_cpus,
+	.smp_init_cpus		= mcpm_smp_init_cpus,
 	.smp_boot_secondary	= mcpm_boot_secondary,
 	.smp_secondary_init	= mcpm_secondary_init,
 #ifdef CONFIG_HOTPLUG_CPU
 	.cpu_disable		= mcpm_cpu_disable,
 	.cpu_die		= mcpm_cpu_die,
+	.cpu_kill		= mcpm_cpu_kill,
 #endif
 };
 

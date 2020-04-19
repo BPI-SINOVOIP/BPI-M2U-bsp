@@ -9,6 +9,19 @@ config SUNXI_SYS_INFO
 	  This driver is used for query system informations.
 	  If you don't know whether need it, please select y.
 
+config SUNXI_QA_TEST
+	bool "sunxi QA test"
+	depends on SUNXI_SYS_INFO
+	help
+	  support sunxi QA test.
+
+config SUNXI_RD_DEBUG
+	bool "sunxi RD debug"
+	depends on SUNXI_SYS_INFO
+	help
+	  It is used for sunxi rd debug,
+	  sid can be readed even the write protect bit not be burned.
+
 config SUNXI_SMC
 	bool "sunxi smc interfaces"
 	default n

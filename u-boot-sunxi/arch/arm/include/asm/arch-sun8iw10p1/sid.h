@@ -37,11 +37,12 @@
 #define EFUSE_1C 			(0x1C)
 
 #define EFUSE_THERMAL_SENSOR    	(EFUSE_10)
-#define EFUSE_RESERVED			(EFUSE_18)
+#define EFUSE_RESERVED			(EFUSE_14)
 
 // size (bit)
 #define	SID_THERMAL_SIZE		(32)
 #define	EFUSE_RESERVED_SIZE		(96)
+#define EFUSE_CHIPCONFIG 0xFFFF/*it is a fake value*/
 
 extern void sid_set_security_mode(void);
 extern int  sid_probe_security_mode(void);

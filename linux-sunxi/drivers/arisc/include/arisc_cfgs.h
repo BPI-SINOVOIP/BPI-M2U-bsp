@@ -36,10 +36,16 @@
 #define ARISC_VERSIONS (104)
 #elif defined CONFIG_ARCH_SUN8IW9P1
 #define ARISC_VERSIONS (105)
+#elif defined CONFIG_ARCH_SUN8IW17P1
+#define ARISC_VERSIONS (117)
 #elif defined CONFIG_ARCH_SUN50IW1P1
 #define ARISC_VERSIONS (110)
 #elif defined CONFIG_ARCH_SUN50IW2P1
 #define ARISC_VERSIONS (120)
+#elif defined CONFIG_ARCH_SUN50IW3P1
+#define ARISC_VERSIONS (130)
+#elif defined CONFIG_ARCH_SUN50IW6P1
+#define ARISC_VERSIONS (160)
 #elif defined CONFIG_ARCH_SUN9IW1P1
 #define ARISC_VERSIONS (200)
 #else
@@ -48,8 +54,42 @@
 
 /* debugger system */
 #define ARISC_DEBUG_ON
-#define ARISC_DEBUG_LEVEL           (3) /* debug level */
+#define ARISC_DEBUG_LEVEL           (2) /* debug level */
 
 #define ARISC_DEV_CLKSRC_NUM        (4)     /* the number of dev clocksource support */
+/* the max number of cached message frame */
+#define ARISC_MESSAGE_CACHED_MAX    (4)
+
+/* the start address of message pool */
+#if (defined CONFIG_ARCH_SUN8IW1P1) || (defined CONFIG_ARCH_SUN8IW3P1) || (defined CONFIG_ARCH_SUN8IW5P1) || \
+	(defined CONFIG_ARCH_SUN8IW6P1) || (defined CONFIG_ARCH_SUN8IW9P1)
+	#define ARISC_MESSAGE_POOL_START    (0x13000)
+	#define ARISC_MESSAGE_POOL_END      (0x14000)
+	#define ARISC_PARA_ADDR_OFFSET      (arisc_cfg.space[0].size - 4 * 1024)
+#elif (defined CONFIG_ARCH_SUN8IW7P1)
+	#define ARISC_MESSAGE_POOL_START    (0x0B800)
+	#define ARISC_MESSAGE_POOL_END      (0x0C000)
+	#define ARISC_PARA_ADDR_OFFSET      (SUNXI_SRAM_A2_SIZE - 2 * 1024)
+#elif defined CONFIG_ARCH_SUN9IW1P1
+	#define ARISC_MESSAGE_POOL_START    (0x27000)
+	#define ARISC_MESSAGE_POOL_END      (0x28000)
+	#define ARISC_PARA_ADDR_OFFSET      (SUNXI_SRAM_A2_SIZE - 4 * 1024)
+#endif
+
+/* send message max timeout, base on ms */
+#define ARISC_SEND_MSG_TIMEOUT      (4000)
+
+/* hwmsgbox channels configure */
+#define ARISC_HWMSGBOX_ARISC_ASYN_TX_CH (0)
+#define ARISC_HWMSGBOX_ARISC_ASYN_RX_CH (1)
+#define ARISC_HWMSGBOX_ARISC_SYN_TX_CH  (2)
+#define ARISC_HWMSGBOX_ARISC_SYN_RX_CH  (3)
+#define ARISC_HWMSGBOX_AC327_SYN_TX_CH  (4)
+#define ARISC_HWMSGBOX_AC327_SYN_RX_CH  (5)
+
+/* dvfs config */
+#define ARISC_DVFS_VF_TABLE_MAX         (16)
+/* ir config */
+#define ARISC_IR_KEY_SUP_NUM            (8)     /* the number of IR remote support */
 
 #endif /* __ARISC_CFGS_H */

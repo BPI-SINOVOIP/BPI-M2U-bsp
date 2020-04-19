@@ -792,7 +792,7 @@ int de_rtmx_get_3d_in(unsigned char fmt, de_rect crop, de_fb *size, unsigned int
 	{
 		if ((trdinmode == DE_3D_SRC_MODE_FP))
 		{
-			pitchr[0]=pitch[0] = DISPALIGN(size[0].w,align[0]);
+			pitchr[0]=pitch[0] = DISPALIGN(size[0].w * ycnt,align[0]) / ycnt;
 			pitchr[1]=pitch[1] = 0;
 			pitchr[2]=pitch[2] = 0;
 
@@ -802,7 +802,7 @@ int de_rtmx_get_3d_in(unsigned char fmt, de_rect crop, de_fb *size, unsigned int
 		}
 		else if ((trdinmode == DE_3D_SRC_MODE_TB))
 		{
-			pitchr[0]=pitch[0] = DISPALIGN(size[0].w,align[0]);
+			pitchr[0]=pitch[0] = DISPALIGN(size[0].w * ycnt,align[0]) / ycnt;
 			pitchr[1]=pitch[1] = 0;
 			pitchr[2]=pitch[2] = 0;
 
@@ -812,8 +812,7 @@ int de_rtmx_get_3d_in(unsigned char fmt, de_rect crop, de_fb *size, unsigned int
 		}
 		else if ((trdinmode == DE_3D_SRC_MODE_SSF)||(trdinmode == DE_3D_SRC_MODE_SSH))
 		{
-
-			pitchr[0]=pitch[0] = DISPALIGN(size[0].w,align[0]);
+			pitchr[0]=pitch[0] = DISPALIGN(size[0].w * ycnt,align[0]) / ycnt;
 			pitchr[1]=pitch[1] = 0;
 			pitchr[2]=pitch[2] = 0;
 
@@ -1062,8 +1061,26 @@ static int de_rtmx_get_coarse_fac(unsigned int sel, unsigned int ovl_w, unsigned
 	ovl_h = ovl_h & (~((1<<hshift)-1));
 
 	status = 0x0;
+
 	//horizontal Y channel
-	if (ovl_w > 8*vsu_outw)
+	if(ovl_w > 4096)
+	{
+		tmpyhn = ovl_w>>1;
+		tmpyhn = tmpyhn & (~((1<<wshift)-1));
+		tmpyhm = ovl_w;
+		*yhm   = tmpyhm;
+		*yhn   = tmpyhn;
+		*chm   = *yhm;
+		*chn   = *yhn;
+
+		//actually fetch horizontal pixel Y channel
+		*midyw = tmpyhn;
+
+		//actually fetch horizontal pixel C channel
+		*midcw = tmpyhn>>wshift;
+		status = 0x1;
+	}
+	else if(ovl_w > 8*vsu_outw)
 	{
 		tmpyhn = 8*vsu_outw;
 		tmpyhn = tmpyhn & (~((1<<wshift)-1));

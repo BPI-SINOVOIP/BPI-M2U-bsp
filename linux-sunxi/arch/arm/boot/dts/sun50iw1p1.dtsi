@@ -431,7 +431,7 @@
 			compatible = "allwinner,sunxi-timer";
 			device_type = "timer";
 			reg = <0x0 0x01c20c00 0x0 0x90>;
-			interrupts = <GIC_SPI 18 IRQ_TYPE_EDGE_RISING>;
+			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
 			clock-frequency = <24000000>;
 			timer-prescale = <16>;
 		};
@@ -1311,14 +1311,25 @@
 			interrupts = <GIC_SPI 31 IRQ_TYPE_NONE>;
 			clocks = <&clk_hosc>,<&clk_ths>;
 			sensor_num = <3>;
+			combine_num = <2>;
 			shut_temp= <120>;
 			status = "okay";
 
-			combine0:combine0{
+			ths_combine0:ths_combine0{
+				compatible = "allwinner,ths_combine0";
 				#thermal-sensor-cells = <1>;
-				combine_cnt = <3>;
-				combine_type = "max";
-				combine_chn = <0 1 2>;
+				combine_sensor_num = <1>;
+				combine_sensor_type = "cpu";
+				combine_sensor_temp_type = "max";
+				combine_sensor_id = <0>;
+			};
+			ths_combine1:ths_combine1{
+				compatible = "allwinner,ths_combine1";
+				#thermal-sensor-cells = <1>;
+				combine_sensor_num = <2>;
+				combine_sensor_type = "gpu";
+				combine_sensor_temp_type = "max";
+				combine_sensor_id = <1 2>;
 			};
 		};
 
@@ -1349,11 +1360,11 @@
 		};
 
 		thermal-zones{
-			soc_thermal{
+			cpu_thermal_zone{
 
 				polling-delay-passive = <500>;
 				polling-delay = <2000>;
-				thermal-sensors = <&combine0 0>;
+				thermal-sensors = <&ths_combine0 0>;
 
 				trips{
 					cpu_trip0:t0{
@@ -1376,17 +1387,7 @@
 						type = "passive";
 						hysteresis = <0>;
 					};
-					gpu_trip0:t4{
-						temperature = <85>;
-						type = "passive";
-						hysteresis = <0>;
-					};
-					gpu_trip1:t5{
-						temperature = <95>;
-						type = "passive";
-						hysteresis = <0>;
-					};
-					crt_trip:t6{
+					crt_trip0:t4{
 						temperature = <110>;
 						type = "critical";
 						hysteresis = <0>;
@@ -1414,6 +1415,33 @@
 						trip = <&cpu_trip3>;
 						cooling-device = <&cpu_budget_cooling 5 6>;
 					};
+				};
+			};
+			gpu_thermal_zone{
+
+				polling-delay-passive = <500>;
+				polling-delay = <2000>;
+				thermal-sensors = <&ths_combine1 1>;
+
+				trips{
+					gpu_trip0:t0{
+						temperature = <85>;
+						type = "passive";
+						hysteresis = <0>;
+					};
+					gpu_trip1:t1{
+						temperature = <95>;
+						type = "passive";
+						hysteresis = <0>;
+					};
+					crt_trip1:t2{
+						temperature = <110>;
+						type = "critical";
+						hysteresis = <0>;
+					};
+				};
+
+				cooling-maps{
 					bind4{
 						contribution = <0>;
 						trip = <&gpu_trip0>;
@@ -1426,6 +1454,7 @@
 					};
 				};
 			};
+
 		};
 
 		keyboard0:keyboard{
@@ -1434,11 +1463,11 @@
 			interrupts = <GIC_SPI 30 IRQ_TYPE_NONE>;
 			status = "okay";
 			key_cnt = <5>;
-			key1 = <240 115>;
-			key2 = <500 114>;
-			key3 = <700 139>;
-			key4 = <890 28>;
-			key5 = <2000 102>;
+			key0 = <190 115>;
+			key1 = <390 114>;
+			key2 = <600 139>;
+			key3 = <800 28>;
+			key4 = <980 102>;
 		};
 
 		gmac0: eth@01c30000 {
@@ -1454,9 +1483,10 @@
 			phy-mode = "rgmii";
 			tx-delay = <7>;
 			rx-delay = <31>;
-			gmac_power1 = "axp81x_dldo2:2500000";
-			gmac_power2 = "axp81x_eldo2:1800000";
-			gmac_power3 = "axp81x_fldo1:1200000";
+			phy-rst;
+			gmac-power0;
+			gmac-power1;
+			gmac-power2;
 			status = "disable";
 		};
 	};

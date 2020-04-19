@@ -1,0 +1,4 @@
+config SUNXI_DUMP
+	bool "help to dump all dram area for crash tool"
+	depends on ARCH_SUN50I
+	default n

@@ -240,8 +240,12 @@ static void clktest_process(void)
 				}
 				case 8://enable
 				{
-					clk_prepare_enable(cur_clk);
-					strcpy(testclk_priv.info,"enabled");
+					if (!clk_prepare_enable(cur_clk))
+						strcpy(testclk_priv.info,
+								"enabled");
+					else
+						strcpy(testclk_priv.info,
+							"enable_failed");
 					break;
 				}
 				case 10://assert

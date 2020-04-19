@@ -21,10 +21,16 @@
 #define HDMI1080P_24_3D_FP  (HDMI1080P_24 +0x80)
 #define HDMI720P_50_3D_FP   (HDMI720P_50  +0x80)
 #define HDMI720P_60_3D_FP   (HDMI720P_60  +0x80)
-#define HDMI3840_2160P_30   (1+0x100)
-#define HDMI3840_2160P_25   (2+0x100)
-#define HDMI3840_2160P_24   (3+0x100)
+#define HDMI3840_2160P_30   (0x01 + 0x100)
+#define HDMI3840_2160P_25   (0x02 + 0x100)
+#define HDMI3840_2160P_24   (0x03 + 0x100)
+#define HDMI4096_2160P_24   (0x04 + 0x100)
 #define HDMI_EDID_LEN 1024
+
+#define HDMI1280_1024       (1+0x110)
+#define HDMI1024_768        (2+0x110)
+#define HDMI900_540         (3+0x110)
+#define HDMI1920_720        (4 + 0x110)
 
 #define HDMI_State_Idle 			 0x00
 #define HDMI_State_Wait_Hpd			 0x02
@@ -98,6 +104,7 @@ extern void hdmi_delay_us(unsigned long us);
 extern int hdmi_clk_enable_prepare(void);
 extern int hdmi_clk_disable_prepare(void);
 extern unsigned int hdmi_get_soc_version(void);
+extern unsigned int hdmi_clk_get_div(void);
 
 #endif
 

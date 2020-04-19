@@ -1,10 +1,11 @@
 #ifndef __FB_CON_H__
 #define __FB_CON_H__
 
-#include "boot_gui.h"
+#include <boot_gui.h>
 
 enum {
-	FB_UNLOCKED = 0x0,
+	FB_UNINIT = 0x0,
+	FB_UNLOCKED,
 	FB_LOCKED,
 };
 

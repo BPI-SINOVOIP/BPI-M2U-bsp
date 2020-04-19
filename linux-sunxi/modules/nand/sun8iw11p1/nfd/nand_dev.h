@@ -9,6 +9,7 @@ struct nand_kobject {
 };
 
 extern unsigned int do_static_wear_leveling(void *zone);
+extern unsigned int static_wear_leveling(void *zone);
 extern unsigned short nftl_get_zone_write_cache_nums(void *_zone);
 extern unsigned int garbage_collect(void *zone);
 extern unsigned int do_prio_gc(void *zone);

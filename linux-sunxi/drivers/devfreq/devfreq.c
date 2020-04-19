@@ -104,6 +104,8 @@ static int devfreq_update_status(struct devfreq *devfreq, unsigned long freq)
 	if (freq != devfreq->previous_freq) {
 		prev_lev = devfreq_get_freq_level(devfreq,
 						devfreq->previous_freq);
+		if (prev_lev < 0)
+			return prev_lev;
 		devfreq->trans_table[(prev_lev *
 				devfreq->profile->max_state) + lev]++;
 		devfreq->total_trans++;
@@ -1023,6 +1025,7 @@ struct opp *devfreq_recommended_opp(struct device *dev, unsigned long *freq,
 
 	return opp;
 }
+EXPORT_SYMBOL_GPL(devfreq_recommended_opp);
 
 /**
  * devfreq_register_opp_notifier() - Helper function to get devfreq notified
@@ -1046,6 +1049,7 @@ int devfreq_register_opp_notifier(struct device *dev, struct devfreq *devfreq)
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(devfreq_register_opp_notifier);
 
 /**
  * devfreq_unregister_opp_notifier() - Helper function to stop getting devfreq
@@ -1072,6 +1076,7 @@ int devfreq_unregister_opp_notifier(struct device *dev, struct devfreq *devfreq)
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(devfreq_unregister_opp_notifier);
 
 MODULE_AUTHOR("MyungJoo Ham <myungjoo.ham@samsung.com>");
 MODULE_DESCRIPTION("devfreq class support");

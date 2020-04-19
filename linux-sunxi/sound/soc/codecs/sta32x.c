@@ -911,7 +911,6 @@ static int sta32x_probe(struct snd_soc_codec *codec)
 	 * so the write to the these registers are suppressed by the cache
 	 * restore code when it skips writes of default registers.
 	 */
-	regcache_cache_only(sta32x->regmap, true);
 	snd_soc_write(codec, STA32X_CONFC, 0xc2);
 	snd_soc_write(codec, STA32X_CONFE, 0xc2);
 	snd_soc_write(codec, STA32X_CONFF, 0x5d);
@@ -924,7 +923,6 @@ static int sta32x_probe(struct snd_soc_codec *codec)
 	snd_soc_write(codec, STA32X_AUTO3, 0x00);
 	snd_soc_write(codec, STA32X_C3CFG, 0x84);
 	snd_soc_write(codec, STA32X_B0CF1, 0x0);
-	regcache_cache_only(sta32x->regmap, false);
 #ifndef CONFIG_ARCH_SUN8IW10
 	/* set thermal warning adjustment and recovery */
 	if (!(sta32x->pdata->thermal_conf & STA32X_THERMAL_ADJUSTMENT_ENABLE))

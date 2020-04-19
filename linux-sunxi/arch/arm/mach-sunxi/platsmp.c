@@ -34,6 +34,7 @@ static DEFINE_SPINLOCK(boot_lock);
 void __iomem *sunxi_cpucfg_base;
 void __iomem *sunxi_rtc_base;
 void __iomem *sunxi_sysctl_base;
+void __iomem *sunxi_r_prcm_base;
 void *cpus_boot_entry[NR_CPUS];
 
 static void sunxi_set_cpus_boot_entry(int cpu, void *entry)
@@ -49,9 +50,12 @@ static void sunxi_set_cpus_boot_entry(int cpu, void *entry)
 static void sunxi_smp_iomap_init(void)
 {
 	sunxi_cpucfg_base = ioremap(SUNXI_CPUCFG_PBASE, SZ_1K);
-#if defined(CONFIG_ARCH_SUN8IW10)
+#if (defined CONFIG_ARCH_SUN8IW10) || (defined CONFIG_ARCH_SUN8IW17)
 	sunxi_rtc_base = ioremap(SUNXI_RTC_PBASE, SZ_1K);
 	pr_debug("cpucfg_base=0x%p rtc_base=0x%p\n", sunxi_cpucfg_base, sunxi_rtc_base);
+#elif (defined CONFIG_ARCH_SUN8IW5)
+	sunxi_r_prcm_base = ioremap(SUNXI_R_PRCM_PBASE, SZ_1K);
+	pr_debug("SUNXI_R_PRCM_PBASE=0x%p\n", sunxi_r_prcm_base);
 #else
 	sunxi_sysctl_base = ioremap(SUNXI_SYSCTL_PBASE, SZ_1K);
 	pr_debug("cpucfg_base=0x%p sysctl_base=0x%p\n", sunxi_cpucfg_base, sunxi_sysctl_base);

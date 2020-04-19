@@ -135,7 +135,7 @@ static int mmc_clk_io_onoff(int sdc_no, int onoff, const normal_gpio_cfg *gpio_i
 	}
 	else // if(sdc_no == 2)
 	{
-		boot_set_gpio((void *)(gpio_info + offset), 10, 1);
+		boot_set_gpio((void *)(gpio_info + offset), 12, 1);
 	}
 	/* config ahb clock */
 	rval = readl(mmchost->hclkbase);
@@ -323,7 +323,7 @@ static int mmc_get_timing_cfg_tm4(u32 sdc_no, u32 spd_md_id, u32 freq_id, u8 *od
 			spd_md_sdly = tune_sdly->tm4_smx_fx[spd_md_id*2 + freq_id/4];
 			dly = ((spd_md_sdly>>((freq_id%4)*8)) & 0xff);
 
-			if (dly == 0xff)
+			if ((dly == 0xff) ||(dly == 0)) //0 is also considered as invalid delay config
 			{
 				if (spd_md_id == DS26_SDR12)
 				{
@@ -361,7 +361,10 @@ static int mmc_get_timing_cfg_tm4(u32 sdc_no, u32 spd_md_id, u32 freq_id, u8 *od
 				}
 			}
 
-			*odly = 0;
+			if (spd_md_id == HSDDR52_DDR50)
+				*odly = 1;
+			else
+				*odly = 0;
 			*sdly = dly;
 			mmcdbg("%s: %d %d 0x%x 0x%x, odly %d sdly %d\n", __FUNCTION__, spd_md_id, freq_id, spd_md_sdly, dly, *odly, *sdly);
 		}

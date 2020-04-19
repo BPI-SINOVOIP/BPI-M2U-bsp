@@ -70,7 +70,8 @@ static int devfreq_adaptive_func(struct devfreq *df, unsigned long *freq)
 	}
 
 	if (!dramfreq->pause) {
-#if defined(CONFIG_ARCH_SUN50I) || defined(CONFIG_ARCH_SUN8IW11)
+#if defined(CONFIG_ARCH_SUN50IW1) || defined(CONFIG_ARCH_SUN50IW2) || \
+	defined(CONFIG_ARCH_SUN8IW11)
 		if (dramfreq->key_masters[MASTER_DE] == 0 &&
 			dramfreq->key_masters[MASTER_GPU] == 0 &&
 			dramfreq->key_masters[MASTER_CSI] == 0) {
@@ -82,6 +83,15 @@ static int devfreq_adaptive_func(struct devfreq *df, unsigned long *freq)
 		} else {
 			*freq = df->max_freq;
 		}
+#elif defined(CONFIG_ARCH_SUN50IW3)
+		if (dramfreq->key_masters[MASTER_DE] == 0)
+			*freq = SUNXI_DRAMFREQ_IDLE;
+		else if (dramfreq->key_masters[MASTER_DE] == 1 &&
+			dramfreq->key_masters[MASTER_GPU] == 0  &&
+			dramfreq->key_masters[MASTER_VE] == 0)
+			*freq = SUNXI_DRAMFREQ_NORMAL;
+		else
+			*freq = df->max_freq;
 #elif defined(CONFIG_ARCH_SUN8IW10)
 #ifdef CONFIG_EINK_PANEL_USED
 		if (dramfreq->key_masters[MASTER_EINK0] == 0

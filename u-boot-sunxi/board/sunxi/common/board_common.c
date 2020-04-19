@@ -23,14 +23,33 @@
 #include <sunxi_nand.h>
 #include <mmc.h>
 #include <asm/arch/dram.h>
-
+#include <asm/arch/platform.h>
+#include <smc.h>
+#ifdef CONFIG_SUNXI_MULITCORE_BOOT
+#include <cputask.h>
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
 #define PARTITION_SETS_MAX_SIZE	 1024
 
 
-
+int __attribute__((weak)) mmc_request_update_boot0(int dev_num)
+{
+	return 0;
+}
+void  __attribute__((weak)) mmc_update_config_for_sdly(struct mmc *mmc)
+{
+	return;
+}
+void  __attribute__((weak)) mmc_update_config_for_dragonboard(int card_no)
+{
+	return;
+}
+struct mmc *  __attribute__((weak)) find_mmc_device(int dev_num)
+{
+	return NULL;
+}
 
 void sunxi_update_subsequent_processing(int next_work)
 {
@@ -63,6 +82,40 @@ void sunxi_update_subsequent_processing(int next_work)
 	return ;
 }
 
+static void  __set_part_name_for_nand(int index, char* part_name,int part_type)
+{
+	if(PART_TYPE_GPT == part_type)
+	{
+		sprintf(part_name, "nand0p%d", index+1);
+	}
+	else
+	{
+		sprintf(part_name, "nand%c", 'a' + index);
+	}
+}
+static void __set_part_name_for_sdmmc(int index, char* part_name,int part_type, int part_total)
+{
+	if(PART_TYPE_GPT == part_type)
+	{
+		sprintf(part_name, "mmcblk0p%d", index+1);
+	}
+	else
+	{
+		if(index == 0)
+		{
+			strcpy(part_name, "mmcblk0p2");
+		}
+		else if( (index+1)==part_total)
+		{
+			strcpy(part_name, "mmcblk0p1");
+		}
+		else
+		{
+			sprintf(part_name, "mmcblk0p%d", index + 4);
+		}
+	}
+}
+
 
 void sunxi_fastboot_init(void)
 {
@@ -73,10 +126,12 @@ void sunxi_fastboot_init(void)
 	char *partition_index = partition_sets;
 	int offset = 0;
 	int temp_offset = 0;
-	int storage_type = uboot_spare_head.boot_data.storage_type;
+	int storage_type = get_boot_storage_type();
+	int part_type = 0;
 
 	printf("--------fastboot partitions--------\n");
 	part_total = sunxi_partition_get_total_num();
+	part_type  = sunxi_partition_get_type();
 	if((part_total <= 0) || (part_total > SUNXI_MBR_MAX_PART_COUNT))
 	{
 		printf("mbr not exist\n");
@@ -97,28 +152,17 @@ void sunxi_fastboot_init(void)
 		printf("%-12s: %-12x  %-12x\n", fb_part.name, fb_part.start, fb_part.length);
 
 		memset(part_name, 0, 16);
-		if(!storage_type)
+		if(storage_type == STORAGE_NAND)
 		{
-			sprintf(part_name, "nand%c", 'a' + index);
+			__set_part_name_for_nand(index, part_name, part_type);
 		}
-		else if (storage_type == 1 || storage_type == 2)
-		{
-			if(index == 0)
-			{
-				strcpy(part_name, "mmcblk0p2");
-			}
-			else if( (index+1)==part_total)
-			{
-				strcpy(part_name, "mmcblk0p1");
-			}
-			else
-			{
-				sprintf(part_name, "mmcblk0p%d", index + 4);
-			}
-		}
+                else if(storage_type == STORAGE_NOR)
+                {
+                        sprintf(part_name, "mtdblock%d", index + 1);
+                }
 		else
 		{
-			sprintf(part_name, "mtdblock%d", index + 1);
+			__set_part_name_for_sdmmc(index, part_name, part_type,part_total);
 		}
 
 		temp_offset = strlen(fb_part.name) + strlen(part_name) + 2;
@@ -167,21 +211,21 @@ static int detect_other_boot_mode(void)
 	int key_high, key_low;
 	int keyvalue;
 
-	keyvalue = gd->key_pressd_value;
-	printf("key %d\n", keyvalue);
+	keyvalue = uboot_spare_head.boot_ext[0].data[2];
+	pr_msg("key %d\n", keyvalue);
 
 	ret1 = script_parser_fetch("recovery_key", "key_max", &key_high, 1);
 	ret2 = script_parser_fetch("recovery_key", "key_min", &key_low,  1);
 	if((ret1) || (ret2))
 	{
-		printf("cant find rcvy value\n");
+		pr_msg("cant find rcvy value\n");
 	}
 	else
 	{
-		printf("recovery key high %d, low %d\n", key_high, key_low);
+		pr_notice("recovery key high %d, low %d\n", key_high, key_low);
 		if((keyvalue >= key_low) && (keyvalue <= key_high))
 		{
-			printf("key found, android recovery\n");
+			pr_notice("key found, android recovery\n");
 
 			return ANDROID_RECOVERY_MODE;
 		}
@@ -190,14 +234,14 @@ static int detect_other_boot_mode(void)
 	ret2 = script_parser_fetch("fastboot_key", "key_min", &key_low, 1);
 	if((ret1) || (ret2))
 	{
-		printf("cant find fstbt value\n");
+		pr_msg("cant find fstbt value\n");
 	}
 	else
 	{
-		printf("fastboot key high %d, low %d\n", key_high, key_low);
+		pr_notice("fastboot key high %d, low %d\n", key_high, key_low);
 		if((keyvalue >= key_low) && (keyvalue <= key_high))
 		{
-			printf("key found, android fastboot\n");
+			pr_notice("key found, android fastboot\n");
 			return ANDROID_FASTBOOT_MODE;
 		}
 	}
@@ -207,16 +251,11 @@ static int detect_other_boot_mode(void)
 
 int update_bootcmd(void)
 {
-	int   mode;
-	int   pmu_value;
-	u32   misc_offset = 0;
-	char  misc_args[2048];
-	char  misc_fill[2048];
-	char  boot_commond[256];
-	static struct bootloader_message *misc_message;
+	int   boot_mode;
+	char  boot_commond[128];
+	int   storage_type = get_boot_storage_type();
 
-	if(gd->force_shell)
-	{
+	if (gd->force_shell) {
 		char delaytime[8];
 		sprintf(delaytime, "%d", 3);
 		setenv("bootdelay", delaytime);
@@ -224,139 +263,40 @@ int update_bootcmd(void)
 
 	memset(boot_commond, 0x0, 128);
 	strcpy(boot_commond, getenv("bootcmd"));
-	printf("base bootcmd=%s\n", boot_commond);
+	pr_msg("base bootcmd=%s\n", boot_commond);
 
-	if((uboot_spare_head.boot_data.storage_type == STORAGE_SD) ||
-		(uboot_spare_head.boot_data.storage_type == STORAGE_EMMC)||
-		uboot_spare_head.boot_data.storage_type == STORAGE_EMMC3)
-	{
+	if ((storage_type == STORAGE_SD) ||
+		(storage_type == STORAGE_EMMC)||
+		storage_type == STORAGE_EMMC3) {
 		sunxi_str_replace(boot_commond, "setargs_nand", "setargs_mmc");
-		printf("bootcmd set setargs_mmc\n");
-	}
-	else if(uboot_spare_head.boot_data.storage_type == STORAGE_NOR)
-	{
+		pr_msg("bootcmd set setargs_mmc\n");
+	} else if (storage_type == STORAGE_NOR) {
 		sunxi_str_replace(boot_commond, "setargs_nand", "setargs_nor");
-	}
-	else if(uboot_spare_head.boot_data.storage_type == STORAGE_NAND)
-	{
-		printf("bootcmd set setargs_nand\n");
+	} else if (storage_type == STORAGE_NAND) {
+		pr_msg("bootcmd set setargs_nand\n");
 	}
 
-	//user enter debug mode by plug usb up to 3 times
-	if(debug_mode_get())
-	{
-		//if enter debug mode,set loglevel = 8
-		debug_mode_update_info();
-		return 0;
-	}
+	boot_mode = detect_other_boot_mode();
 
-	misc_message = (struct bootloader_message *)misc_args;
-	memset(misc_args, 0x0, 2048);
-	memset(misc_fill, 0xff, 2048);
+#ifdef CONFIG_DETECT_RTC_BOOT_MODE
+	set_bootcmd_from_rtc(boot_mode, boot_commond);
+#else
+	set_bootcmd_from_misc(boot_mode, boot_commond);
+#endif
 
-	mode = detect_other_boot_mode();
-	switch(mode)
-	{
-		case ANDROID_RECOVERY_MODE:
-			strcpy(misc_message->command, "boot-recovery");
-			break;
-		case ANDROID_FASTBOOT_MODE:
-			strcpy(misc_message->command, "bootloader");
-			break;
-		case ANDROID_NULL_MODE:
-			{
-				pmu_value = axp_probe_pre_sys_mode();
-				if(pmu_value == PMU_PRE_FASTBOOT_MODE)
-				{
-					puts("PMU : ready to enter fastboot mode\n");
-					strcpy(misc_message->command, "bootloader");
-				}
-				else if(pmu_value == PMU_PRE_RECOVERY_MODE)
-				{
-					puts("PMU : ready to enter recovery mode\n");
-					strcpy(misc_message->command, "boot-recovery");
-				}
-				else
-				{
-					misc_offset = sunxi_partition_get_offset_byname("misc");
-					debug("misc_offset = %x\n",misc_offset);
-					if(!misc_offset)
-					{
-						printf("no misc partition is found\n");
-					}
-					else
-					{
-						printf("misc partition found\n");
-						//read misc partition data
-						sunxi_flash_read(misc_offset, 2048/512, misc_args);
-					}
-				}
-			}
-			break;
+#ifdef CONFIG_SUNXI_MULITCORE_BOOT
+	if (gd->need_shutdown) {
+		sunxi_secondary_cpu_poweroff();
+		sunxi_board_shutdown();
+		for(;;);
 	}
-
-	if(!strcmp(misc_message->command, "efex"))
-	{
-		/* there is a recovery command */
-		puts("find efex cmd\n");
-		sunxi_flash_write(misc_offset, 2048/512, misc_fill);
-		sunxi_board_run_fel();
-		return 0;
-	}
-	else if(!strcmp(misc_message->command, "boot-resignature"))
-	{
-		puts("error: find boot-resignature cmd,but this cmd not implement\n");
-		//sunxi_flash_write(misc_offset, 2048/512, misc_fill);
-		//sunxi_oem_op_lock(SUNXI_LOCKING, NULL, 1);
-	}
-	else if(!strcmp(misc_message->command, "boot-recovery"))
-	{
-		if(!strcmp(misc_message->recovery, "sysrecovery"))
-		{
-			puts("recovery detected, will sprite recovery\n");
-			strncpy(boot_commond, "sprite_recovery", sizeof("sprite_recovery"));
-			uboot_spare_head.boot_data.work_mode = WORK_MODE_SPRITE_RECOVERY;//misc cmd must update work_mode
-			sunxi_flash_write(misc_offset, 2048/512, misc_fill);
-		}
-		else
-		{
-			puts("Recovery detected, will boot recovery\n");
-			sunxi_str_replace(boot_commond, "boot_normal", "boot_recovery");
-		}
-		/* android recovery will clean the misc */
-	}
-	else if(!strcmp(misc_message->command, "bootloader"))
-	{
-		puts("Fastboot detected, will boot fastboot\n");
-		sunxi_str_replace(boot_commond, "boot_normal", "boot_fastboot");
-		if(misc_offset)
-			sunxi_flash_write(misc_offset, 2048/512, misc_fill);
-	}
-	else if(!strcmp(misc_message->command, "usb-recovery"))
-	{
-		puts("Recovery detected, will usb recovery\n");
-		sunxi_str_replace(boot_commond, "boot_normal", "boot_recovery");
-	}
-	else if(!strcmp(misc_message->command ,"debug_mode"))
-	{
-		puts("debug_mode detected ,will enter debug_mode");
-		if(0 == debug_mode_set())
-		{
-			debug_mode_update_info();
-		}
-		sunxi_flash_write(misc_offset,2048/512,misc_fill);
-	}
-	else
-	{
-
-	}
+#endif
 
 	setenv("bootcmd", boot_commond);
-	printf("to be run cmd=%s\n", boot_commond);
+	pr_msg("to be run cmd=%s\n", boot_commond);
 
 	return 0;
 }
-
 
 int disable_node(char* name)
 {
@@ -384,10 +324,20 @@ int  dragonboard_handler(void* dtb_base)
 #ifdef CONFIG_SUNXI_DRAGONBOARD_SUPPORT
 	int card_num = 0;
 
+	int ret;
 	printf("%s call\n",__func__);
-	if(!nand_uboot_probe())  //nand_uboot_init(1)
+
+#ifdef CONFIG_SUNXI_UBIFS
+	if (sunxi_get_mtd_ubi_mode_status())
+		ret = sunxi_nand_uboot_probe();
+	else
+#endif
+		ret = nand_uboot_probe();
+
+	/* nand_uboot_init(1) */
+	if (!ret)
 	{
-		printf("try nand successed \n");
+		printf("try nand successed\n");
 		disable_node("mmc2");
 		disable_node("mmc3");
 	}
@@ -433,9 +383,25 @@ int update_fdt_para_for_kernel(void* dtb_base)
 	int ret;
 	int nodeoffset = 0;
 	uint storage_type = 0;
+	struct mmc *mmc =NULL;
+	int dev_num = 0;
+	extern void display_update_dtb(void);
 
+	storage_type = get_boot_storage_type_ext();
 
-	storage_type = uboot_spare_head.boot_data.storage_type;
+	//update sdhc dbt para
+	if(storage_type == STORAGE_EMMC || storage_type == STORAGE_EMMC3)
+	{
+		dev_num = (storage_type == STORAGE_EMMC)? 2:3;
+		mmc = find_mmc_device(dev_num);
+		if (mmc == NULL) {
+			printf("can't find valid mmc %d\n", dev_num);
+			return -1;
+		}
+		if (mmc->cfg->platform_caps.sample_mode == AUTO_SAMPLE_MODE) {
+			mmc_update_config_for_sdly(mmc);
+		}
+	}
 
 	//fix nand&sdmmc
 	switch(storage_type)
@@ -443,14 +409,30 @@ int update_fdt_para_for_kernel(void* dtb_base)
 		case STORAGE_NAND:
 			disable_node("mmc2");
 			disable_node("mmc3");
+			disable_node("spi0");
+			#ifdef CONFIG_STORAGE_MEDIA_SPINAND
+			disable_node("spinand");
+			#endif
+			break;
+		case STORAGE_SPI_NAND:
+			disable_node("nand0");
+			disable_node("mmc2");
+			disable_node("spi0");
 			break;
 		case STORAGE_EMMC:
 			disable_node("nand0");
 			disable_node("mmc3");
+			disable_node("spi0");
+			#ifdef CONFIG_STORAGE_MEDIA_SPINAND
+			disable_node("spinand");
+			#endif
 			break;
 		case STORAGE_EMMC3:
 			disable_node("nand0");
 			disable_node("mmc2");
+			#ifdef CONFIG_STORAGE_MEDIA_SPINAND
+			disable_node("spinand");
+			#endif
 			break;
 		case STORAGE_SD:
 		{
@@ -459,6 +441,10 @@ int update_fdt_para_for_kernel(void* dtb_base)
 			if(dragonboard_test == 1)
 			{
 				dragonboard_handler(dtb_base);
+				mmc_update_config_for_dragonboard(2);
+				#ifdef CONFIG_MMC3_SUPPORT
+				mmc_update_config_for_dragonboard(3);
+				#endif
 			}
 			else
 			{
@@ -472,8 +458,18 @@ int update_fdt_para_for_kernel(void* dtb_base)
 				}
 #endif
 				disable_node("mmc3");
+				#ifdef CONFIG_STORAGE_MEDIA_SPINAND
+				disable_node("spinand");
+				#endif
 			}
 		}
+			break;
+		case STORAGE_NOR:
+			disable_node("nand0");
+			disable_node("mmc2");
+			#ifdef CONFIG_STORAGE_MEDIA_SPINAND
+			disable_node("spinand");
+			#endif
 			break;
 		default:
 			break;
@@ -487,10 +483,25 @@ int update_fdt_para_for_kernel(void* dtb_base)
 		return -1;
 	}
 
+#if defined(CONFIG_ARCH_SUN50IW6P1) ||  defined(CONFIG_ARCH_SUN50IW3P1)\
+	|| defined(CONFIG_ARCH_SUN8IW7P1)
+	ulong drm_base = 0, drm_size = 0;
+
+	if ((gd->securemode == SUNXI_SECURE_MODE_WITH_SECUREOS) &&
+		(!smc_tee_probe_drm_configure(&drm_base, &drm_size))) {
+		pr_msg("drm_base=0x%lx\n", drm_base);
+		pr_msg("drm_size=0x%lx\n", drm_size);
+		ret = fdt_add_mem_rsv(dtb_base, drm_base, drm_size);
+		if (ret)
+			printf("##add mem rsv error: %s : %s\n",
+				__func__, fdt_strerror(ret));
+	}
+#endif
+
 	//fix dram para
 	uint32_t *dram_para = NULL;
 	dram_para = (uint32_t *)uboot_spare_head.boot_data.dram_para;
-	puts("update dtb dram start\n");
+	pr_msg("update dtb dram start\n");
 	nodeoffset = fdt_path_offset(dtb_base, "/dram");
 	if(nodeoffset<0)
 	{
@@ -521,9 +532,96 @@ int update_fdt_para_for_kernel(void* dtb_base)
 	fdt_setprop_u32(dtb_base,nodeoffset, "dram_tpr11", dram_para[21]);
 	fdt_setprop_u32(dtb_base,nodeoffset, "dram_tpr12", dram_para[22]);
 	fdt_setprop_u32(dtb_base,nodeoffset, "dram_tpr13", dram_para[23]);
-	puts("update dtb dram  end\n");
+	pr_msg("update dtb dram  end\n");
 
 	return 0;
+}
+
+#ifdef CONFIG_DETECT_RTC_BOOT_MODE
+char *set_bootcmd_from_rtc(int mode, char *bootcmd)
+{
+	u8	bootmode_flag = 0;
+	if (mode == ANDROID_NULL_MODE) {
+		/* read RTC flag*/
+		bootmode_flag = sunxi_get_bootmode_flag();
+	} else if (mode == ANDROID_RECOVERY_MODE) {
+		bootmode_flag = SUNXI_BOOT_RECOVERY_FLAG;
+	} else if (mode == ANDROID_FASTBOOT_MODE) {
+		bootmode_flag = SUNXI_FASTBOOT_FLAG;
+	}
+	/*clear rtc*/
+	sunxi_set_bootmode_flag(0);
+
+	switch (bootmode_flag) {
+	case SUNXI_EFEX_CMD_FLAG:
+		pr_msg("find efex cmd\n");
+		sunxi_board_run_fel();
+		break;
+	case SUNXI_BOOT_RECOVERY_FLAG:
+		pr_msg("Recovery detected, will boot recovery\n");
+		sunxi_str_replace(bootcmd, "boot_normal", "boot_recovery");
+		break;
+	case SUNXI_FASTBOOT_FLAG:
+		pr_msg("Fastboot detected, will boot fastboot\n");
+		sunxi_str_replace(bootcmd, "boot_normal", "boot_fastboot");
+		break;
+	default:
+		break;
+	}
+	return bootcmd;
+}
+#endif
+
+char *set_bootcmd_from_misc(int mode, char *bootcmd)
+{
+	u32   misc_offset = 0;
+	char  misc_args[2048];
+	char  misc_fill[2048];
+	struct bootloader_message *misc_message;
+
+	misc_message = (struct bootloader_message *)misc_args;
+	memset(misc_args, 0x0, 2048);
+	memset(misc_fill, 0xff, 2048);
+
+	switch (mode) {
+	case ANDROID_RECOVERY_MODE:
+		strcpy(misc_message->command, "recovery");
+		break;
+	case ANDROID_FASTBOOT_MODE:
+		strcpy(misc_message->command, "bootloader");
+		break;
+	case ANDROID_NULL_MODE:
+		{
+			misc_offset = sunxi_partition_get_offset_byname("misc");
+			if (!misc_offset) {
+				pr_msg("no misc partition is found\n");
+			} else {
+				pr_msg("misc partition found\n");
+				sunxi_flash_read(misc_offset, 2048/512, misc_args);
+			}
+		}
+		break;
+	default:
+		break;
+	}
+	if (!strcmp(misc_message->command, "efex")) {
+		puts("find efex cmd\n");
+		sunxi_flash_write(misc_offset, 2048/512, misc_fill);
+		sunxi_board_run_fel();
+		return 0;
+	} else if (!strcmp(misc_message->command, "boot-recovery")) {
+		puts("boot-recovery detected, will boot recovery\n");
+		sunxi_str_replace(bootcmd, "boot_normal", "boot_recovery");
+	} else if (!strcmp(misc_message->command, "recovery")) {
+		puts("Recovery detected, will boot recovery\n");
+		sunxi_str_replace(bootcmd, "boot_normal", "boot_recovery");
+	} else if (!strcmp(misc_message->command, "bootloader")) {
+		puts("Fastboot detected, will boot fastboot\n");
+		sunxi_str_replace(bootcmd, "boot_normal", "boot_fastboot");
+		if (misc_offset)
+			sunxi_flash_write(misc_offset, 2048/512, misc_fill);
+	}
+	return bootcmd;
 }
 
 int get_boot_work_mode(void)
@@ -531,10 +629,29 @@ int get_boot_work_mode(void)
 	return uboot_spare_head.boot_data.work_mode;
 }
 
-int get_boot_storage_type(void)
+int get_boot_storage_type_ext(void)
 {
+	/* get real storage type that from BROM at boot mode*/
 	return uboot_spare_head.boot_data.storage_type;
 }
+
+int get_boot_storage_type(void)
+{
+	/* we think that nand and spi-nand are the same storage medium */
+	/* so we can use the same process to deal with them */
+	if(uboot_spare_head.boot_data.storage_type == STORAGE_NAND
+		|| uboot_spare_head.boot_data.storage_type == STORAGE_SPI_NAND)
+	{
+		return STORAGE_NAND;
+	}
+	return uboot_spare_head.boot_data.storage_type;
+}
+
+void set_boot_storage_type(int storage_type)
+{
+	uboot_spare_head.boot_data.storage_type = storage_type;
+}
+
 
 u32 get_boot_dram_para_addr(void)
 {
@@ -568,7 +685,10 @@ void set_boot_dram_update_flag(u32 *dram_para)
 	pdram->dram_tpr13 = flag;
 }
 
-
+u32 get_pmu_byte_from_boot0(void)
+{
+	return uboot_spare_head.boot_ext[0].data[0];
+}
 
 /*
 ************************************************************************************************************
@@ -636,10 +756,17 @@ int update_dram_para_for_ota(void)
 	return 0;
 #else
 	int ret = 0;
+	int card_num = 2;
+
+	if (get_boot_storage_type() == STORAGE_EMMC3)
+	{
+		card_num = 3;
+	}
+
 	if( (get_boot_work_mode() == WORK_MODE_BOOT) &&
 		(STORAGE_SD != get_boot_storage_type()))
 	{
-		if(get_boot_dram_update_flag())
+		if(get_boot_dram_update_flag()|| mmc_request_update_boot0(card_num))
 		{
 			printf("begin to update boot0 atfer ota\n");
 			ret = sunxi_flash_update_boot0();
@@ -658,20 +785,68 @@ int update_dram_para_for_ota(void)
 int board_late_init(void)
 {
 	int ret  = 0;
-	if(get_boot_work_mode() == WORK_MODE_BOOT)
-	{
+	if (get_boot_work_mode() == WORK_MODE_BOOT) {
+
 		sunxi_fastboot_init();
-#ifndef CONFIG_SUNXI_SPINOR_PLATFORM
 		update_dram_para_for_ota();
-#endif
 		update_bootcmd();
 		ret = update_fdt_para_for_kernel(working_fdt);
+
+#ifdef CONFIG_SUNXI_USER_KEY
+		/* update mac/wifi serial info in env */
+		extern int update_user_data(void);
+		update_user_data();
+#endif
+
 #ifdef CONFIG_SUNXI_SERIAL
-                sunxi_set_serial_num();
+		sunxi_set_serial_num();
 #endif
 		return 0;
 	}
 
 	return ret;
 }
+
+uint sunxi_generate_checksum(void *buffer, uint length, uint src_sum)
+{
+#ifndef CONFIG_USE_NEON_SIMD
+	uint *buf;
+	uint count;
+	uint sum;
+
+	count = length >> 2;
+	sum = 0;
+	buf = (__u32 *)buffer;
+	do
+	{
+		sum += *buf++;
+		sum += *buf++;
+		sum += *buf++;
+		sum += *buf++;
+	}while( ( count -= 4 ) > (4-1) );
+
+	while( count-- > 0 )
+		sum += *buf++;
+#else
+	uint sum;
+
+	sum = add_sum_neon(buffer, length);
+#endif
+	sum = sum - src_sum + STAMP_VALUE;
+
+    return sum;
+}
+
+int sunxi_verify_checksum(void *buffer, uint length, uint src_sum)
+{
+	uint sum;
+	sum = sunxi_generate_checksum(buffer, length, src_sum);
+
+	debug("src sum=%x, check sum=%x\n", src_sum, sum);
+	if( sum == src_sum )
+		return 0;
+	else
+		return -1;
+}
+
 

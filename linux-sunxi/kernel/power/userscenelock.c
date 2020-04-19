@@ -262,20 +262,33 @@ ssize_t wakeup_src_show(
 
 		s += scnprintf(s, end - s, "%s\n", "dynamic wakeup src config:");
 		s += scnprintf(s, end - s, "wakeup_src 0x%lx\n", manager->event);
+#if defined(CONFIG_ARCH_SUN8IW6P1) || defined(CONFIG_ARCH_SUN8IW5P1)
+		s += parse_wakeup_event(s, end - s, manager->event, CPUS_ID);
+#else
 		s += parse_wakeup_event(s, end - s, manager->event);
+#endif
 		s += scnprintf(s, end - s, "wakeup_gpio_map 0x%lx\n", manager->wakeup_gpio_map);
 		s += parse_wakeup_gpio_map(s, end -s, manager->wakeup_gpio_map);	
 		s += scnprintf(s, end - s, "wakeup_gpio_group 0x%lx\n", manager->wakeup_gpio_group);
 		s += parse_wakeup_gpio_group_map(s, end - s, manager->wakeup_gpio_group);
-		if (NULL != manager->pextended_standby)
+		if (NULL != manager->pextended_standby) {
+#if defined(CONFIG_ARCH_SUN8IW6P1) || defined(CONFIG_ARCH_SUN8IW5P1)
+			s += scnprintf(s, end - s, "extended_standby id = 0x%lx\n", manager->pextended_standby->id);
+#else
 			s += scnprintf(s, end - s, "extended_standby id = 0x%x\n", manager->pextended_standby->id);
+#endif
+		}
 	}
 
 	s += scnprintf(s, end - s, "%s\n", "==========================wakeup src setting usage help info========:");
 	s += scnprintf(s, end - s, "%s\n", "echo wakeup_src_e para (1:enable)/(0:disable) > /sys/power/wakeup_src");
 	s += scnprintf(s, end - s, "%s\n", "demo: echo 0x2000 0x200 1 > /sys/power/wakeup_src");
 	s += scnprintf(s, end - s, "%s\n", "wakeup_src_e para info: ");
+#if defined(CONFIG_ARCH_SUN8IW6P1) || defined(CONFIG_ARCH_SUN8IW5P1)
+	s += parse_wakeup_event(s, end - s, 0xffffffff, CPUS_ID);
+#else
 	s += parse_wakeup_event(s, end - s, 0xffffffff);
+#endif
 	s += scnprintf(s, end - s, "%s\n", "gpio para info: ");
 	s += show_gpio_config(s, end - s);
 

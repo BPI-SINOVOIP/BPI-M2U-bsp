@@ -161,7 +161,7 @@ static int abortboot_normal(int bootdelay)
 	if (bootdelay >= 0) {
 		if (tstc()) {	/* we got a key press	*/
 			(void) getc();  /* consume input	*/
-			puts("\b\b\b 0");
+			printf("\b\b\b 0");
 			abort = 1;	/* don't auto boot	*/
 		}
 	}
@@ -188,7 +188,7 @@ static int abortboot_normal(int bootdelay)
 		printf("\b\b\b%2d ", bootdelay);
 	}
 
-	putc('\n');
+	printf("\n");
 
 #ifdef CONFIG_SILENT_CONSOLE
 	if (abort)

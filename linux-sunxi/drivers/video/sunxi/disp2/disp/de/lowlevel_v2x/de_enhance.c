@@ -166,6 +166,7 @@ int de_enhance_set_format(unsigned int screen_id, unsigned int format)
 	if (g_format[screen_id] != format) {
 		g_format[screen_id] = format;
 		format_change = 1;
+		g_config[screen_id].flags |= ENH_FORMAT_DIRTY;
 	}
 
 	if (format_change == 1 || g_size_change[screen_id])
@@ -194,8 +195,11 @@ int de_enhance_apply(unsigned int screen_id,
 	       sizeof(struct disp_enhance_config));
 	de_enhance_set_mode(g_format[screen_id], config);
 	for (ch_id = 0; ch_id < chno; ch_id++) {
-		auto_contrast_dirty =
-		    (config[0].flags & ENHANCE_ENABLE_DIRTY) ? 1 : 0;
+		auto_contrast_dirty = (config[0].flags & (ENH_ENABLE_DIRTY
+						       | ENH_SIZE_DIRTY
+						       | ENH_FORMAT_DIRTY
+						       | ENH_MODE_DIRTY)) ?
+							1 : 0;
 
 		/* disp_enhance_info -> vep_config_data */
 		de_enhance_info2data(&config[0], data,
@@ -235,6 +239,7 @@ int de_enhance_apply(unsigned int screen_id,
 
 	}
 	de_enhance_demo_enable(screen_id, config[0].info.demo_enable);
+	g_config[screen_id].flags = 0;
 
 	kfree(data);
 err:
@@ -297,6 +302,7 @@ int de_enhance_set_size(unsigned int screen_id, struct disp_rect *size)
 	if ((size->width !=  g_size[screen_id].width)
 	    || (size->height != g_size[screen_id].height)) {
 		g_size_change[screen_id] = true;
+		g_config[screen_id].flags |= ENH_SIZE_DIRTY;
 	} else
 		g_size_change[screen_id] = false;
 	memcpy(&g_size[screen_id], size, sizeof(struct disp_rect));

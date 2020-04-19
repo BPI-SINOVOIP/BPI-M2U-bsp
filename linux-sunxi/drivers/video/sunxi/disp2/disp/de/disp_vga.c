@@ -161,6 +161,54 @@ static s32 vga_calc_judge_line(struct disp_device *vga)
 	return 0;
 }
 
+static s32 cal_real_frame_period(struct disp_device *vga)
+{
+	s32 ret = -1;
+	struct disp_vga_private_data *vgap;
+	unsigned long long temp = 0;
+
+	if (!vga) {
+		DE_WRN("device hdl is NULL!\n");
+		goto OUT;
+	}
+
+	vgap = disp_vga_get_priv(vga);
+
+	if (!vgap) {
+		DE_WRN("vgap hdl is NULL!\n");
+		goto OUT;
+	}
+
+	if (!vgap->clk || !vgap->video_info) {
+		DE_WRN("vga clk | video_info null!\n");
+		goto OUT;
+	}
+
+	vga->timings.dclk_rate_set = clk_get_rate(vgap->clk);
+
+	if (vga->timings.dclk_rate_set == 0) {
+		DE_WRN(" vga dclk_rate_set is 0!\n");
+		goto OUT;
+	}
+
+	temp = ONE_SEC * vgap->video_info->hor_total_time *
+	       vgap->video_info->ver_total_time;
+
+	do_div(temp, vga->timings.dclk_rate_set *
+			 (vgap->video_info->b_interlace + 1));
+
+	vga->timings.frame_period = temp;
+
+	vga->timings.start_delay =
+	    disp_al_device_get_start_delay(vga->hwdev_index);
+
+	DE_INF("vga frame period:%llu\n", vga->timings.frame_period);
+	ret = 0;
+
+OUT:
+	return ret;
+}
+
 static s32 disp_vga_enable( struct disp_device* vga)
 {
 	int ret;
@@ -212,6 +260,10 @@ static s32 disp_vga_enable( struct disp_device* vga)
 		DE_WRN("fail to enable clock\n");
 		goto exit;
 	}
+
+	ret = cal_real_frame_period(vga);
+	if (!ret)
+		DE_WRN("cal_real_frame_period fali!\n");
 
 	vgap->tv_func.tv_enable(vga->disp);
 	disp_al_vga_cfg(vga->hwdev_index, vgap->video_info);
@@ -283,6 +335,9 @@ static s32 disp_vga_sw_enable( struct disp_device* vga)
 	if (0 != vga_clk_enable(vga))
 		goto exit;
 #endif
+
+	if (0 != cal_real_frame_period(vga))
+		DE_WRN("cal_real_frame_period fali!\n");
 
 	spin_lock_irqsave(&vgap->data_lock, flags);
 	vgap->enabled = true;
@@ -571,6 +626,33 @@ static s32 disp_vga_get_fps(struct disp_device *vga)
 	return vgap->frame_per_sec;
 }
 
+static s32 disp_vga_set_static_config(struct disp_device *vga,
+			       struct disp_device_config *config)
+{
+	return disp_vga_set_mode(vga, config->mode);
+}
+
+static s32 disp_vga_get_static_config(struct disp_device *vga,
+			      struct disp_device_config *config)
+{
+	int ret = 0;
+	struct disp_vga_private_data *vgap = disp_vga_get_priv(vga);
+
+	if ((vga == NULL) || (vgap == NULL)) {
+		DE_WRN("NULL hdl!\n");
+		ret = -1;
+		goto exit;
+	}
+
+	config->type = vga->type;
+	config->mode = vgap->vga_mode;
+	if (vgap->tv_func.tv_get_input_csc)
+		vgap->tv_func.tv_get_input_csc(vga->disp);
+
+exit:
+	return ret;
+}
+
 s32 disp_init_vga(void)
 {
 	u32 value = 0;
@@ -663,12 +745,17 @@ s32 disp_init_vga(void)
 		vga->is_enabled = disp_vga_is_enabled;
 		vga->set_mode = disp_vga_set_mode;
 		vga->get_mode = disp_vga_get_mode;
+		vga->set_static_config = disp_vga_set_static_config;
+		vga->get_static_config = disp_vga_get_static_config;
 		vga->check_support_mode = disp_vga_check_support_mode;
 		vga->get_input_csc = disp_vga_get_input_csc;
 		vga->suspend = disp_vga_suspend;
 		vga->resume = disp_vga_resume;
 		vga->set_enhance_mode = disp_set_enhance_mode;
 		vga->get_fps = disp_vga_get_fps;
+		vga->get_status = disp_device_get_status;
+		vga->is_in_safe_period = disp_device_is_in_safe_period;
+		vga->usec_before_vblank = disp_device_usec_before_vblank;
 		vga->init(vga);
 		disp_device_register(vga);
 		disp++;

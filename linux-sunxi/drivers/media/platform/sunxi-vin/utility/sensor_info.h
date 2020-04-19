@@ -42,7 +42,7 @@ struct sensor_item {
 	int i2c_addr;
 	enum sensor_type_t sensor_type;
 	enum sensor_size_t sensor_size;
-	int core_clk_for_sensor;
+	int core_clk;
 };
 
 int get_sensor_info(char *sensor_name, struct sensor_item *sensor_info);

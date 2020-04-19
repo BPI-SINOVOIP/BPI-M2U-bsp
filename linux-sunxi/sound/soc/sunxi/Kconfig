@@ -7,19 +7,27 @@ config SND_SUNXI_SOC_SPDIF_UTILS
 	bool
 config SND_SOC_CS4385
 	bool
+# for AHUB design should use pll_auio * 4
+config AHUB_FREQ_REQ
+	bool
+
 
 menuconfig SND_SUNXI_SOC
 	tristate "ASoC support for SUNXI"
 	select SND_SUNXI_SOC_AUDIO_DMA
-	#select SND_SUNXI_SOC_RW
 	select SND_SOC_DMAENGINE_PCM
 	---help---
 	  Say Y if you want to add support for sound on sunxi chips.
 
 if SND_SUNXI_SOC
+
+source "sound/soc/sunxi/audiocodec/Kconfig"
+source "sound/soc/sunxi/i2s0/Kconfig"
+source "sound/soc/sunxi/i2s1/Kconfig"
+
 config SND_SUNXI_SOC_INTERNAL_AUDIOCODEC
 	tristate "ASoC support for audiocodec"
-	depends on ARCH_SUN50IW1P1
+	depends on ARCH_SUN50IW1P1 || ARCH_SUN50IW3P1
 	select SND_SUNXI_SOC_RW
 	help
 	  Say Y or M if you want to add support for codecs attached to the
@@ -27,7 +35,7 @@ config SND_SUNXI_SOC_INTERNAL_AUDIOCODEC
 
 config SND_SUNXI_SOC_INTERNAL_I2S
 	tristate "ASoC support for internal-i2s"
-	depends on ARCH_SUN50IW1P1
+	depends on ARCH_SUN50IW1P1 || ARCH_SUN50IW3P1
 	select SND_SUNXI_SOC_RW
 	help
 	  Say Y or M if you want to add support for codecs attached to the
@@ -35,11 +43,28 @@ config SND_SUNXI_SOC_INTERNAL_I2S
 
 config SND_SUNXI_SOC_AUDIO_CODEC_MACHINE
 	tristate "ASoC support for audiocodec machine"
-	depends on ARCH_SUN50IW1P1
+	depends on ARCH_SUN50IW1P1 || ARCH_SUN50IW3P1
 	select SND_SUNXI_SOC_RW
 	help
 	  Say Y or M if you want to add support for codecs attached to the
 	  AUDIOCODEC MACHEINE interface.
+
+config SND_SUNXI_SOC_INTERNAL_SUN50IW3_AUDIOCODEC
+	tristate "ASoC support for sun50iw3 audiocodec"
+	depends on ARCH_SUN50IW3
+	select SND_SUNXI_SOC_RW
+	help
+	  Say Y or M if you want to add support for codecs attached to the
+	  AUDIOCODEC interface
+
+config SND_SUNXI_SOC_INTERNAL_SUN3IW1_AUDIOCODEC
+	tristate "ASoC support for sun3iw1 audiocodec"
+	depends on ARCH_SUN3IW1
+	select SND_SUNXI_SOC_RW
+	help
+	  Say Y or M if you want to add support for codecs attached to the
+	  AUDIOCODEC interface.
+
 
 config SND_SUNXI_SOC_INTERNAL_SUN8IW10_AUDIOCODEC
 	tristate "ASoC support for audiocodec"
@@ -68,11 +93,27 @@ config SND_SUNXI_SOC_INTERNAL_SUN50IW2_AUDIOCODEC
 
 config SND_SUNXI_SOC_CODEC_CPU_DAI
 	tristate "ASoC support for internal-codec cpudai"
-	depends on ARCH_SUN8IW10 || ARCH_SUN8IW11 || ARCH_SUN50IW2
+	depends on ARCH_SUN3IW1 || ARCH_SUN8IW10 || ARCH_SUN8IW11 || ARCH_SUN50IW2
 	select SND_SUNXI_SOC_RW
 	help
 	  Say Y or M if you want to add support for codecs attached to the
 	  INTERNAL I2S interface.
+
+config SND_SUNXI_SOC_SUN3IW1_AUDIO_CODEC_MACHINE
+	tristate "ASoC support for sun3iw1 audiocodec machine"
+	depends on ARCH_SUN3IW1
+	select SND_SUNXI_SOC_RW
+	help
+	  Say Y or M if you want to add support for codecs attached to the
+	  AUDIOCODEC MACHEINE interface.
+
+config SND_SUNXI_SOC_SUN50IW3_AUDIO_CODEC_MACHINE
+	tristate "ASoC support for sun50iw3 audiocodec machine"
+	depends on ARCH_SUN50IW3
+	select SND_SUNXI_SOC_RW
+	help
+	  Say Y or M if you want to add support for codecs attached to the
+	  AUDIOCODEC MACHEINE interface.
 
 config SND_SUNXI_SOC_SUN8IW10_AUDIO_CODEC_MACHINE
 	tristate "ASoC support for sun8iw10 audiocodec machine"
@@ -100,22 +141,42 @@ config SND_SUNXI_SOC_SUN50IW2_AUDIO_CODEC_MACHINE
 
 config SND_SUNXI_SOC_DAUDIO_PLATFORM
 	tristate "ASoC support for daudio platform."
+	depends on !SND_SUNXI_SOC_AHUB
 	select REGMAP_MMIO
 	help
  	  Say Y or M if you want to add the daudio platform interface.
 
+config SND_CODEC_NAU85L20
+	tristate "audiocodec for NAU85L20"
+	depends on ARCH_SUN3IW1
+	select I2C
+	help
+	  Say Y or M if you want to add support for external codecs of NAU85L20
+
 config SND_SUNXI_SOC_VIRCODEC
 	tristate "ASoC support for vircodec."
+        depends on !ARCH_SUN50IW6
 	help
  	  Say Y or M if you want to add the vircodec interface.
 
+config SND_SUNXI_SOC_DAUDIO_MACHINE
+        tristate "ASoC Support For Daudio"
+        select SND_SUNXI_SOC_DAUDIO_PLATFORM if !SND_SUNXI_SOC_AHUB
+        depends on ARCH_SUN50IW6
+        help
+          Say Y or M if you want to add the daudio machine interface.
+
 config SND_SUNXI_SOC_DAUDIO0_MACHINE
-	tristate "ASoC support for daudio0 machine"
+	tristate "ASoC support for Daudio0 machine"
+        select SND_SUNXI_SOC_DAUDIO_PLATFORM if !SND_SUNXI_SOC_AHUB
+	depends on !ARCH_SUN50IW6
 	help
  	  Say Y or M if you want to add the daudio0 MACHEINE interface.
 
 config SND_SUNXI_SOC_DAUDIO1_MACHINE
-	tristate "ASoC support for daudio1 machine"
+	tristate "ASoC support for Daudio1 machine"
+	select SND_SUNXI_SOC_DAUDIO_PLATFORM if !SND_SUNXI_SOC_AHUB
+        depends on !ARCH_SUN50IW6
 	help
  	  Say Y or M if you want to add the daudio1 MACHEINE interface.
 
@@ -123,7 +184,7 @@ config SND_SUNXI_SOC_DMIC
 	tristate "ASoC support for dmic."
 	select REGMAP_MMIO
 	select SND_SOC_DMIC
-	depends on ARCH_SUN8IW10
+	depends on ARCH_SUN3IW1 || ARCH_SUN8IW10 || ARCH_SUN8IW17 || ARCH_SUN50IW6 || ARCH_SUN50IW3
 	help
  	  Say Y or M if you want to add the dmic interface.
 
@@ -136,8 +197,8 @@ config SND_SUNXI_SOC_DSD
 
 config SND_SUNXI_SOC_HDMIAUDIO
 	tristate "ASoC support for hdmiaudio."
-	depends on ARCH_SUN50IW1P1 || ARCH_SUN8IW11 || ARCH_SUN50IW2
-	select SND_SUNXI_SOC_DAUDIO_PLATFORM
+	depends on ARCH_SUN50IW1P1 || ARCH_SUN8IW11 || ARCH_SUN50IW2 || ARCH_SUN50IW6
+	select SND_SUNXI_SOC_DAUDIO_PLATFORM if !SND_SUNXI_SOC_AHUB
 	help
  	  Say Y or M if you want to add the hdmi platform interface.
 
@@ -145,8 +206,17 @@ config SND_SUNXI_SOC_SPDIF
 	tristate "ASoC support for spdif soundcard"
 	select REGMAP_MMIO
 	select SND_SUNXI_SOC_SPDIF_UTILS
+	depends on ARCH_SUN8IW10 || ARCH_SUN8IW11 || ARCH_SUN50IW2 || ARCH_SUN50IW1 || ARCH_SUN50IW6
 	help
  	  Say Y or M if you want to add the spdif soundcard include macheine plarform.
+
+config SND_SUNXI_SOC_AHUB
+	tristate "ASoC support for audio hub support"
+	select REGMAP_MMIO
+	select AHUB_FREQ_REQ
+	depends on ARCH_SUN50IW6
+	help
+	  Say Y or M if you want to using ahub module.
 
 config SUNXI_AUDIO_DEBUG
 	bool "Support SUNXI AUDIO DEBUG"

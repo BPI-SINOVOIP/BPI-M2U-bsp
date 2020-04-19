@@ -55,6 +55,9 @@ static struct mfd_cell axp259_cells[] = {
 		.num_resources = ARRAY_SIZE(axp259_charger_resources),
 		.resources     = axp259_charger_resources,
 	},
+	{
+		.name          = "axp259-gpio",
+	},
 };
 
 void axp259_power_off(void)
@@ -210,6 +213,9 @@ struct axp_platform_ops axp259_platform_ops = {
 	},
 	.charger_name = {
 		"axp259-charger",
+	},
+	.gpio_name = {
+		"axp259-gpio",
 	},
 };
 

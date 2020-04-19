@@ -1,3 +1,12 @@
+/*
+ * Driver for sunxi SD/MMC host controllers
+ * (C) Copyright 2012-2017 lixiang <lixiang@allwinnertech.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ */
 
 #include <linux/clk.h>
 #include <linux/clk-private.h>
@@ -34,6 +43,8 @@
 #define SDXC_REG_DRV_DL	 	(0x0140)	/*SMHC Drive Delay Control Register */
 #define SDXC_REG_SAMP_DL	(0x0144)	/*SMHC Sample Delay Control Register */
 #define SDXC_REG_DS_DL		(0x0148)	/*SMHC Data Strobe Delay Control Register */
+#define SDXC_REG_EMCE		(0x64)		/*SMHC EMCE Control Register*/
+#define SDXC_REG_SMCV		(0x300)		/*SMHC Version Register */
 
 /*bit*/
 #define SDXC_HS400_MD_EN				(1U<<31)
@@ -68,6 +79,15 @@
 #define SUNXI_DMA_TL_SDMMC_V4P5X		((0x3<<28)|(15<<16)|240)
 /*one dma des can transfer data size = 1<<SUNXI_DES_SIZE_SDMMC2*/
 #define SUNXI_DES_SIZE_SDMMC_V4P5X	(12)
+
+/* EMCE controller  */
+#define SDXC_EMCE_ENCR		BIT(4)
+#define SDXC_EMCE_AC_MD		BIT(1)
+#define SDXC_EMCE_ENB		BIT(0)
+
+/*Sunxi MMC Host Controller Version*/
+#define SMHC_VERSION_V4P6	0x40600
+#define SMHC_VERSION_V4P7	0x40700
 
 struct sunxi_mmc_spec_regs {
 	u32 drv_dl;		/*REG_DRV_DL*/
@@ -193,6 +213,7 @@ static void sunxi_mmc_set_clk_dly(struct sunxi_mmc_host *host, int clk,
 		break;
 	case MMC_TIMING_UHS_DDR50:
 		speed_mod = SM2_HSDDR52_DDR50;
+		dat_drv_ph = 1;
 		break;
 	case MMC_TIMING_UHS_SDR50:
 	case MMC_TIMING_UHS_SDR104:
@@ -330,6 +351,26 @@ static void sunxi_mmc_dump_dly2(struct sunxi_mmc_host *host)
 		printk("raw_tm_sm1 %x\n", mmc_clk_dly[i].raw_tm_sm[1]);
 		printk("********************\n");
 	}
+}
+
+static void sunxi_mmc_on_off_emce_v4p6x(struct sunxi_mmc_host *host,
+		u32 en_crypt, u32 ac_mode, u32 en_emce)
+{
+	u32 rval = 0;
+	rval = mmc_readl(host, REG_EMCE);
+	rval &= 0x0000FFFF;
+	rval |= (0x200 << 16);
+	mmc_writel(host, REG_EMCE, rval);
+	rval &= ~(SDXC_EMCE_ENB | SDXC_EMCE_ENCR | SDXC_EMCE_AC_MD);
+	if (en_emce)
+		rval |= SDXC_EMCE_ENB;
+	if (en_crypt)
+		rval |= SDXC_EMCE_ENCR;
+	if (ac_mode)
+		rval |= SDXC_EMCE_AC_MD;
+	mmc_writel(host, REG_EMCE, rval);
+	dev_dbg(mmc_dev(host->mmc), "%s REG_EMCE:%x\n", __func__,
+		mmc_readl(host, REG_EMCE));
 }
 
 static int __sunxi_mmc_do_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en,
@@ -798,6 +839,94 @@ void sunxi_mmc_init_priv_v4p5x(struct sunxi_mmc_host *host,
 	host->sunxi_mmc_set_acmda = sunxi_mmc_set_a12a;
 	host->sunxi_mmc_dump_dly_table = sunxi_mmc_dump_dly2;
 	host->phy_index = phy_index;
+	if (host->ctl_spec_cap & NO_REINIT_SHUTDOWN) {
+		host->sunxi_mmc_shutdown = sunxi_mmc_do_shutdown_v4p5x;
+	} else {
+		/*only be compatible with a20 */
+		host->sunxi_mmc_shutdown = sunxi_mmc_do_shutdown_com;
+	}
+
+	host->sunxi_mmc_oclk_en = sunxi_mmc_oclk_onoff;
+}
+
+void sunxi_mmc_init_priv_v4p6x(struct sunxi_mmc_host *host,
+			       struct platform_device *pdev, int phy_index)
+{
+	struct sunxi_mmc_ver_priv *ver_priv =
+	    devm_kzalloc(&pdev->dev, sizeof(struct sunxi_mmc_ver_priv),
+			 GFP_KERNEL);
+
+	host->version_priv_dat = ver_priv;
+	ver_priv->mmc_clk_dly[SM0_DS26_SDR12].spm = SM0_DS26_SDR12;
+	ver_priv->mmc_clk_dly[SM0_DS26_SDR12].mod_str = "DS26_SDR12";
+	ver_priv->mmc_clk_dly[SM0_DS26_SDR12].raw_tm_sm_str[0] =
+		"sdc_tm4_sm0_freq0";
+	ver_priv->mmc_clk_dly[SM0_DS26_SDR12].raw_tm_sm_str[1] =
+		"sdc_tm4_sm0_freq1";
+	ver_priv->mmc_clk_dly[SM0_DS26_SDR12].raw_tm_sm[0] = 0;
+	ver_priv->mmc_clk_dly[SM0_DS26_SDR12].raw_tm_sm[1] = 0;
+	ver_priv->mmc_clk_dly[SM0_DS26_SDR12].raw_tm_sm_def[0] = 0;
+	ver_priv->mmc_clk_dly[SM0_DS26_SDR12].raw_tm_sm_def[1] = 0;
+
+	ver_priv->mmc_clk_dly[SM1_HSSDR52_SDR25].spm = SM1_HSSDR52_SDR25;
+	ver_priv->mmc_clk_dly[SM1_HSSDR52_SDR25].mod_str = "HSSDR52_SDR25";
+	ver_priv->mmc_clk_dly[SM1_HSSDR52_SDR25].raw_tm_sm_str[0] =
+		"sdc_tm4_sm1_freq0";
+	ver_priv->mmc_clk_dly[SM1_HSSDR52_SDR25].raw_tm_sm_str[1] =
+		"sdc_tm4_sm1_freq1";
+	ver_priv->mmc_clk_dly[SM1_HSSDR52_SDR25].raw_tm_sm[0] = 0;
+	ver_priv->mmc_clk_dly[SM1_HSSDR52_SDR25].raw_tm_sm[1] = 0;
+	ver_priv->mmc_clk_dly[SM1_HSSDR52_SDR25].raw_tm_sm_def[0] = 0;
+	ver_priv->mmc_clk_dly[SM1_HSSDR52_SDR25].raw_tm_sm_def[1] = 0;
+
+	ver_priv->mmc_clk_dly[SM2_HSDDR52_DDR50].spm = SM2_HSDDR52_DDR50;
+	ver_priv->mmc_clk_dly[SM2_HSDDR52_DDR50].mod_str = "HSDDR52_DDR50";
+	ver_priv->mmc_clk_dly[SM2_HSDDR52_DDR50].raw_tm_sm_str[0] =
+		"sdc_tm4_sm2_freq0";
+	ver_priv->mmc_clk_dly[SM2_HSDDR52_DDR50].raw_tm_sm_str[1] =
+		"sdc_tm4_sm2_freq1";
+	ver_priv->mmc_clk_dly[SM2_HSDDR52_DDR50].raw_tm_sm[0] = 0;
+	ver_priv->mmc_clk_dly[SM2_HSDDR52_DDR50].raw_tm_sm[1] = 0;
+	ver_priv->mmc_clk_dly[SM2_HSDDR52_DDR50].raw_tm_sm_def[0] = 0;
+	ver_priv->mmc_clk_dly[SM2_HSDDR52_DDR50].raw_tm_sm_def[1] = 0;
+
+	ver_priv->mmc_clk_dly[SM3_HS200_SDR104].spm = SM3_HS200_SDR104;
+	ver_priv->mmc_clk_dly[SM3_HS200_SDR104].mod_str = "HS200_SDR104";
+	ver_priv->mmc_clk_dly[SM3_HS200_SDR104].raw_tm_sm_str[0] =
+		 "sdc_tm4_sm3_freq0";
+	ver_priv->mmc_clk_dly[SM3_HS200_SDR104].raw_tm_sm_str[1] =
+		 "sdc_tm4_sm3_freq1";
+	ver_priv->mmc_clk_dly[SM3_HS200_SDR104].raw_tm_sm[0] = 0;
+	ver_priv->mmc_clk_dly[SM3_HS200_SDR104].raw_tm_sm[1] = 0;
+	ver_priv->mmc_clk_dly[SM3_HS200_SDR104].raw_tm_sm_def[0] = 0;
+	ver_priv->mmc_clk_dly[SM3_HS200_SDR104].raw_tm_sm_def[1] = 0x00000405;
+
+	ver_priv->mmc_clk_dly[SM4_HS400].spm = SM4_HS400;
+	ver_priv->mmc_clk_dly[SM4_HS400].mod_str = "HS400";
+	ver_priv->mmc_clk_dly[SM4_HS400].raw_tm_sm_str[0] =
+		"sdc_tm4_sm4_freq0";
+	ver_priv->mmc_clk_dly[SM4_HS400].raw_tm_sm_str[1] =
+		"sdc_tm4_sm4_freq1";
+	ver_priv->mmc_clk_dly[SM4_HS400].raw_tm_sm[0] = 0;
+	ver_priv->mmc_clk_dly[SM4_HS400].raw_tm_sm[1] = 0x00000608;
+	ver_priv->mmc_clk_dly[SM4_HS400].raw_tm_sm_def[0] = 0;
+	ver_priv->mmc_clk_dly[SM4_HS400].raw_tm_sm_def[1] = 0x00000408;
+
+	host->sunxi_mmc_clk_set_rate = sunxi_mmc_clk_set_rate_for_sdmmc_v4p5x;
+	/*host->dma_tl = (0x2<<28)|(7<<16)|248; */
+	host->dma_tl = SUNXI_DMA_TL_SDMMC_V4P5X;
+	/*host->idma_des_size_bits = 15; */
+	host->idma_des_size_bits = SUNXI_DES_SIZE_SDMMC_V4P5X;
+	host->sunxi_mmc_thld_ctl = sunxi_mmc_thld_ctl_for_sdmmc_v4p5x;
+	host->sunxi_mmc_save_spec_reg = sunxi_mmc_save_spec_reg_v4p5x;
+	host->sunxi_mmc_restore_spec_reg = sunxi_mmc_restore_spec_reg_v4p5x;
+	sunxi_mmc_reg_ex_res_inter(host, phy_index);
+	host->sunxi_mmc_set_acmda = sunxi_mmc_set_a12a;
+	host->sunxi_mmc_dump_dly_table = sunxi_mmc_dump_dly2;
+	host->phy_index = phy_index;
+	if (SMHC_VERSION_V4P6 == mmc_readl(host, REG_SMCV) ||
+	    SMHC_VERSION_V4P7 == mmc_readl(host, REG_SMCV))
+		host->sunxi_mmc_on_off_emce = sunxi_mmc_on_off_emce_v4p6x;
 	if (host->ctl_spec_cap & NO_REINIT_SHUTDOWN) {
 		host->sunxi_mmc_shutdown = sunxi_mmc_do_shutdown_v4p5x;
 	} else {

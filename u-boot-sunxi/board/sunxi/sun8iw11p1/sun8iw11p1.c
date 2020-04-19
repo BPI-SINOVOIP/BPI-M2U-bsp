@@ -318,16 +318,24 @@ static void sunxi_random_ether_addr(void)
 }
 #endif
 
+#ifdef CONFIG_SUNXI_GETH
+extern int geth_initialize(bd_t *bis);
+#endif
+
 int board_eth_init(bd_t *bis)
 {
 	int rc = 0;
 
-#if defined(CONFIG_USB_ETHER)
-	sunxi_random_ether_addr();
-	sunxi_udc_probe();
-	usb_eth_initialize(bis);
+#ifdef CONFIG_SUNXI_GETH
+	rc = geth_initialize(bis);
 #endif
 
+#ifdef CONFIG_USB_ETHER
+	sunxi_random_ether_addr();
+	sunxi_udc_probe();
+	rc = usb_eth_initialize(bis);
+#endif
 	return rc;
 }
+
 #endif

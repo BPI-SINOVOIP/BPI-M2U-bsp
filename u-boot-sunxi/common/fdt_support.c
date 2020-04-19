@@ -19,6 +19,8 @@
 __attribute__((section(".data")))
 struct fdt_header *working_fdt = NULL;
 
+extern int get_core_pos(void);
+
 void set_working_fdt_addr(void *addr)
 {
 	void *buf;
@@ -112,8 +114,13 @@ int fdt_getprop_u32(const void *fdt, int nodeoffset,
 {
 	int len;
 	const fdt32_t* data=NULL;
+	int cpu_id = get_core_pos();
+	char  *fdt_base = (char *)working_fdt;
 
-	data = fdt_getprop(working_fdt,nodeoffset,prop,&len);
+	if(cpu_id)
+		fdt_base += fdt_totalsize(fdt);
+
+	data = fdt_getprop(fdt_base,nodeoffset,prop,&len);
 	if((data == NULL) || (len ==0) || (len % 4 != 0))
 	{
 		return -FDT_ERR_INTERNAL;
@@ -180,9 +187,14 @@ int fdt_getprop_string(const void *fdt, int nodeoffset,
 {
 	int len;
 	char* data=NULL;
+	int cpu_id = get_core_pos();
+	char  *fdt_base = (char *)working_fdt;
+
+	if(cpu_id)
+		fdt_base += fdt_totalsize(fdt);
 
 	*val = NULL;
-	data = (void*)fdt_getprop(fdt,nodeoffset,name,&len);
+	data = (void*)fdt_getprop(fdt_base,nodeoffset,name,&len);
 	if(data != NULL)
 	{
 		if(val != NULL) *val =  data;

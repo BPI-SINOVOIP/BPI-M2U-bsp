@@ -28,15 +28,24 @@
 extern s32 axp_usb_vbus_output(int high);
 #endif
 
+extern int usb_disabled(void);
+
 #define  DMSG_ERR(format,args...)               pr_err("hci: "format,##args)
 #define  DMSG_PRINT(stuff...)		 	printk(stuff)
 
 #define HCI_USBC_NO     "hci_ctrl_no"
 
+#if defined(CONFIG_ARCH_SUN8IW6) || defined(CONFIG_ARCH_SUN8IW5)
+#define HCI0_USBC_NO    1
+#define HCI1_USBC_NO    2
+#define HCI2_USBC_NO    3
+#define HCI3_USBC_NO    4
+#else
 #define HCI0_USBC_NO    0
 #define HCI1_USBC_NO    1
 #define HCI2_USBC_NO    2
 #define HCI3_USBC_NO    3
+#endif
 
 #if 0
 #define DMSG_DEBUG                              DMSG_PRINT
@@ -83,8 +92,13 @@ extern s32 axp_usb_vbus_output(int high);
 
 #define SUNXI_USB_PMU_IRQ_ENABLE                0x800
 #define SUNXI_HCI_PHY_CTRL                      0x810
+#define SUNXI_HCI_PHY_TUNE                      0x818
 #define SUNXI_HCI_UTMI_PHY_STATUS               0x824
-#define SUNXI_HCI_PHY_CTRL_DISENABLE               3
+#if defined(CONFIG_ARCH_SUN50IW6) || defined(CONFIG_ARCH_SUN50IW3)
+#define SUNXI_HCI_PHY_CTRL_SIDDQ                3
+#else
+#define SUNXI_HCI_PHY_CTRL_SIDDQ                1
+#endif
 
 #define SUNXI_OTG_PHY_CTRL                      0x410
 #define SUNXI_OTG_PHY_CFG                       0x420
@@ -162,6 +176,67 @@ extern s32 axp_usb_vbus_output(int high);
 #define  KEY_USB_HSIC_RDY_GPIO                  "usb_hsic_rdy_gpio"
 #define  KEY_USB_HSIC_REGULATOR_IO		"usb_hsic_regulator_io"
 
+/* xHCI */
+#define XHCI_RESOURCES_NUM	2
+#define XHCI_REGS_START		0x0
+#define XHCI_REGS_END		0x7fff
+
+/* xHCI Operational Registers */
+#define XHCI_OP_REGS_HCUSBCMD		0X0020
+#define XHCI_OP_REGS_HCUSBSTS		0X0024
+#define XHCI_OP_REGS_HCPORT1SC		0X0420
+#define XHCI_OP_REGS_HCPORT1PMSC	0X0424
+
+#define SUNXI_GLOBALS_REGS_START	0xc100
+#define SUNXI_GLOBALS_REGS_END		0xc6ff
+
+/* Global Registers */
+#define SUNXI_GLOBALS_REGS_GCTL		0xc110
+#define SUNXI_GUSB2PHYCFG(n)		(0xc200 + (n * 0x04))
+#define SUNXI_GUSB3PIPECTL(n)		(0xc2c0 + (n * 0x04))
+
+/* Interface Status and Control Register */
+#define SUNXI_APP			0x10000
+#define SUNXI_PIPE_CLOCK_CONTROL	0x10014
+#define SUNXI_PHY_TUNE_LOW		0x10018
+#define SUNXI_PHY_TUNE_HIGH		0x1001c
+#define SUNXI_PHY_EXTERNAL_CONTROL	0x10020
+
+/* Bit fields */
+
+/* Global Configuration Register */
+#define SUNXI_GCTL_PRTCAPDIR(n)	((n) << 12)
+#define SUNXI_GCTL_PRTCAP_HOST	1
+#define SUNXI_GCTL_PRTCAP_DEVICE	2
+#define SUNXI_GCTL_PRTCAP_OTG	3
+#define SUNXI_GCTL_SOFITPSYNC	(0x01 << 10)
+#define SUNXI_GCTL_CORESOFTRESET	(1 << 11)
+
+/* Global USB2 PHY Configuration Register n */
+#define SUNXI_USB2PHYCFG_SUSPHY	(0x01 << 6)
+#define SUNXI_USB2PHYCFG_PHYSOFTRST (1 << 31)
+
+/* Global USB3 PIPE Control Register */
+#define SUNXI_USB3PIPECTL_PHYSOFTRST (1 << 31)
+
+/* USB2.0 Interface Status and Control Register */
+#define SUNXI_APP_FOCE_VBUS	(0x03 << 12)
+
+/* PIPE Clock Control Register */
+#define SUNXI_PPC_PIPE_CLK_OPEN	(0x01 << 6)
+
+/* PHY External Control Register */
+#define SUNXI_PEC_EXTERN_VBUS	(0x03 << 1)
+#define SUNXI_PEC_SSC_EN	(0x01 << 24)
+#define SUNXI_PEC_REF_SSP_EN	(0x01 << 26)
+
+/* PHY Tune High Register */
+#define SUNXI_TX_DEEMPH_3P5DB(n)	((n) << 19)
+#define SUNXI_TX_DEEMPH_6DB(n)	((n) << 13)
+#define SUNXI_TX_SWING_FULL(n)	((n) << 6)
+#define SUNXI_LOS_BIAS(n)		((n) << 3)
+#define SUNXI_TXVBOOSTLVL(n)		((n) << 0)
+
 #if defined (CONFIG_FPGA_V4_PLATFORM) || defined (CONFIG_FPGA_V7_PLATFORM)
 #define SUNXI_USB_FPGA
 #endif
@@ -170,6 +245,7 @@ enum sunxi_usbc_type{
 	SUNXI_USB_UNKOWN = 0,
 	SUNXI_USB_EHCI,
 	SUNXI_USB_OHCI,
+	SUNXI_USB_XHCI,
 };
 
 enum usb_drv_vbus_type {
@@ -282,21 +358,22 @@ struct sunxi_hci_hcd{
 	void (* port_configure)(struct sunxi_hci_hcd *sunxi_hci, u32 enable);
 	void (* usb_passby)(struct sunxi_hci_hcd *sunxi_hci, u32 enable);
 	void (* hci_phy_ctrl)(struct sunxi_hci_hcd *sunxi_hci, u32 enable);
+
+	/* xhci */
+	struct resource xhci_resources[XHCI_RESOURCES_NUM];
+	spinlock_t		lock;
+	struct device		*dev;
+	void			*mem;
+	void __iomem	*regs;
+	size_t		regs_size;
+	void __iomem	*xhci_base;
+	__u32 xhci_reg_length;
+
+	/* resume work */
+	struct work_struct resume_work;
 };
 
-#ifdef  SUNXI_USB_FPGA
-/* otg and hci share the same phy in fpga, so need switch phy to hci here */
-static inline void fpga_config_use_hci(struct sunxi_hci_hcd *sunxi_hci)
-{
-	u32 reg_value = 0;
-	if(sunxi_hci->usbc_no == HCI0_USBC_NO){
-		reg_value = USBC_Readl(sunxi_hci->sram_vbase + 0x04);
-		/* bit1:  1- select phy for hci */
-		reg_value |= 0x01;
-		USBC_Writel(reg_value, (sunxi_hci->sram_vbase + 0x04));
-	}
-}
-#endif
+extern atomic_t g_sunxi_xhci_standby_flag;
 
 int init_sunxi_hci(struct platform_device *pdev, int usbc_type);
 int exit_sunxi_hci(struct sunxi_hci_hcd *sunxi_hci);
@@ -305,6 +382,8 @@ void sunxi_set_host_hisc_rdy(struct sunxi_hci_hcd *sunxi_hci, int is_on);
 void sunxi_set_host_vbus(struct sunxi_hci_hcd *sunxi_hci, int is_on);
 int usb_phyx_tp_write(struct sunxi_hci_hcd *sunxi_hci, int addr, int data, int len);
 int usb_phyx_tp_read(struct sunxi_hci_hcd *sunxi_hci, int addr, int len);
+int sunxi_usb_enable_xhci(void);
+int sunxi_usb_disable_xhci(void);
 
 #endif   //__SUNXI_HCI_SUNXI_H__
 

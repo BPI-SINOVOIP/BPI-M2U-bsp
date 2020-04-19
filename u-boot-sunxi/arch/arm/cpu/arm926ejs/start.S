@@ -32,6 +32,9 @@
  *
  *************************************************************************
  */
+.globl _TEXT_BASE
+_TEXT_BASE:
+	.word   CONFIG_SYS_TEXT_BASE
 
 	.globl	reset
 
@@ -110,3 +113,33 @@ flush_dcache:
 	mov	lr, ip		/* restore link */
 	mov	pc, lr		/* back to my caller */
 #endif /* CONFIG_SKIP_LOWLEVEL_INIT */
+
+	.globl get_core_pos
+
+get_core_pos:
+	mov	r0, #0		/* arm926ejs don't have MPIDR, return 0 here */
+	bx      lr
+
+	.globl  cpu0_set_irq_stack
+
+cpu0_set_irq_stack:
+	@ set irq sp
+	mrs r1, cpsr
+	bic     r1, r1, #0x1f           @ clear all mode bits
+	orr     r1, r1, #0x12           @ set IRQ mode
+	msr     cpsr, r1
+	mov sp, r0
+	bic     r1, r1, #0x1f           @ clear all mode bits
+	orr     r1, r1, #0x13           @ set SVC mode
+	msr     cpsr, r1
+
+	bx  lr
+
+	.global jump_fel
+jump_fel:
+	mrc	p15, 0, r0, c1, c0, 0
+	orr	r0, r0, #0x00002000		@ set bit 13 (--V- ----)
+	bic	r0, r0, #0x00000002		@ clear bit 2 (A) Align
+	mcr	p15, 0, r0, c1, c0, 0
+	ldr	r0, =(FEL_BASE)
+	mov	pc, r0

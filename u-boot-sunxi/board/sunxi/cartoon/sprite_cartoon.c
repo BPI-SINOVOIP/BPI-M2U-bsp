@@ -76,10 +76,7 @@ int sprite_cartoon_screen_set(void)
 
 	board_display_framebuffer_set(sprite_source.screen_width, sprite_source.screen_height, 32, (void *)sprite_source.screen_buf);
 
-	struct disp_layer_config *layer_para;
-	layer_para = (struct disp_layer_config *)gd->layer_para;
-	layer_para->info.alpha_mode = 0;
-	board_display_layer_para_set();
+	board_display_set_alpha_mode(0);
 
 #else
 

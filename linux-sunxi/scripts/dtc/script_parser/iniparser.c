@@ -851,10 +851,8 @@ dictionary *iniparser_load(const char *ininame)
 			free(full_line);
 			full_line = NULL;
 		}
-		if (errs < 0) {
-			fprintf(stderr, "iniparser: memory allocation failure\n");
+		if (errs < 0)
 			break;
-		}
 	}
 out:
 	if (errs) {

@@ -16,6 +16,10 @@
 #include "../pm.h"
 #include "standby_dram.h"
 
+#ifdef CONFIG_ARCH_SUN3IW1P1
+#define printk(format, args...)   do {} while (0)
+#endif
+
 #ifndef IO_ADDRESS
 #define IO_ADDRESS(x)  ((x) + 0xf0000000)
 #endif

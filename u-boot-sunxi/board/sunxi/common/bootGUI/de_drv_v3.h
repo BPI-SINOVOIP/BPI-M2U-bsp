@@ -102,7 +102,6 @@ static inline void _simple_init_layer(void *layer_config)
 {
 	struct disp_layer_config *layer = (struct disp_layer_config *)layer_config;
 
-	memset((void *)layer, 0, sizeof(*layer));
 	layer->channel = 1;
 	layer->layer_id = 0;
 
@@ -125,7 +124,7 @@ static inline void _set_layer_addr(void *layer_config, void *addr)
 	layer->info.fb.addr[0] = (uint)addr; /* argb only has one planrer ? */
 }
 
-/* NOTICE: _set_layer_crop must be call after _set_layer_geometry calling */
+/* NOTICE: _set_layer_crop is called in the end of _set_layer_geometry calling */
 static inline void _set_layer_crop(void *layer_config,
 	int left, int top, int right, int bottom)
 {
@@ -144,12 +143,28 @@ static inline void _get_layer_size(void *layer_config,
 	*height = layer->info.fb.size[0].height;
 }
 
+static inline void _set_layer_alpha_mode(void *layer_config,
+	unsigned char alpha_mode, unsigned char alpha_value)
+{
+	struct disp_layer_config *layer = (struct disp_layer_config *)layer_config;
+
+	layer->info.alpha_mode = alpha_mode;
+	layer->info.alpha_value = alpha_value;
+}
+
 static inline void _set_layer_geometry(void *layer_config,
-	int width, int height, int bpp, int byte_align)
+	int width, int height, int bpp, int stride)
 {
 	struct disp_layer_config *layer = (struct disp_layer_config *)layer_config;
 
 	if (32 == bpp) {
+		/*
+		* Notice: here we apply pixel alpha mode.
+		* bootlogo will be not displayed if alpha values of
+		* all pixels of bootlogo is 0.
+		* Then here suggest to modify the bootlogo picture.
+		* Or you can change alpha mode by calling _set_alpha_mode().
+		*/
 		layer->info.alpha_mode = 0x0;
 		layer->info.alpha_value = 0x0;
 		layer->info.fb.format = DISP_FORMAT_ARGB_8888;

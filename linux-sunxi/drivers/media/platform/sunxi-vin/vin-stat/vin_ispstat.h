@@ -12,7 +12,7 @@
 
 #include "../vin-isp/sunxi_isp.h"
 
-#define STAT_MAX_BUFS		5
+#define STAT_MAX_BUFS		2
 #define STAT_NEVENTS		8
 
 #define STAT_BUF_DONE		0	/* Buffer is ready */
@@ -90,6 +90,7 @@ struct isp_stat {
 
 	/* Buffer */
 	u16 config_counter;
+	u8 stata_en_flag;
 	u32 frame_number;
 	u32 buf_size;
 	u32 buf_alloc_size;
@@ -100,20 +101,6 @@ struct isp_stat {
 	struct ispstat_buffer *locked_buf;
 };
 
-struct ispstat_generic_config {
-	u32 buf_size;
-	u16 config_counter;
-};
-/*
-struct vin_isp_stat_data {
-	struct timeval ts;
-	void __user *buf;
-	__u32 buf_size;
-	__u16 frame_number;
-	__u16 cur_frame;
-	__u16 config_counter;
-};
-*/
 int vin_isp_stat_config(struct isp_stat *stat, void *new_conf);
 int vin_isp_stat_request_statistics(struct isp_stat *stat,
 				     struct vin_isp_stat_data *data);

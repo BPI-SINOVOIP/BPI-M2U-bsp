@@ -63,7 +63,7 @@ void set_pll_cpux_axi(void)
 	//writel((1<<31) | readl(CCMU_PLL_CPUX_CTRL_REG), CCMU_PLL_CPUX_CTRL_REG);
 	reg_val = readl(CCMU_PLL_CPUX_CTRL_REG);
 	reg_val &= ~((1<<31) | (0x03 << 16) | (0x1f << 8) | (0x03 << 4) | (0x03 << 0));
-	reg_val |=  ((1<<31) | (0 << 16) | (22<<8) | (1<<4) | (0 << 0)) ;
+	reg_val |=  ((1<<31) | (0 << 16) | (20<<8) | (1<<4) | (0 << 0)) ;
 	writel(reg_val, CCMU_PLL_CPUX_CTRL_REG);
 	//wait PLL_CPUX stable
 #ifndef FPGA_PLATFORM
@@ -211,5 +211,26 @@ void reset_pll( void )
 void set_gpio_gate(void)
 {
 
+}
+
+int sunxi_key_clock_open(void)
+{
+	uint reg_val = 0,i=0;
+
+	//reset
+	reg_val = readl(CCMU_BUS_SOFT_RST_REG2);
+	reg_val &= ~(1<<9);
+	writel(reg_val, CCMU_BUS_SOFT_RST_REG2);
+	for( i = 0; i < 100; i++ );
+	reg_val |=	(1<<9);
+	writel(reg_val, CCMU_BUS_SOFT_RST_REG2);
+
+	//enable KEYADC gating
+	reg_val = readl(CCMU_BUS_CLK_GATING_REG2);
+	reg_val |= (1<<9);
+	writel(reg_val, CCMU_BUS_CLK_GATING_REG2);
+
+
+	return 0;
 }
 

@@ -1,3 +1,13 @@
+/*
+ * Driver for sunxi SD/MMC host controllers
+ * (C) Copyright 2012-2017 lixiang <lixiang@allwinnertech.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ */
+
 #ifdef CONFIG_ARCH_SUN50IW1P1
 
 
@@ -626,6 +636,16 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
 		pwr_save = 1;
 	return __sunxi_mmc_do_oclk_onoff(host,oclk_en,pwr_save,1);
 }
+
+
+int sunxi_mmc_oclk_onoff_sdmmc2(struct sunxi_mmc_host *host, u32 oclk_en)
+{
+	return sunxi_mmc_oclk_onoff(host, oclk_en);
+}
+
+
+
+
 int sunxi_mmc_clk_set_rate_for_sdmmc2(struct sunxi_mmc_host *host,
 				  struct mmc_ios *ios)
 {

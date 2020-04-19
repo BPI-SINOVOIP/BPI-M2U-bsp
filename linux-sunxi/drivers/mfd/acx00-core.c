@@ -22,6 +22,8 @@
 #include <linux/mfd/acx00-mfd.h>
 #include <linux/pwm.h>
 #include <linux/regulator/consumer.h>
+#include <linux/sys_config.h>
+#include <linux/sunxi-sid.h>
 
 #define SUNXI_CHIP_NAME	"ACX00-CHIP"
 static unsigned int twi_id = 0;
@@ -32,7 +34,12 @@ struct regmap_config acx00_base_regmap_config = {
 	.val_bits = 16,
 };
 static struct regulator *vcc_ave = NULL;
+static char key_name[20] = "ac200";
+static char ave_regulator_name[20] = "vcc-audio-33";
+static int tv_twi_used;
 
+static int sys_script_get_item(char *main_name, char *sub_name, int value[],
+			       int type);
 /**
  * acx00_reg_read: Read a single ACX00 register.
  *
@@ -82,12 +89,46 @@ int acx00_enable(void)
 }
 EXPORT_SYMBOL_GPL(acx00_enable);
 
+#if defined(CONFIG_ARCH_SUN50IW6)
+/**
+ * @name       acx00_read_sid
+ * @brief      read tv out sid from efuse
+ * @param[IN]   none
+ * @param[OUT]  p_bang_gap:tve band gap
+ * @return	return 0 if success,-1 if fail
+ */
+static s32 acx00_read_sid(u16 *p_band_gap)
+{
+	s32 ret = 0;
+	u8 buf[6];
+
+	if (p_band_gap == NULL) {
+		pr_err("%s's pointer type args are NULL!\n", __func__);
+		return -1;
+	}
+	ret = sunxi_efuse_readn(EFUSE_OEM_NAME, buf, 6);
+	if (ret < 0) {
+		pr_err("sunxi_efuse_readn failed:%d\n", ret);
+		return ret;
+	}
+	*p_band_gap = buf[4] + (buf[5] << 8);
+	return 0;
+}
+#endif
+
 static void acx00_init_work(struct work_struct *work)
 {
 	struct acx00 *acx00 = container_of(work, struct acx00, init_work);
+#if defined(CONFIG_ARCH_SUN50IW6)
+	u16 band_gap = 0;
+#endif
 
 	atomic_set(&acx00_en, 0);
 	pr_err("%s,l:%d\n", __func__, __LINE__);
+#if defined(CONFIG_ARCH_SUN50IW6)
+	if (acx00_read_sid(&band_gap) == 0 && band_gap != 0)
+		acx00_reg_write(acx00, 0x0050, band_gap | 0x8000 | (0xa << 6));
+#endif /*endif CONFIG_ARCH_SUN50IW6 */
 	msleep(120);
 	acx00_reg_write(acx00, 0x0002,0x1);
 	pr_err("%s,l:%d\n", __func__, __LINE__);
@@ -219,6 +260,7 @@ static int acx00_i2c_probe(struct i2c_client *i2c,
 {
 	struct acx00 *acx00;
 	int ret = 0;
+	int value;
 	pr_err("%s,l:%d\n", __func__, __LINE__);
 	acx00 = devm_kzalloc(&i2c->dev, sizeof(struct acx00), GFP_KERNEL);
 	if (acx00 == NULL)
@@ -242,12 +284,17 @@ static int acx00_i2c_probe(struct i2c_client *i2c,
 	}
 	INIT_WORK(&acx00->init_work, acx00_init_work);
 
-	acx00->pwm_ac200 = pwm_request(16, NULL);
-	if (!IS_ERR_OR_NULL(acx00->pwm_ac200)) {
-		pwm_config(acx00->pwm_ac200, 20, 41);
-		pwm_enable(acx00->pwm_ac200);
-	} else
-		dev_warn(acx00->dev, "Warn: can't get pwm device\n");
+	ret = sys_script_get_item(key_name, "tv_pwm_ch", &value, 1);
+	if (ret == 1) {
+		acx00->pwm_ac200 = pwm_request(value, NULL);
+		if (!IS_ERR_OR_NULL(acx00->pwm_ac200)) {
+			pwm_config(acx00->pwm_ac200, 20, 41);
+			pwm_enable(acx00->pwm_ac200);
+		} else
+			dev_warn(acx00->dev, "Warn: can't get pwm device\n");
+	} else {
+		dev_warn(acx00->dev, "Get tv_pwm_ch failed\n");
+	}
 
 	atomic_set(&acx00_en, 0);
 	schedule_work(&acx00->init_work);
@@ -269,9 +316,9 @@ static int acx00_i2c_remove(struct i2c_client *i2c)
 
 	return 0;
 }
-static int acx00_i2c_suspend(struct i2c_client *client,pm_message_t state)
+static int acx00_i2c_suspend(struct device *dev)
 {
-	struct acx00 *acx00 = i2c_get_clientdata(client);
+	struct acx00 *acx00 = dev_get_drvdata(dev);
 
 	if (vcc_ave != NULL) {
 		regulator_disable(vcc_ave);
@@ -286,15 +333,21 @@ static int acx00_i2c_suspend(struct i2c_client *client,pm_message_t state)
 	return 0;
 }
 
-static int acx00_i2c_resume(struct i2c_client *client)
+static int acx00_i2c_resume(struct device *dev)
 {
-	struct acx00 *acx00 = i2c_get_clientdata(client);
+	int ret = 0;
+	struct acx00 *acx00 = dev_get_drvdata(dev);
 
-	vcc_ave = regulator_get(NULL, "vcc-ave-33");
+	vcc_ave = regulator_get(NULL, ave_regulator_name);
 	if (IS_ERR_OR_NULL(vcc_ave)) {
-		pr_err("get audio vcc-ave-33 failed\n");
-	} else
-		regulator_enable(vcc_ave);
+		pr_err("get audio %s failed\n", ave_regulator_name);
+	} else {
+		ret = regulator_enable(vcc_ave);
+		if (IS_ERR(vcc_ave)) {
+			pr_err("[%s]: vcc_ave:regulator_enable() failed!\n",
+			       __func__);
+		}
+	}
 
 	if (!IS_ERR_OR_NULL(acx00->pwm_ac200)) {
 		pwm_config(acx00->pwm_ac200, 20, 41);
@@ -304,6 +357,11 @@ static int acx00_i2c_resume(struct i2c_client *client)
 	schedule_work(&acx00->init_work);
 	return 0;
 }
+
+static const struct dev_pm_ops acx00_core_pm_ops = {
+	.suspend_late = acx00_i2c_suspend,
+	.resume_early = acx00_i2c_resume,
+};
 
 static int acx00_detect(struct i2c_client *client, struct i2c_board_info *info)
 {
@@ -318,7 +376,7 @@ static int acx00_detect(struct i2c_client *client, struct i2c_board_info *info)
 	}
 }
 
-static const unsigned short normal_i2c[] = {0x10, I2C_CLIENT_END};
+static unsigned short normal_i2c[] = {0x10, I2C_CLIENT_END};
 
 static const struct i2c_device_id acx00_id[] = {
 	{"ACX00-CHIP", 2},
@@ -339,28 +397,103 @@ static struct i2c_driver acx00_i2c_driver = {
 		.owner 	= THIS_MODULE,
 		.name 	= "ACX00-CHIP",
 		.of_match_table = sunxi_ac200_match,
+		.pm	= &acx00_core_pm_ops,
 	},
 	.address_list = normal_i2c,
-	.suspend  = acx00_i2c_suspend,
-	.resume = acx00_i2c_resume,
 };
 
-static int ac200_used = 1;
+/* type: 0:invalid, 1: int; 2:str*/
+static int sys_script_get_item(char *main_name, char *sub_name, int value[],
+			       int type)
+{
+	char compat[32];
+	u32 len = 0;
+	struct device_node *node;
+	int ret = 0;
+
+	len = sprintf(compat, "allwinner,sunxi-%s", main_name);
+	if (len > 32) {
+		pr_warn("size of mian_name is out of range\n");
+		goto error_exit;
+	}
+
+	node = of_find_compatible_node(NULL, NULL, compat);
+	if (!node) {
+		pr_warn("of_find_compatible_node %s fail\n", compat);
+		goto error_exit;
+	}
+
+	if (1 == type) {
+		if (of_property_read_u32_array(node, sub_name, value, 1)) {
+			pr_info("of_property_read_u32_array %s.%s fail\n",
+				main_name, sub_name);
+			goto error_exit;
+		} else
+			ret = type;
+	} else if (2 == type) {
+		const char *str;
+
+		if (of_property_read_string(node, sub_name, &str)) {
+			pr_info("of_property_read_string %s.%s fail\n",
+				main_name, sub_name);
+			goto error_exit;
+		} else {
+			ret = type;
+			memcpy((void *)value, str, strlen(str) + 1);
+		}
+	}
+
+	return ret;
+error_exit:
+	return -1;
+}
+
 static int __init acx00_i2c_init(void)
 {
 	int ret = 0;
+	int value;
+	int ac200_used = 0;
+	ret = sys_script_get_item(key_name, "tv_used", &value, 1);
+	if (ret == 1)
+		ac200_used = value;
 
 	if (ac200_used) {
-		acx00_i2c_driver.detect = acx00_detect;
-		ret = i2c_add_driver(&acx00_i2c_driver);
-		if (ret != 0)
-			pr_err("Failed to register acx00 I2C driver: %d\n", ret);
-
-		vcc_ave = regulator_get(NULL, "vcc-ave-33");
-		if (IS_ERR_OR_NULL(vcc_ave)) {
-			pr_err("get audio vcc-ave-33 failed\n");
-		} else{
-			regulator_enable(vcc_ave);
+		ret = sys_script_get_item(key_name, "tv_twi_used", &value,
+					       1);
+		if (ret == 1)
+			tv_twi_used = value;
+		if (tv_twi_used == 1) {
+			ret = sys_script_get_item(key_name, "tv_twi_id",
+						       &value, 1);
+			twi_id = (ret == 1) ? value : twi_id;
+			ret = sys_script_get_item(key_name, "tv_twi_addr",
+						       &value, 1);
+			normal_i2c[0] = (ret == 1) ? value : normal_i2c[0];
+			acx00_i2c_driver.detect = acx00_detect;
+			ret = i2c_add_driver(&acx00_i2c_driver);
+			if (ret != 0)
+				pr_err(
+				    "Failed to register acx00 I2C driver: %d\n",
+				    ret);
+		}
+		ret = sys_script_get_item(key_name, "tv_regulator_name",
+					       (int *)&ave_regulator_name, 2);
+		if (ret == 2) {
+			vcc_ave = regulator_get(NULL, ave_regulator_name);
+			if (IS_ERR_OR_NULL(vcc_ave)) {
+				pr_err("get audio %s failed\n",
+				       ave_regulator_name);
+			} else {
+				ret = regulator_enable(vcc_ave);
+				if (IS_ERR(vcc_ave)) {
+					pr_err(
+					    "[%s]: vcc_ave:regulator_enable() "
+					    "failed!\n",
+					    __func__);
+				}
+			}
+		} else {
+			pr_err("get ave_regulator_name failed!\n");
 		}
 	}
 

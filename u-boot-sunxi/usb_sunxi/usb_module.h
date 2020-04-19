@@ -28,11 +28,22 @@
 #include "usb_base.h"
 
 
-
+#ifdef  SUNXI_CMD_SUNXI_USBMASS
 #define  SUNXI_USB_DEVICE_MASS   	 1
+#endif
+
+#ifdef  CONFIG_CMD_SUNXI_EFEX
 #define  SUNXI_USB_DEVICE_EFEX   	 2
+#endif
+
+#ifdef CONFIG_CMD_FASTBOOT
 #define  SUNXI_USB_DEVICE_FASTBOOT   3
+#endif
+
+#ifdef CONFIG_CMD_SUNXI_BURN
 #define  SUNXI_USB_DEVICE_BURN       4
+#endif
+
 //#define  SUNXI_USB_DEVICE_EFEX_TEST  5
 
 typedef struct sunxi_usb_setup_req_s

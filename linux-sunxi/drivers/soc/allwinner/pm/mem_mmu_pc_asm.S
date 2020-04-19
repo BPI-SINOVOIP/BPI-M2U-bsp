@@ -31,6 +31,7 @@ get_sp:
     mov r0, r13
     mov pc, lr
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
     .align	4
     .globl get_cur_cluster_id
 get_cur_cluster_id:
@@ -281,6 +282,8 @@ enable_program_flow_prediction:
     pop     {r0-r3}
     MOV     pc, lr
 
+#endif
+
 /*-------------------------------------tlb related api:----------------------------------------*/
 /*mem_flush_tlb*/
 /*mem_preload_tlb*/
@@ -295,9 +298,13 @@ mem_flush_tlb:
 	/* invalid entire data tlb */
 	mcr p15, 0, r0, c8, c6, 0
 	/*invalidate entire unified TLB inner shareable*/
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	mcr p15, 0, r0, c8, c7, 0
+#else
 	mcr p15, 0, r0, c8, c3, 0
 	dsb
     ISB
+#endif
 	pop     {r0-r3}
 	mov pc, lr
 
@@ -340,7 +347,8 @@ preload_continue:
 	ldr r1, [r0]
 	ldr r0, =IO_ADDRESS(AW_SRAM_A3_BASE + 0x3000)  /*°üº¬SRAM_A4 3K*/
 	ldr r1, [r0]
-#elif defined(CONFIG_ARCH_SUN50IW1P1) || defined(CONFIG_ARCH_SUN50IW2P1)
+#elif defined(CONFIG_ARCH_SUN50IW1P1) || defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || defined(CONFIG_ARCH_SUN50IW6P1)
 	/*80k*/
 	ldr r0, =IO_ADDRESS(AW_SRAM_A2_BASE)
 	ldr r1, [r0]
@@ -389,6 +397,12 @@ preload_continue:
 	ldr r1, [r0]
 	ldr r0, =IO_ADDRESS(AW_R_PRCM_BASE)
 	ldr r1, [r0]
+#elif defined(CONFIG_ARCH_SUN3IW1P1)
+	/*16k*/
+	ldr r0, =IO_ADDRESS(AW_SRAM_A1_BASE)
+	ldr r1, [r0]
+	ldr r0, =IO_ADDRESS(AW_SRAM_A1_BASE + 0x1000)
+	ldr r1, [r0]
 #endif
 
 	ldr r0, =IO_ADDRESS(AW_PIO_BASE)
@@ -402,9 +416,11 @@ preload_continue:
 	ldr r0, =IO_ADDRESS(AW_TWI0_BASE)
 	ldr r1, [r0]
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	dsb
 	isb
 
+#endif
 	pop     {r0-r3}
 	mov pc, lr
 
@@ -454,6 +470,7 @@ __turn_mmu_on:
                 /*return*/
                 mov pc, lr
 
+#ifndef CONFIG_ARCH_SUN3IW1P1
 /*----------------------------------------pc related api:---------------------------------------*/
 /*jump_to_suspend*/
 /*jump_to_resume*/
@@ -559,3 +576,4 @@ restore_prefetch:
 
 	/* return*/
 	mov     pc, lr
+#endif

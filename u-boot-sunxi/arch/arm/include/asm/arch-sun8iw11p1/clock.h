@@ -34,6 +34,11 @@ extern int sunxi_clock_get_apb(void);
 extern int sunxi_clock_get_axi(void);
 extern int sunxi_clock_get_ahb2(void);
 extern int sunxi_clock_get_mbus(void);
+extern void ccm_module_enable(u32 clk_id);
+extern void ccm_clock_enable(u32 clk_id);
+extern void ccm_clock_disable(u32 clk_id);
+extern void ccm_module_reset(u32 clk_id);
+extern u32 ccm_get_pll_periph_clk(void);
 
 extern void set_pll( void );
 extern void set_gpio_gate(void);

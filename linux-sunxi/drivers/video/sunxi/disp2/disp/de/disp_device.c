@@ -1,3 +1,4 @@
+#include <linux/kernel.h>
 #include "disp_device.h"
 
 static LIST_HEAD(device_list);
@@ -64,6 +65,72 @@ s32 disp_device_is_interlace(struct disp_device *dispdev)
 	}
 
 	return dispdev->timings.b_interlace;
+}
+
+s32 disp_device_get_status(struct disp_device *dispdev)
+{
+	if (NULL == dispdev) {
+		DE_WRN("NULL hdl!\n");
+		return 0;
+	}
+
+	return disp_al_device_get_status(dispdev->hwdev_index);
+}
+
+bool disp_device_is_in_safe_period(struct disp_device *dispdev)
+{
+	int cur_line;
+	int start_delay;
+	bool ret = true;
+
+	if (NULL == dispdev) {
+		DE_WRN("NULL hdl!\n");
+		goto exit;
+	}
+
+	start_delay =
+	    disp_al_device_get_start_delay(dispdev->hwdev_index);
+	cur_line = disp_al_device_get_cur_line(dispdev->hwdev_index);
+	if (cur_line >= start_delay)
+		ret = false;
+
+exit:
+	return ret;
+}
+
+u32 disp_device_usec_before_vblank(struct disp_device *dispdev)
+{
+	int cur_line;
+	int start_delay;
+	u32 usec = 0;
+	struct disp_video_timings *timings;
+	u32 usec_per_line;
+	unsigned long long n_temp, base_temp;
+	u32 mod;
+
+	if (NULL == dispdev) {
+		DE_WRN("NULL hdl!\n");
+		goto exit;
+	}
+
+	start_delay =
+	    disp_al_device_get_start_delay(dispdev->hwdev_index);
+	cur_line = disp_al_device_get_cur_line(dispdev->hwdev_index);
+	if (cur_line > (start_delay - 4)) {
+		timings = &dispdev->timings;
+		/*usec_per_line = (u32)((uint64_t)timings->hor_total_time *
+					(uint64_t)1000000 /
+					(uint64_t)timings->pixel_clk);*/
+		n_temp = (unsigned long long)timings->hor_total_time *
+				(unsigned long long)(1000000);
+		base_temp = (unsigned long long)timings->pixel_clk;
+		mod = (u32)do_div(n_temp, base_temp);
+		usec_per_line = (u32)n_temp;
+		usec = (timings->ver_total_time - cur_line + 1) * usec_per_line;
+	}
+
+exit:
+	return usec;
 }
 
 /* get free device */

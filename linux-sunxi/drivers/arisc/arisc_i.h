@@ -45,6 +45,8 @@
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/power/axp_depend.h>
+#include <linux/sunxi-sid.h>
+#include "hwmsgbox/hwmsgbox_i.h"
 
 #define DRV_NAME    "sunxi-arisc"
 #define DEV_NAME    "sunxi-arisc"
@@ -61,10 +63,16 @@
 #define DRV_VERSION "1.04"
 #elif defined CONFIG_ARCH_SUN8IW9P1
 #define DRV_VERSION "1.05"
+#elif defined CONFIG_ARCH_SUN8IW17P1
+#define DRV_VERSION "1.17"
 #elif defined CONFIG_ARCH_SUN50IW1P1
 #define DRV_VERSION "1.10"
 #elif defined CONFIG_ARCH_SUN50IW2P1
 #define DRV_VERSION "1.20"
+#elif defined CONFIG_ARCH_SUN50IW3P1
+#define DRV_VERSION "1.30"
+#elif defined CONFIG_ARCH_SUN50IW6P1
+#define DRV_VERSION "1.60"
 #elif defined CONFIG_ARCH_SUN9IW1P1
 #define DRV_VERSION "2.00"
 #else

@@ -43,7 +43,7 @@ int cleanup_before_linux(void)
 	 */
 	icache_disable();
 	invalidate_icache_all();
-
+#ifdef CONFIG_ARM_A7
 	/*
 	 * turn off D-cache
 	 * dcache_disable() in turn flushes the d-cache and disables MMU
@@ -67,7 +67,7 @@ int cleanup_before_linux(void)
 	 * Some CPU need more cache attention before starting the kernel.
 	 */
 	cpu_cache_initialization();
-
+#endif
 	return 0;
 }
 
@@ -75,13 +75,15 @@ void disable_smp(void);
 
 int cleanup_before_powerdown(void)
 {
+#ifdef CONFIG_ARM_A7
 	uint32_t reg;
+#endif
 	/*
 	 * Turn off I-cache and invalidate it
 	 */
 	icache_disable();
 	invalidate_icache_all();
-
+#ifdef CONFIG_ARM_A7
 	reg = get_cr();
 	__msdelay(10);
 	set_cr(reg & ~CR_C);
@@ -90,7 +92,7 @@ int cleanup_before_powerdown(void)
 	flush_dcache_all();
 
 	__asm volatile("clrex");
-
+#endif
 	return 0;
 
 }

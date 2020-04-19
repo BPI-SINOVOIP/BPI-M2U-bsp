@@ -22,6 +22,11 @@
 #include <asm/bootm.h>
 #include <linux/compiler.h>
 
+#ifdef CONFIG_ALLWINNER
+#include <sunxi_board.h>
+#include <power/sunxi/pmu.h>
+#endif
+#include <smc.h>
 #if defined(CONFIG_ARMV7_NONSEC) || defined(CONFIG_ARMV7_VIRT)
 #include <asm/armv7.h>
 #endif
@@ -60,7 +65,7 @@ void arch_lmb_reserve(struct lmb *lmb)
 		    gd->bd->bi_dram[0].start + gd->bd->bi_dram[0].size - sp);
 }
 
-#if 0
+
 /**
  * announce_and_cleanup() - Print message and prepare for kernel boot
  *
@@ -68,8 +73,16 @@ void arch_lmb_reserve(struct lmb *lmb)
  */
 static void announce_and_cleanup(int fake)
 {
+
+#ifdef CONFIG_ALLWINNER
+	#ifndef CONFIG_ARCH_SUN3IW1P1
+                sunxi_board_prepare_kernel();
+        #endif
+#endif
+
 	printf("\nStarting kernel ...%s\n\n", fake ?
 		"(fake run for tracing)" : "");
+
 	bootstage_mark_name(BOOTSTAGE_ID_BOOTM_HANDOFF, "start_kernel");
 #ifdef CONFIG_BOOTSTAGE_FDT
 	bootstage_fdt_add_report();
@@ -83,9 +96,7 @@ static void announce_and_cleanup(int fake)
 #endif
 	cleanup_before_linux();
 }
-#else
-extern	void announce_and_cleanup(int fake);
-#endif
+
 
 static void setup_start_tag (bd_t *bd)
 {
@@ -292,26 +303,13 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 		r2 = gd->bd->bi_boot_params;
 
 	if (!fake)
+#ifdef CONFIG_ARCH_SUN50IW1P1
+		arm_svc_run_os((ulong)kernel_entry,r2,1);
+#else
 		kernel_entry(0, machid, r2);
 #endif
-}
 
-static void update_bootargs(void)
-{
-	char *str;
-	char cmdline[1024] = {0};
-	str = getenv("bootargs");
-
-	strcpy(cmdline,str);
-	//charge type
-	if((0==strcmp(getenv("bootcmd"),"run setargs_mmc boot_normal"))||
-		(0==strcmp(getenv("bootcmd"),"run setargs_nand boot_normal"))||
-		(0==strcmp(getenv("bootcmd"),"run setargs_nor boot_normal")))
-	{
-		printf("only in boot normal mode, pass charger para to kernel\n");
-		strcat(cmdline," boot.mode=charger");
-		setenv("bootargs", cmdline);
-	}
+#endif
 }
 
 /* Main Entry point for arm bootm implementation
@@ -327,8 +325,6 @@ int do_bootm_linux(int flag, int argc, char *argv[], bootm_headers_t *images)
 		return -1;
 
 	if (flag & BOOTM_STATE_OS_PREP) {
-		if(gd->chargemode)
-			update_bootargs();
 		boot_prep_linux(images);
 		return 0;
 	}

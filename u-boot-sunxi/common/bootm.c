@@ -88,7 +88,7 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 	os_hdr = boot_get_kernel(cmdtp, flag, argc, argv,
 			&images, &images.os.image_start, &images.os.image_len);
 	if (images.os.image_len == 0) {
-		puts("ERROR: can't get kernel image!\n");
+		printf("ERROR: can't get kernel image!\n");
 		return 1;
 	}
 
@@ -109,7 +109,7 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 		if (fit_image_get_type(images.fit_hdr_os,
 				       images.fit_noffset_os,
 				       &images.os.type)) {
-			puts("Can't get image type!\n");
+			printf("Can't get image type!\n");
 			bootstage_error(BOOTSTAGE_ID_FIT_TYPE);
 			return 1;
 		}
@@ -117,14 +117,14 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 		if (fit_image_get_comp(images.fit_hdr_os,
 				       images.fit_noffset_os,
 				       &images.os.comp)) {
-			puts("Can't get image compression!\n");
+			printf("Can't get image compression!\n");
 			bootstage_error(BOOTSTAGE_ID_FIT_COMPRESSION);
 			return 1;
 		}
 
 		if (fit_image_get_os(images.fit_hdr_os, images.fit_noffset_os,
 				     &images.os.os)) {
-			puts("Can't get image OS!\n");
+			printf("Can't get image OS!\n");
 			bootstage_error(BOOTSTAGE_ID_FIT_OS);
 			return 1;
 		}
@@ -133,7 +133,7 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 
 		if (fit_image_get_load(images.fit_hdr_os, images.fit_noffset_os,
 				       &images.os.load)) {
-			puts("Can't get image load address!\n");
+			printf("Can't get image load address!\n");
 			bootstage_error(BOOTSTAGE_ID_FIT_LOADADDR);
 			return 1;
 		}
@@ -152,7 +152,7 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 		break;
 #endif
 	default:
-		puts("ERROR: unknown image format type!\n");
+		printf("ERROR: unknown image format type!\n");
 		return 1;
 	}
 
@@ -166,12 +166,12 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 		ret = fit_image_get_entry(images.fit_hdr_os,
 					  images.fit_noffset_os, &images.ep);
 		if (ret) {
-			puts("Can't get entry point property!\n");
+			printf("Can't get entry point property!\n");
 			return 1;
 		}
 #endif
 	} else if (!ep_found) {
-		puts("Could not find kernel entry point!\n");
+		printf("Could not find kernel entry point!\n");
 		return 1;
 	}
 
@@ -193,7 +193,7 @@ static int bootm_find_ramdisk(int flag, int argc, char * const argv[])
 	ret = boot_get_ramdisk(argc, argv, &images, IH_INITRD_ARCH,
 			       &images.rd_start, &images.rd_end);
 	if (ret) {
-		puts("Ramdisk image is corrupt or invalid\n");
+		printf("Ramdisk image is corrupt or invalid\n");
 		return 1;
 	}
 
@@ -210,7 +210,7 @@ static int bootm_find_fdt(int flag, int argc, char * const argv[])
 	ret = boot_get_fdt(flag, argc, argv, IH_ARCH_DEFAULT, &images,
 			   &images.ft_addr, &images.ft_len);
 	if (ret) {
-		puts("Could not find a valid device tree\n");
+		printf("Could not find a valid device tree\n");
 		return 1;
 	}
 
@@ -296,7 +296,7 @@ static int decomp_image(int comp, ulong load, ulong image_start, int type,
 	case IH_COMP_GZIP:
 		printf("   Uncompressing %s ... ", type_name);
 		if (gunzip(load_buf, unc_len, image_buf, &image_len) != 0) {
-			puts("GUNZIP: uncompress, out-of-mem or overwrite error - must RESET board to recover\n");
+			printf("GUNZIP: uncompress, out-of-mem or overwrite error - must RESET board to recover\n");
 			return BOOTM_ERR_RESET;
 		}
 
@@ -366,7 +366,7 @@ static int decomp_image(int comp, ulong load, ulong image_start, int type,
 		return BOOTM_ERR_UNIMPLEMENTED;
 	}
 
-	puts("OK\n");
+	printf("OK\n");
 
 	return 0;
 }
@@ -410,10 +410,10 @@ static int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
 		if (images->legacy_hdr_valid) {
 			if (image_get_type(&images->legacy_hdr_os_copy)
 					== IH_TYPE_MULTI)
-				puts("WARNING: legacy format multi component image overwritten\n");
+				printf("WARNING: legacy format multi component image overwritten\n");
 			return BOOTM_ERR_OVERLAP;
 		} else {
-			puts("ERROR: new format image overwritten - must RESET the board to recover\n");
+			printf("ERROR: new format image overwritten - must RESET the board to recover\n");
 			bootstage_error(BOOTSTAGE_ID_OVERWRITTEN);
 			return BOOTM_ERR_RESET;
 		}
@@ -572,7 +572,7 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	if (!ret && (states & BOOTM_STATE_LOADOS)) {
 		ulong load_end;
 
-		iflag = bootm_disable_interrupts();
+		//iflag = bootm_disable_interrupts();
 		ret = bootm_load_os(images, &load_end, 0);
 		if (ret == 0)
 			lmb_reserve(&images->lmb, images->os.load,
@@ -646,7 +646,7 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 
 	/* Check for unsupported subcommand. */
 	if (ret) {
-		puts("subcommand not supported\n");
+		printf("subcommand not supported\n");
 		return ret;
 	}
 
@@ -686,14 +686,14 @@ static image_header_t *image_get_kernel(ulong img_addr, int verify)
 	image_header_t *hdr = (image_header_t *)img_addr;
 
 	if (!image_check_magic(hdr)) {
-		puts("Bad Magic Number\n");
+		printf("Bad Magic Number\n");
 		bootstage_error(BOOTSTAGE_ID_CHECK_MAGIC);
 		return NULL;
 	}
 	bootstage_mark(BOOTSTAGE_ID_CHECK_HEADER);
 
 	if (!image_check_hcrc(hdr)) {
-		puts("Bad Header Checksum\n");
+		printf("Bad Header Checksum\n");
 		bootstage_error(BOOTSTAGE_ID_CHECK_HEADER);
 		return NULL;
 	}
@@ -702,13 +702,13 @@ static image_header_t *image_get_kernel(ulong img_addr, int verify)
 	image_print_contents(hdr);
 
 	if (verify) {
-		puts("   Verifying Checksum ... ");
+		printf("   Verifying Checksum ... ");
 		if (!image_check_dcrc(hdr)) {
 			printf("Bad Data CRC\n");
 			bootstage_error(BOOTSTAGE_ID_CHECK_CHECKSUM);
 			return NULL;
 		}
-		puts("OK\n");
+		printf("OK\n");
 	}
 	bootstage_mark(BOOTSTAGE_ID_CHECK_ARCH);
 
@@ -885,12 +885,12 @@ static int bootm_host_load_image(const void *fit, int req_image_type)
 	if (noffset < 0)
 		return noffset;
 	if (fit_image_get_type(fit, noffset, &image_type)) {
-		puts("Can't get image type!\n");
+		printf("Can't get image type!\n");
 		return -EINVAL;
 	}
 
 	if (fit_image_get_comp(fit, noffset, &imape_comp)) {
-		puts("Can't get image compression!\n");
+		printf("Can't get image compression!\n");
 		return -EINVAL;
 	}
 

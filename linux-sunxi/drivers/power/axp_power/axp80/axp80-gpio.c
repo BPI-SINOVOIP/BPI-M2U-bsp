@@ -123,7 +123,8 @@ static int axp80_gpio_probe(struct platform_device *pdev)
 	struct axp_pinctrl *axp80_pin;
 
 	axp80_pin = axp_pinctrl_register(&pdev->dev,
-			axp_dev, &axp80_pinctrl_pins_desc, &axp80_gpio_ops);
+				axp_dev, &axp80_pinctrl_pins_desc,
+				&axp80_gpio_ops, axp_dev->pmu_num);
 	if (IS_ERR_OR_NULL(axp80_pin))
 		return -1;
 

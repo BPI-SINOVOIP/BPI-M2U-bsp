@@ -21,17 +21,14 @@
 #include <linux/sched.h>
 #include <linux/mutex.h>
 #include <linux/semaphore.h>
-#define MAX_CCI_DEVICE 2
-wait_queue_head_t wait[MAX_CCI_DEVICE];
-static int status_err_flag[MAX_CCI_DEVICE] = { 0 };
-struct mutex cci_mutex[MAX_CCI_DEVICE];
-struct semaphore cci_sema[MAX_CCI_DEVICE];
-int cci_cnt_done;
-int cci_cnt_irq;
+
+wait_queue_head_t wait[MAX_CSIC_CCI_NUM];
+static int status_err_flag[MAX_CSIC_CCI_NUM] = { 0 };
+struct mutex cci_mutex[MAX_CSIC_CCI_NUM];
+struct semaphore cci_sema[MAX_CSIC_CCI_NUM];
+
 int bsp_csi_cci_set_base_addr(unsigned int sel, unsigned long addr)
 {
-	cci_cnt_done = 0;
-	cci_cnt_irq = 0;
 	init_waitqueue_head(&wait[sel]);
 	mutex_init(&cci_mutex[sel]);
 	sema_init(&cci_sema[sel], 1);
@@ -184,7 +181,6 @@ static int bsp_cci_tx_start_wait_done_unlocked(unsigned int sel,
 		     "addr_8bit = %x, wr_flag = %d, val = %x\n",
 		     sel, msg->bus_fmt.saddr_7bit << 1, msg->bus_fmt.wr_flag,
 		     *(int *)msg->pkt_buf);
-		cci_cnt_done--;
 		ret = -1;
 	}
 #endif
@@ -274,7 +270,6 @@ int bsp_cci_irq_process(unsigned int sel)
 {
 	struct cci_int_status status;
 	unsigned int ret = 0;
-	cci_cnt_irq++;
 	cci_int_get_status(sel, &status);
 	if (status.error) {
 		bsp_cci_error_process(sel);

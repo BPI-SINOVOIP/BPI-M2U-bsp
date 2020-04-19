@@ -37,6 +37,11 @@ u32  open_usb_clock(sunxi_udc_io_t *sunxi_udc_io)
 {
 	DMSG_INFO_UDC("open_usb_clock\n");
 
+	/* To fix hardware design issue. */
+#if defined(CONFIG_ARCH_SUN50IW3) || defined(CONFIG_ARCH_SUN50IW6)
+	usb_otg_phy_txtune(sunxi_udc_io->usb_vbase);
+#endif
+
 	if (sunxi_udc_io->ahb_otg && sunxi_udc_io->mod_usbphy && !sunxi_udc_io->clk_is_open) {
 		if (clk_prepare_enable(sunxi_udc_io->ahb_otg)) {
 			DMSG_PANIC("ERR:try to prepare_enable sunxi_udc_io->mod_usbphy failed!\n");
@@ -56,8 +61,16 @@ u32  open_usb_clock(sunxi_udc_io_t *sunxi_udc_io)
 			sunxi_udc_io->ahb_otg, sunxi_udc_io->mod_usbotg, sunxi_udc_io->mod_usbphy, sunxi_udc_io->clk_is_open);
 	}
 
+#if defined(CONFIG_ARCH_SUN8IW6) || defined(CONFIG_ARCH_SUN50IW6) \
+		|| defined(CONFIG_ARCH_SUN50IW3)
+	USBC_PHY_Set_Ctl(sunxi_udc_io->usb_vbase, USBC_PHY_CTL_VBUSVLDEXT);
+	USBC_PHY_Clear_Ctl(sunxi_udc_io->usb_vbase, USBC_PHY_CTL_SIDDQ);
+#else
 	UsbPhyInit(0);
-#if defined (CONFIG_ARCH_SUN50I) || defined (CONFIG_ARCH_SUN8IW10) || defined (CONFIG_ARCH_SUN8IW11)
+#endif
+
+#if defined(CONFIG_ARCH_SUN50I) || defined(CONFIG_ARCH_SUN8IW10) \
+	|| defined(CONFIG_ARCH_SUN8IW11) || defined(CONFIG_ARCH_SUN8IW17)
 	/*otg and hci0 Controller Shared phy in SUN50I and SUN8IW10*/
 	USBC_SelectPhyToDevice(sunxi_udc_io->usb_vbase);
 #endif
@@ -82,7 +95,12 @@ u32 close_usb_clock(sunxi_udc_io_t *sunxi_udc_io)
 			sunxi_udc_io->ahb_otg, sunxi_udc_io->mod_usbotg, sunxi_udc_io->mod_usbphy, sunxi_udc_io->clk_is_open);
 	}
 
+#if defined(CONFIG_ARCH_SUN8IW6) || defined(CONFIG_ARCH_SUN50IW6) \
+		|| defined(CONFIG_ARCH_SUN50IW3)
+	USBC_PHY_Set_Ctl(sunxi_udc_io->usb_vbase, USBC_PHY_CTL_SIDDQ);
+#else
 	UsbPhyInit(0);
+#endif
 
 	return 0;
 }

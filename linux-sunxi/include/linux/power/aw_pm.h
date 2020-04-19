@@ -10,7 +10,12 @@
 
 #include "axp_depend.h"
 #include <linux/types.h>
+
+#if defined(CONFIG_ARCH_SUN8IW6P1) || defined(CONFIG_ARCH_SUN8IW5P1)
+#include "../../../drivers/soc/allwinner/pm_legacy/pm.h"
+#else
 #include "../../../drivers/soc/allwinner/pm/pm.h"
+#endif
 
 #define BITMAP(bit) (0x1<<bit)
 
@@ -39,7 +44,11 @@
 #define CPU0_WAKEUP_ALARM	(1<<4)
 #define CPU0_WAKEUP_USB		(1<<5)
 #define CPU0_WAKEUP_TIMEOUT	(1<<6)
+#if defined(CONFIG_ARCH_SUN8IW6P1) || defined(CONFIG_ARCH_SUN8IW5P1)
+#define CPU0_WAKEUP_PIO		(1<<7)
+#else
 #define CPU0_WAKEUP_GPIO	(1<<7)
+#endif
 
 /* the wakeup source of assistant cpu: cpus */
 #define CPUS_WAKEUP_LOWBATT     (1<<12)
@@ -77,8 +86,11 @@
 #if defined(CONFIG_ARCH_SUN8IW6P1) || defined(CONFIG_ARCH_SUN8IW8P1) \
 	|| defined(CONFIG_ARCH_SUN50IW1P1) \
 	|| defined(CONFIG_ARCH_SUN50IW2P1) \
+	|| defined(CONFIG_ARCH_SUN50IW3P1) \
+	|| defined(CONFIG_ARCH_SUN50IW6P1) \
 	|| defined(CONFIG_ARCH_SUN8IW10P1) \
-	|| defined(CONFIG_ARCH_SUN8IW11P1)
+	|| defined(CONFIG_ARCH_SUN8IW11P1) \
+	|| defined(CONFIG_ARCH_SUN8IW17P1)
 #define IO_NUM (2)
 #elif defined(CONFIG_ARCH_SUN9IW1P1)
 #define PLL_NUM (12)
@@ -99,8 +111,11 @@ typedef struct {
 	defined(CONFIG_ARCH_SUN8IW8P1) || \
 	defined(CONFIG_ARCH_SUN8IW10P1) || \
 	defined(CONFIG_ARCH_SUN8IW11P1)  || \
+	defined(CONFIG_ARCH_SUN8IW17P1)  || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1)
 typedef struct {
 	unsigned int factor1;
 	unsigned int factor2;
@@ -149,7 +164,8 @@ typedef struct {
 #define BUS_AHB2    (5)
 #define BUS_APB1    (6)
 #define BUS_APB2    (7)
-#define BUS_NUM	    (8)
+#define BUS_AHB3    (8)
+#define BUS_NUM	    (9)
 
 #define OSC_HOSC_BIT	    (3)
 #define OSC_LOSC_BIT	    (2)
@@ -188,6 +204,10 @@ typedef enum {
 	CLK_SRC_APB0,   /* APB0 clock */
 	CLK_SRC_APB1,   /* APB1 clock */
 	CLK_SRC_APB2,   /* APB2 clock */
+	CLK_SRC_PSI,    /* PSI  clock */
+	CLK_SRC_AHBS,   /* AHBS clock */
+	CLK_SRC_APBS1,  /* APBS1 clock*/
+	CLK_SRC_APBS2,  /* APBS2 clock*/
 } clk_src_e;
 
 typedef struct {
@@ -367,6 +387,64 @@ typedef struct soc_pwr_dep {
 
 } soc_pwr_dep_t;
 
+#if defined(CONFIG_ARCH_SUN8IW5P1)
+
+typedef struct extended_standby{
+	/*
+	 * id of extended standby
+	 */
+	unsigned long id;
+	/*
+	 * clk tree para description as follow:
+	 * vdd_dll : exdev : avcc : vcc_wifi : vcc_dram: vdd_sys : vdd_cpux : vdd_gpu : vcc_io : vdd_cpus
+	 */
+	int pwr_dm_en;
+
+	/*
+	 * Hosc: losc: ldo: ldo1
+	 */
+	int osc_en;
+
+	/*
+	 * pll_10: pll_9: pll_mipi: pll_8: pll_7: pll_6: pll_5: pll_4: pll_3: pll_2: pll_1
+	 */
+	int init_pll_dis;
+
+	/*
+	 * pll_10: pll_9: pll_mipi: pll_8: pll_7: pll_6: pll_5: pll_4: pll_3: pll_2: pll_1
+	 */
+	int exit_pll_en;
+
+	/*
+	 * set corresponding bit if it's pll factors need to be set some value.
+	 * pll_10: pll_9: pll_mipi: pll_8: pll_7: pll_6: pll_5: pll_4: pll_3: pll_2: pll_1
+	 */
+	int pll_change;
+
+	/*
+	 * fill in the enabled pll freq factor sequently. unit is khz pll6: 0x90041811
+	 * factor n/m/k/p already do the pretreatment of the minus one
+	 */
+	pll_para_t pll_factor[PLL_NUM];
+
+	/*
+	 * bus_en: cpu:axi:atb/apb:ahb1:apb1:apb2,
+	 * normally, only clk src need be cared.
+	 * so, at a31, only cpu:ahb1:apb2 need be cared.
+	 * pll1->cpu -> axi
+	 *	     -> atb/apb
+	 * ahb1 -> apb1
+	 * apb2
+	 */
+	int bus_change;
+
+	/*
+	 * bus_src: ahb1, apb2 src;
+	 * option:  pllx:axi:hosc:losc
+	 */
+	bus_para_t bus_factor[BUS_NUM];
+} extended_standby_t;
+#else
 typedef struct extended_standby {
 	/*
 	 * id of extended standby
@@ -393,6 +471,7 @@ typedef struct extended_standby {
 	soc_io_para_t soc_io_state;
 	cpux_clk_para_t cpux_clk_state;
 } extended_standby_t;
+#endif
 
 
 #define CPUS_ENABLE_POWER_EXP   (1<<31)
@@ -457,6 +536,10 @@ typedef	struct super_standby_para {
 	unsigned int resume_code_src;
 	unsigned int resume_code_length;
 	unsigned int resume_entry;
+#if defined(CONFIG_SUNXI_ARISC_COM_DIRECTLY) \
+	&& !(defined(CONFIG_ARCH_SUN8IW6) || defined(CONFIG_ARCH_SUN8IW5))
+	unsigned int cpu_resume_entry;
+#endif
 	unsigned int timeout;
 	unsigned int gpio_enable_bitmap;
 	unsigned int cpux_gpiog_bitmap;
@@ -566,6 +649,17 @@ typedef struct standby_space_cfg {
     size_t mem_size;
 } standby_space_cfg_t;
 
+#if defined(CONFIG_ARCH_SUN8IW6P1) || defined(CONFIG_ARCH_SUN8IW5P1)
+
+extern unsigned int parse_wakeup_gpio_group_map(char *s, unsigned int size, unsigned int gpio_map);
+
+extern unsigned int parse_wakeup_event(char *s, unsigned int size, unsigned int event, event_cpu_id_e cpu_id);
+
+extern unsigned int parse_wakeup_gpio_map(char *s, unsigned int size, unsigned int gpio_map);
+
+extern unsigned int show_gpio_config(char *s, unsigned int size);
+
+#else
 extern unsigned int parse_wakeup_gpio_group_map(char *s, unsigned int size,
 					unsigned int gpio_map);
 
@@ -576,5 +670,6 @@ extern unsigned int parse_wakeup_gpio_map(char *s, unsigned int size,
 				unsigned int gpio_map);
 
 extern unsigned int show_gpio_config(char *s, unsigned int size);
+#endif
 
 #endif /* __AW_PM_H__ */

@@ -1,18 +1,15 @@
 
 /*
- ******************************************************************************
+ * vin_video.h for video api
  *
- * vin_video.h
+ * Copyright (c) 2017 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
  *
- * Hawkview ISP - vin_video.h module
+ * Authors:  Zhao Wei <zhaowei@allwinnertech.com>
+ *	Yang Feng <yangfeng@allwinnertech.com>
  *
- * Copyright (c) 2015 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
- *
- * Version		  Author         Date		    Description
- *
- *   3.0		  Zhao Wei   	2015/12/01	ISP Tuning Tools Support
- *
- ******************************************************************************
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 
 #ifndef _VIN_VIDEO_H_
@@ -31,9 +28,12 @@
 #include <media/v4l2-subdev.h>
 #include <media/videobuf2-core.h>
 #include "../platform/platform_cfg.h"
+#include "../vin-vipp/sunxi_scaler.h"
+#include "dma_reg.h"
 
-#define MAX_OVERLAY	(64)
-#define MAX_COVER	(8)
+#define USE_BIG_PIPELINE 0
+
+#define USE_BIG_PIPELINE 0
 
 /* buffer for one video frame */
 struct vin_buffer {
@@ -51,21 +51,43 @@ enum vin_subdev_ind {
 	VIN_IND_CSI,
 	VIN_IND_ISP,
 	VIN_IND_SCALER,
+	VIN_IND_CAPTURE,
 	VIN_IND_ACTUATOR,
 	VIN_IND_FLASH,
 	VIN_IND_STAT,
 	VIN_IND_MAX,
 };
 
+enum vin_state_flags {
+	VIN_LPM,
+
+	VIN_RUN,
+	VIN_PEND,
+	VIN_SUSPENDED,
+	VIN_STREAM,
+	VIN_SHUT,
+	VIN_BUSY,
+	VIN_APPLY_CFG,
+};
+
+#define vin_running(dev) test_bit(VIN_RUN, &(dev)->state)
+#define vin_pending(dev) test_bit(VIN_PEND, &(dev)->state)
+#define vin_busy(dev) test_bit(VIN_BUSY, &(dev)->state)
+#define vin_streaming(dev) test_bit(VIN_STREAM, &(dev)->state)
+#define CEIL_EXP(a, b) (((a)>>(b)) + (((a)&((1<<(b))-1)) ? 1 : 0))
+
 struct vin_pipeline {
 	struct media_pipeline pipe;
 	struct v4l2_subdev *sd[VIN_IND_MAX];
-	atomic_t frame_number;
 };
-
+#if USE_BIG_PIPELINE
+/*
+ * valid only when pipe streamon, where
+ * media_entity_pipeline_start is called.
+ */
 #define to_vin_pipeline(e) (((e)->pipe == NULL) ? NULL : \
 	container_of((e)->pipe, struct vin_pipeline, pipe))
-
+#endif
 
 enum vin_fmt_flags {
 	VIN_FMT_YUV = (1 << 0),
@@ -81,6 +103,7 @@ enum vin_fmt_flags {
 struct vin_fmt {
 	enum v4l2_mbus_pixelcode mbus_code;
 	char	*name;
+	u32	mbus_type;
 	u32	fourcc;
 	u16	memplanes;
 	u16	colplanes;
@@ -107,8 +130,6 @@ struct vin_dma_offset {
 };
 
 struct vin_frame {
-	u32	f_width;
-	u32	f_height;
 	u32	o_width;
 	u32	o_height;
 	u32	offs_h;
@@ -119,18 +140,27 @@ struct vin_frame {
 	unsigned long		bytesperline[VIDEO_MAX_PLANES];
 	struct vin_addr	paddr;
 	struct vin_dma_offset	dma_offset;
-	struct vin_fmt	*fmt;
+	struct vin_fmt	fmt;
 };
 
 /* osd settings */
 struct vin_osd {
 	int is_set;
-	int clipcount;		/* number of clips */
+	int ov_set_cnt;
+	int overlay_en;
+	int cover_en;
+	int overlay_cnt;
+	int cover_cnt;
 	int chromakey;
-	void *overlay_mask;		/* bitmap addr */
-	int global_alpha[MAX_OVERLAY];
-	struct v4l2_rect region[MAX_OVERLAY];	/* position */
-	int yuv_cover[3][MAX_COVER];
+	int inverse_close[MAX_OVERLAY_NUM];
+	enum vipp_osd_argb overlay_fmt;
+	struct vin_mm ov_mask[2];	/* bitmap addr */
+	int y_bmp_avp[MAX_OVERLAY_NUM];
+	int global_alpha[MAX_OVERLAY_NUM];
+	struct v4l2_rect ov_win[MAX_OVERLAY_NUM];	/* position */
+	struct v4l2_rect cv_win[MAX_COVER_NUM];	/* position */
+	int rgb_cover[MAX_COVER_NUM];
+	u8 yuv_cover[3][MAX_COVER_NUM];
 	struct vin_fmt *fmt;
 };
 
@@ -138,22 +168,16 @@ struct vin_vid_cap {
 	struct video_device vdev;
 	struct vin_frame frame;
 	struct vin_osd osd;
-	unsigned int isp_sel;
 	/* video capture */
 	struct vb2_queue vb_vidq;
-	struct mutex buf_lock;
 	struct vb2_alloc_ctx *alloc_ctx;
 	struct list_head vidq_active;
+	unsigned int isp_wdr_mode;
 	unsigned int capture_mode;
-	unsigned int width;
-	unsigned int height;
 	unsigned int buf_byte_size; /* including main and thumb buffer */
 	/*working state */
-	unsigned long generating;
-	unsigned long opened;
 	unsigned long registered;
-	struct mutex opened_lock;
-	struct mutex stream_lock;
+	struct mutex lock;
 	unsigned int first_flag; /* indicate the first time triggering irq */
 	struct timeval ts;
 	spinlock_t slock;
@@ -166,6 +190,8 @@ struct vin_vid_cap {
 	struct v4l2_ctrl_handler ctrl_handler;
 	struct v4l2_ctrl *ae_win[4];	/* wb win cluster */
 	struct v4l2_ctrl *af_win[4];	/* af win cluster */
+	struct work_struct s_stream_task;
+	unsigned long state;
 };
 
 #define pipe_to_vin_video(p) ((p == NULL) ? NULL : \
@@ -195,10 +221,6 @@ static inline int vin_unique(int *a, int number)
 	return k + 1;
 }
 
-int vin_is_generating(struct vin_vid_cap *cap);
-void vin_start_generating(struct vin_vid_cap *cap);
-void vin_stop_generating(struct vin_vid_cap *cap);
-int vin_is_opened(struct vin_vid_cap *cap);
 int vin_set_addr(struct vin_core *vinc, struct vb2_buffer *vb,
 		      struct vin_frame *frame, struct vin_addr *paddr);
 

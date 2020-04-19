@@ -30,43 +30,44 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifdef CONFIG_SUNXI_DISPLAY
-
 static __u32 screen_id = 0;
 static __u32 disp_para = 0;
+static __u32 disp_para1;
+static __u32 disp_para2;
+static __u32 fb_base_addr = SUNXI_DISPLAY_FRAME_BUFFER_ADDR;
 extern __s32 disp_delay_ms(__u32 ms);
 extern long disp_ioctl(void *hd, unsigned int cmd, void *arg);
 
 static int board_display_update_para_for_kernel(char *name, int value)
 {
+#ifndef CONFIG_SUNXI_MULITCORE_BOOT
 	int node;
 	int ret = -1;
-#ifdef CONFIG_SUNXI_MULITCORE_BOOT
+
 	node = fdt_path_offset(working_fdt,"disp");
 	if (node < 0) {
-		printf("%s:disp_fdt_nodeoffset %s fail\n", __func__,"disp");
+		pr_error("%s:disp_fdt_nodeoffset %s fail\n", __func__,"disp");
 		goto exit;
 	}
+
 	ret = fdt_setprop_u32(working_fdt, node, name, (uint32_t)value);
 	if ( ret < 0)
-		printf("fdt_setprop_u32 %s.%s(0x%x) fail.err code:%s\n", "disp", name, value,fdt_strerror(ret));
+		pr_error("fdt_setprop_u32 %s.%s(0x%x) fail.err code:%s\n", "disp", name, value,fdt_strerror(ret));
 	else
 		ret = 0;
-#else
-	node = fdt_path_offset(working_fdt,"disp");
-	if (node < 0) {
-		printf("%s:disp_fdt_nodeoffset %s fail\n", __func__,"disp");
-		goto exit;
-	}
-	ret = fdt_setprop_u32(working_fdt, node, name, (uint32_t)value);
-	if ( ret < 0)
-		printf("fdt_setprop_u32 %s.%s(0x%x) fail.err code:%s\n", "disp", name, value,fdt_strerror(ret));
-	else
-		ret = 0;
-#endif
+
 exit:
 	return ret;
+#else
+	return sunxi_fdt_getprop_store(working_fdt, "disp", name, value);
+#endif
 }
+
+//void display_update_dtb(void)
+//{
+//	board_display_update_para_for_kernel("fb_base", fb_base_addr);
+//	board_display_update_para_for_kernel("boot_disp", disp_para);
+//}
 
 int board_display_layer_request(void)
 {
@@ -346,7 +347,7 @@ int board_display_layer_para_set(void)
 */
 int board_display_show_until_lcd_open(int display_source)
 {
-	printf("%s\n", __func__);
+	pr_msg("%s\n", __func__);
 	if(!display_source)
 	{
 		board_display_wait_lcd_open();
@@ -410,7 +411,7 @@ int board_display_framebuffer_set(int width, int height, int bitcount, void *buf
 		layer_para = (struct disp_layer_config *)malloc(sizeof(struct disp_layer_config));
 		if(!layer_para)
 		{
-			tick_printf("sunxi display error: unable to malloc memory for layer\n");
+			pr_error("display: unable to malloc memory for layer\n");
 
 			return -1;
 		}
@@ -425,17 +426,17 @@ int board_display_framebuffer_set(int width, int height, int bitcount, void *buf
 	{
 		if(fdt_getprop_u32(working_fdt,nodeoffset,"output_full",&full) < 0)
 		{
-			printf("fetch script data boot_disp.output_full fail\n");
+			pr_error("fetch script data boot_disp.output_full fail\n");
 		}
 	}
 
 	arg[0] = screen_id;
 	screen_width = disp_ioctl(NULL, DISP_GET_SCN_WIDTH, (void*)arg);
 	screen_height = disp_ioctl(NULL, DISP_GET_SCN_HEIGHT, (void*)arg);
-	printf("screen_id =%d, screen_width =%d, screen_height =%d\n", screen_id, screen_width, screen_height);
+	pr_notice("screen_id =%d, screen_width =%d, screen_height =%d\n", screen_id, screen_width, screen_height);
 	memset((void *)layer_para, 0, sizeof(struct disp_layer_config));
 	layer_para->info.fb.addr[0]		= (uint)buffer;
-	printf("frame buffer address %x\n", (uint)buffer);
+	pr_notice("frame buffer address %x\n", (uint)buffer);
 	layer_para->channel = 1;
 	layer_para->layer_id = 0;
 	layer_para->info.fb.format		= (bitcount == 24)? DISP_FORMAT_RGB_888:DISP_FORMAT_ARGB_8888;
@@ -465,9 +466,10 @@ int board_display_framebuffer_set(int width, int height, int bitcount, void *buf
 	layer_para->info.b_trd_out		= 0;
 	layer_para->info.out_trd_mode 	= 0;
 	gd->layer_para = (uint)layer_para;
-
+	fb_base_addr=(uint)buffer - sizeof(bmp_header_t);
+#ifndef CONFIG_SUNXI_MULITCORE_BOOT
 	board_display_update_para_for_kernel("fb_base", (uint)buffer - sizeof(bmp_header_t));
-
+#endif
 	return 0;
 }
 
@@ -491,95 +493,166 @@ int board_display_framebuffer_change(void *buffer)
 
 int board_display_device_open(void)
 {
-
 	int  value = 1;
 	int  ret = 0;
-	__u32 output_type = 0;
-	__u32 output_mode = 0;
+	struct disp_device_config config;
+
 	__u32 auto_hpd = 0;
 	__u32 err_count = 0;
+	__u32 using_device_config = 0;
 	unsigned long arg[4] = {0};
 	int node;
 
 	debug("De_OpenDevice\n");
 
+	memset(&config, 0, sizeof(struct disp_device_config));
+
 	node = fdt_path_offset(working_fdt,"boot_disp");
 	if (node >= 0) {
-		/* getproc output_disp, indicate which disp channel will be using */
-		if (fdt_getprop_u32(working_fdt, node, "output_disp", (uint32_t*)&screen_id) < 0) {
-			printf("fetch script data boot_disp.output_disp fail\n");
+		/* getproc output_disp,
+		 * indicate which disp channel will be using
+		 */
+		if (fdt_getprop_u32(working_fdt, node, "output_disp",
+						(uint32_t *)&screen_id) < 0) {
+			pr_error("fetch script boot_disp.output_disp fail\n");
 			err_count ++;
 		} else
-			printf("boot_disp.output_disp=%d\n", screen_id);
+			pr_msg("boot_disp.output_disp=%d\n", screen_id);
 
-		/* getproc output_type, indicate which kind of device will be using */
-		if (fdt_getprop_u32(working_fdt, node, "output_type", (uint32_t*)&value) < 0) {
-			printf("fetch script data boot_disp.output_type fail\n");
+		/* getproc output_type,
+		 * indicate which kind of device will be using
+		 */
+		if (fdt_getprop_u32(working_fdt, node, "output_type",
+						(uint32_t *)&value) < 0) {
+			pr_error("fetch script boot_disp.output_type fail\n");
 			err_count ++;
 		} else
-			printf("boot_disp.output_type=%d\n", value);
+			pr_msg("boot_disp.output_type=%d\n", value);
 
 		if(value == 0)
 		{
-			output_type = DISP_OUTPUT_TYPE_NONE;
+			config.type = DISP_OUTPUT_TYPE_NONE;
 		}
 		else if(value == 1)
 		{
-			output_type = DISP_OUTPUT_TYPE_LCD;
+			config.type = DISP_OUTPUT_TYPE_LCD;
 		}
 		else if(value == 2)
 		{
-			output_type = DISP_OUTPUT_TYPE_TV;
+			config.type = DISP_OUTPUT_TYPE_TV;
 		}
 		else if(value == 3)
 		{
-			output_type = DISP_OUTPUT_TYPE_HDMI;
+			config.type = DISP_OUTPUT_TYPE_HDMI;
 		}
 		else if(value == 4)
 		{
-			output_type = DISP_OUTPUT_TYPE_VGA;
+			config.type = DISP_OUTPUT_TYPE_VGA;
 		}
 		else
 		{
-			printf("invalid output_type %d\n", value);
+			pr_error("invalid output_type %d\n", value);
 			return -1;
 		}
 
-		/* getproc output_mode, indicate which kind of mode will be output */
-		if (fdt_getprop_u32(working_fdt, node, "output_mode", (uint32_t*)&output_mode) < 0) {
-			printf("fetch script data boot_disp.output_mode fail\n");
+		/* getproc output_mode,
+		 * indicate which kind of mode will be output
+		 */
+		if (fdt_getprop_u32(working_fdt, node, "output_mode",
+					(uint32_t *)&config.mode) < 0) {
+			pr_error("fetch script boot_disp.output_mode fail\n");
 			err_count ++;
 		} else
-			printf("boot_disp.output_mode=%d\n", output_mode);
+			pr_msg("boot_disp.output_mode=%d\n", config.mode);
 
-		/* getproc auto_hpd, indicate output device decided by the hot plug status of device */
-		if (fdt_getprop_u32(working_fdt, node, "auto_hpd", (uint32_t*)&auto_hpd) < 0) {
-			printf("fetch script data boot_disp.auto_hpd fail\n");
+		/* getproc auto_hpd,
+		 * indicate output device decided by the hot plug status
+		 * of device
+		 */
+		if (fdt_getprop_u32(working_fdt, node, "auto_hpd",
+						(uint32_t *)&auto_hpd) < 0) {
+			pr_error("fetch script data boot_disp.auto_hpd fail\n");
 			err_count ++;
-		 } else
-			printf("boot_disp.auto_hpd=%d\n", auto_hpd);
+		} else
+			pr_msg("boot_disp.auto_hpd=%d\n", auto_hpd);
+
+		if (config.type == DISP_OUTPUT_TYPE_HDMI) {
+			/* getproc output_format, indicate output YUV or RGB */
+			if (fdt_getprop_u32(working_fdt, node, "output_format",
+					    (uint32_t *)&config.format) < 0) {
+				pr_error("fetch script boot_disp.output_format "
+					 "fail\n");
+			} else {
+				using_device_config = 1;
+				pr_msg("boot_disp.output_format=%d\n",
+				       config.format);
+			}
+			/* getproc output_bits, indicate output color deep */
+			if (fdt_getprop_u32(working_fdt, node, "output_bits",
+					    (uint32_t *)&config.bits) < 0) {
+				pr_error("fetch script boot_disp.output_bits "
+					 "fail\n");
+			} else {
+				using_device_config = 1;
+				pr_msg("boot_disp.output_bits=%d\n",
+				       config.bits);
+			}
+			/* getproc eotf, indicate output range */
+			if (fdt_getprop_u32(working_fdt, node, "output_eotf",
+					    (uint32_t *)&config.eotf) < 0) {
+				pr_msg("fetch script boot_disp.output_eotf "
+				       "fail\n");
+			} else {
+				using_device_config = 1;
+				pr_msg("boot_disp.output_eotf=%d\n",
+				       config.eotf);
+			}
+
+			/* getproc eotf, indicate output range */
+			if (fdt_getprop_u32(working_fdt, node, "output_cs",
+					    (uint32_t *)&config.cs) < 0) {
+				pr_error(
+				    "fetch script boot_disp.output_cs fail\n");
+			} else {
+				using_device_config = 1;
+				pr_msg("boot_disp.output_cs=%d\n", config.cs);
+			}
+		}
+
 	} else
 		err_count = 4;
 
 	if(err_count >= 4)//no boot_disp config
 	{
-		output_type = DISP_OUTPUT_TYPE_LCD;
+		config.type = DISP_OUTPUT_TYPE_LCD;
 	}
 	else//has boot_disp config
 	{
 
 	}
-	printf("disp%d device type(%d) enable\n", screen_id, output_type);
+	pr_notice("disp%d device type(%d) enable\n", screen_id, config.type);
 
 	arg[0] = screen_id;
-	arg[1] = output_type;
-	arg[2] = output_mode;
+	arg[1] = config.type;
+	arg[2] = config.mode;
+
 	disp_ioctl(NULL, DISP_DEVICE_SWITCH, (void *)arg);
 
-
-
-	disp_para = ((output_type << 8) | (output_mode)) << (screen_id*16);
+	disp_para = ((config.type << 8) | (config.mode)) << (screen_id*16);
 	board_display_update_para_for_kernel("boot_disp", disp_para);
+	if (using_device_config == 1) {
+		arg[0] = screen_id;
+		arg[1] = (unsigned long)&config;
+
+		disp_ioctl(NULL, DISP_DEVICE_SET_CONFIG, (void *)arg);
+
+		disp_para1 = (config.cs << 16) | (config.bits << 8) |
+								(config.format);
+		disp_para2 = config.eotf;
+
+		board_display_update_para_for_kernel("boot_disp1", disp_para1);
+		board_display_update_para_for_kernel("boot_disp2", disp_para2);
+	}
 
 	return ret;
 }
@@ -609,86 +682,3 @@ int borad_display_get_screen_height(void)
 	return disp_ioctl(NULL, DISP_GET_SCN_HEIGHT, (void*)arg);
 
 }
-
-#else
-int board_display_layer_request(void)
-{
-	return 0;
-}
-
-int board_display_layer_release(void)
-{
-	return 0;
-}
-int board_display_wait_lcd_open(void)
-{
-	return 0;
-}
-int board_display_wait_lcd_close(void)
-{
-	return 0;
-}
-int board_display_set_exit_mode(int lcd_off_only)
-{
-	return 0;
-}
-int board_display_layer_open(void)
-{
-	return 0;
-}
-
-int board_display_layer_close(void)
-{
-	return 0;
-}
-
-int board_display_layer_para_set(void)
-{
-	return 0;
-}
-
-int board_display_show_until_lcd_open(int display_source)
-{
-	return 0;
-}
-
-int board_display_show(int display_source)
-{
-	return 0;
-}
-
-int board_display_framebuffer_set(int width, int height, int bitcount, void *buffer)
-{
-	return 0;
-}
-
-void board_display_set_alpha_mode(int mode)
-{
-	return ;
-}
-
-int board_display_framebuffer_change(void *buffer)
-{
-	return 0;
-}
-int board_display_device_open(void)
-{
-	return 0;
-}
-
-int borad_display_get_screen_width(void)
-{
-	return 0;
-}
-
-int borad_display_get_screen_height(void)
-{
-	return 0;
-}
-
-void board_display_setenv(char *data)
-{
-	return;
-}
-
-#endif

@@ -36,6 +36,7 @@
 #define ARISC_CPU_OP_REQ                (ARISC_MESSAGE_BASE + 0x12)  /* cpu operations         (ac327 to arisc) */
 #define ARISC_QUERY_WAKEUP_SRC_REQ      (ARISC_MESSAGE_BASE + 0x13)  /* query wakeup source    (ac327 to arisc) */
 #define ARISC_SYS_OP_REQ                (ARISC_MESSAGE_BASE + 0x14)  /* system operations      (ac327 to arisc) */
+#define ARISC_CLEAR_WAKEUP_SRC_REQ      (ARISC_MESSAGE_BASE + 0x15)  /* query wakeup source    (ac327 to arisc) */
 
 /* dvfs commands */
 #define ARISC_CPUX_DVFS_REQ              (ARISC_MESSAGE_BASE + 0x20)  /* request dvfs           (ac327 to arisc) */
@@ -87,6 +88,17 @@
 
 /* arisc initialize state notify commands */
 #define ARISC_STARTUP_NOTIFY             (ARISC_MESSAGE_BASE + 0x80)  /* arisc init state notify(arisc to ac327) */
+#define ARISC_CRASHDUMP                  (ARISC_MESSAGE_BASE + 0x85)
+
+/* sensorhub commands */
+#define ARISC_AP_READ_DATA               (ARISC_MESSAGE_BASE + 0x90)  /* ap read data        (ac327 to arisc) */
+#define ARISC_AP_WRITE_DATA              (ARISC_MESSAGE_BASE + 0x91)  /* ap write data       (ac327 to arisc) */
+#define ARISC_SH_READ_DATA               (ARISC_MESSAGE_BASE + 0x92)  /* sh read data        (arisc to ac327) */
+#define ARISC_SH_WRITE_DATA              (ARISC_MESSAGE_BASE + 0x93)  /* sh write data       (arisc to ac327) */
+#define ARISC_SET_MSGBOX_RX_INT          (ARISC_MESSAGE_BASE + 0x94)  /* set msgbox rx int  (ac327 to arisc) */
+#define ARISC_GET_MSGBOX_RX_PEND         (ARISC_MESSAGE_BASE + 0x95)  /* get msgbox rx pend  (ac327 to arisc) */
+#define ARISC_CLR_MSGBOX_RX_PEND         (ARISC_MESSAGE_BASE + 0x96)  /* clr msgbox rx pend  (ac327 to arisc) */
+#define ARISC_AP_WAKEUP_SH               (ARISC_MESSAGE_BASE + 0x97)  /* ap wakeup sh  (ac327 to arisc) */
 
 #ifdef CONFIG_ARM
 /* the base of ARM SVC ARISC */
@@ -114,6 +126,7 @@
 #define ARM_SVC_ARISC_CPUIDLE_CFG_REQ           (ARM_SVC_ARISC_BASE + ARISC_CPUIDLE_CFG_REQ)           /* request to config      (ac327 to arisc) */
 #define ARM_SVC_ARISC_CPU_OP_REQ                (ARM_SVC_ARISC_BASE + ARISC_CPU_OP_REQ)                /* cpu operations         (ac327 to arisc) */
 #define ARM_SVC_ARISC_QUERY_WAKEUP_SRC_REQ      (ARM_SVC_ARISC_BASE + ARISC_QUERY_WAKEUP_SRC_REQ)      /* query wakeup source    (ac327 to arisc) */
+#define ARM_SVC_ARISC_CLEAR_WAKEUP_SRC_REQ      (ARM_SVC_ARISC_BASE + ARISC_CLEAR_WAKEUP_SRC_REQ)      /* query wakeup source    (ac327 to arisc) */
 #define ARM_SVC_ARISC_SYS_OP_REQ                (ARM_SVC_ARISC_BASE + ARISC_SYS_OP_REQ)                /* system operations      (ac327 to arisc) */
 
 /* dvfs commands */
@@ -166,7 +179,17 @@
 
 /* arisc initialize state notify commands */
 #define ARM_SVC_ARISC_STARTUP_NOTIFY             (ARM_SVC_ARISC_BASE + ARISC_STARTUP_NOTIFY)           /* arisc init state notify(arisc to ac327) */
+#define ARM_SVC_ARISC_CRASHDUMP_START            (ARM_SVC_ARISC_BASE + ARISC_CRASHDUMP)
 
+/* sensorhub commands */
+#define ARM_SVC_ARISC_AP_READ_DATA               (ARM_SVC_ARISC_BASE + ARISC_AP_READ_DATA)             /* ap read data        (ac327 to arisc) */
+#define ARM_SVC_ARISC_AP_WRITE_DATA              (ARM_SVC_ARISC_BASE + ARISC_AP_WRITE_DATA)            /* ap write data       (ac327 to arisc) */
+#define ARM_SVC_ARISC_SH_READ_DATA               (ARM_SVC_ARISC_BASE + ARISC_SH_READ_DATA)             /* sh read data        (arisc to ac327) */
+#define ARM_SVC_ARISC_SH_WRITE_DATA              (ARM_SVC_ARISC_BASE + ARISC_SH_WRITE_DATA)            /* sh write data       (arisc to ac327) */
+#define ARM_SVC_ARISC_SET_MSGBOX_RX_INT          (ARM_SVC_ARISC_BASE + ARISC_SET_MSGBOX_RX_INT)        /* set msgbox rx int (ac327 to arisc) */
+#define ARM_SVC_ARISC_GET_MSGBOX_RX_PEND         (ARM_SVC_ARISC_BASE + ARISC_GET_MSGBOX_RX_PEND)       /* get msgbox rx pend (ac327 to arisc) */
+#define ARM_SVC_ARISC_CLR_MSGBOX_RX_PEND         (ARM_SVC_ARISC_BASE + ARISC_CLR_MSGBOX_RX_PEND)       /* clr msgbox rx pend (ac327 to arisc) */
+#define ARM_SVC_ARISC_AP_WAKEUP_SH               (ARM_SVC_ARISC_BASE + ARISC_AP_WAKEUP_SH)             /* ap wakeup sh (ac327 to arisc) */
 
 #define NMI_INT_TYPE_PMU (0)
 #define NMI_INT_TYPE_RTC (1)
@@ -261,8 +284,37 @@ typedef enum arisc_rsb_bits_ops {
 	RSB_SET_BITS
 } arisc_rsb_bits_ops_e;
 
+typedef enum arisc_audio_mode {
+	AUDIO_PLAY,                   /* play    mode */
+	AUDIO_CAPTURE                 /* capture mode */
+} arisc_audio_mode_e;
+
+typedef struct arisc_audio_mem {
+	unsigned int mode;
+	unsigned int sram_base_addr;
+	unsigned int buffer_size;
+	unsigned int period_size;
+} arisc_audio_mem_t;
+
+
+typedef struct arisc_audio_tdm {
+	unsigned int mode;
+	unsigned int samplerate;
+	unsigned int channum;
+} arisc_audio_tdm_t;
+
 /* arisc call-back */
 typedef int (*arisc_cb_t)(void *arg);
+
+/* sunxi_perdone_cbfn
+ *
+ * period done callback routine type
+*/
+/* audio callback struct */
+typedef struct audio_cb {
+	arisc_cb_t	handler;	/* dma callback fuction */
+	void 		*arg;		/* args of func         */
+} audio_cb_t;
 
 /*
  * @len :       number of read registers, max len:4;
@@ -280,7 +332,7 @@ typedef struct arisc_rsb_block_cfg
 	unsigned int devaddr;
 	unsigned char *regaddr;
 	unsigned int *data;
-}arisc_rsb_block_cfg_t;
+} arisc_rsb_block_cfg_t;
 
 /*
  * @len  :       number of operate registers, max len:4;
@@ -292,8 +344,7 @@ typedef struct arisc_rsb_block_cfg
  * @mask :       point of mask bits data;
  * @delay:       point of delay times;
  */
-typedef struct arisc_rsb_bits_cfg
-{
+typedef struct arisc_rsb_bits_cfg {
 	unsigned int len;
 	unsigned int datatype;
 	unsigned int msgattr;
@@ -302,16 +353,14 @@ typedef struct arisc_rsb_bits_cfg
 	unsigned char *regaddr;
 	unsigned char *delay;
 	unsigned int *mask;
-}arisc_rsb_bits_cfg_t;
+} arisc_rsb_bits_cfg_t;
 
-typedef enum arisc_rw_type
-{
+typedef enum arisc_rw_type {
 	ARISC_READ = 0x0,
 	ARISC_WRITE = 0x1,
 } arisc_rw_type_e;
 
-typedef struct nmi_isr
-{
+typedef struct nmi_isr {
 	arisc_cb_t   handler;
 	void        *arg;
 } nmi_isr_t;
@@ -322,10 +371,10 @@ extern nmi_isr_t nmi_isr_node[2];
  * @flags: 0x01-clean pendings, 0x10-enter cupidle.
  * @resume_addr: resume address for cpu0 out of idle.
  */
-typedef struct sunxi_enter_idle_para{
+typedef struct sunxi_enter_idle_para {
 	unsigned long flags;
 	void *resume_addr;
-}sunxi_enter_idle_para_t;
+} sunxi_enter_idle_para_t;
 
 
 /*
@@ -371,6 +420,8 @@ typedef struct arisc_twi_bits_cfg {
  *                !0 - set frequency failed;
  */
 int arisc_dvfs_set_cpufreq(unsigned int freq, unsigned int pll, unsigned int mode, arisc_cb_t cb, void *cb_arg);
+int arisc_dvfs_cfg_vf_table(unsigned int cluster, unsigned int vf_num,
+				void *vf_tbl);
 
 /**
  * query super-standby wakeup source.
@@ -379,6 +430,11 @@ int arisc_dvfs_set_cpufreq(unsigned int freq, unsigned int pll, unsigned int mod
  * return: result, 0 - query successed, !0 - query failed;
  */
 int arisc_query_wakeup_source(u32 *event);
+
+int arisc_standby_super(struct super_standby_para *para, arisc_cb_t cb, void *cb_arg);
+
+int arisc_cpux_ready_notify(void);
+int arisc_clear_wakeup_source(void);
 
 extern int arisc_query_set_standby_info(struct standby_info_para *para, arisc_rw_type_e op);
 
@@ -453,7 +509,8 @@ int arisc_set_nmi_trigger(u32 type);
 int arisc_axp_get_chip_id(unsigned char *chip_id);
 #if (defined CONFIG_ARCH_SUN8IW5P1) || \
 	(defined CONFIG_ARCH_SUN50IW1P1) || \
-	(defined CONFIG_ARCH_SUN50IW2P1)
+	(defined CONFIG_ARCH_SUN50IW2P1) || \
+	(defined CONFIG_ARCH_SUN50IW3P1)
 int arisc_adjust_pmu_chgcur(unsigned int max_chgcur, unsigned int chg_ic_temp);
 #endif
 int arisc_set_pwr_tree(u32 *pwr_tree);
@@ -595,8 +652,77 @@ int arisc_twi_write_block_data(struct arisc_twi_block_cfg *cfg);
  */
 int twi_bits_ops_sync(struct arisc_twi_bits_cfg *cfg);
 
-/* ====================================debug interface==================================== */
+/* ====debug interface==== */
 int arisc_message_loopback(void);
 int arisc_config_ir_paras(u32 ir_code, u32 ir_addr);
+int arisc_set_crashdump_mode(void);
 
+/* ====standby interface==== */
+/**
+ * enter super standby.
+ * @para:  parameter for enter normal standby.
+ *
+ * return: result, 0 - super standby successed, !0 - super standby failed;
+ */
+int arisc_standby_super(struct super_standby_para *para, arisc_cb_t cb, void *cb_arg);
+
+/**
+ * notify arisc cpux restored.
+ * @para:  none.
+ *
+ * return: result, 0 - notify successed, !0 - notify failed;
+ */
+int arisc_cpux_ready_notify(void);
+
+/**
+ * ap read data.
+ * @data:    point of data;
+ * @length:  length of data;
+ *
+ * return: result, 0 - read data successed,
+ *                !0 - read data failed or the len more then max len;
+ */
+int arisc_ap_read_data(char *data, int length);
+
+/**
+ * ap write data.
+ * @data:    point of data;
+ * @length:  length of data;
+ *
+ * return: result, 0 - write data successed,
+ *                !0 - write data failed or the len more then max len;
+ */
+int arisc_ap_write_data(char *data, int length);
+
+/**
+ * set msgbox channel receiver interrupt.
+ *
+ * return: result, 0 - setting successed,
+ *                !0 - setting failed;
+ */
+int arisc_set_msgbox_receiver_int(unsigned int channel, unsigned int user, bool enable);
+
+/**
+ * get msgbox channel receiver pend.
+ *
+ * return: result 1 - interrupt pending,
+ *                !0 - interrupt not pending;
+ */
+int arisc_get_msgbox_receiver_pend(unsigned int channel, unsigned int user);
+
+/**
+ * clear msgbox channel receiver pend.
+ *
+ * return: result 0 - clear interrupt pending successed,
+ *                !0 - clear interrupt pending  failed;;
+ */
+int arisc_clear_msgbox_receiver_pend(unsigned int channel, unsigned int user);
+
+/**
+ *  ap wakeup sh interrupt.
+ *
+ * return: result 0 - send successed,
+ *                !0 - send  failed;;
+ */
+int arisc_ap_wakeup_sh(bool wakeup);
 #endif	/* __ASM_ARCH_A100_H */

@@ -650,8 +650,10 @@ static int do_ubi(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			ret = ubi_volume_write(argv[3], (void *)addr, size);
 		}
 		if (!ret) {
-			printf("%lld bytes written to volume %s\n", size,
-			       argv[3]);
+			/*
+			 * printf("%lld bytes written to volume %s\n", size,
+			 *      argv[3]);
+			 */
 		}
 
 		return ret;
@@ -709,3 +711,84 @@ U_BOOT_CMD(
 	" size: specified in bytes\n"
 	" type: s[tatic] or d[ynamic] (default=dynamic)"
 );
+
+int sunxi_do_ubi(int flag, int argc, char * const argv[])
+{
+	return do_ubi(NULL, flag, argc, argv);
+}
+
+int sunxi_ubi_volume_read(char *volume, loff_t offp, char *buf, size_t size)
+{
+	int err, lnum, off, len, tbuf_size;
+	void *tbuf;
+	unsigned long long tmp;
+	struct ubi_volume *vol;
+	/* loff_t offp = 0; */
+
+	vol = ubi_find_volume(volume);
+	if (vol == NULL)
+		return -ENODEV;
+
+	if (vol->updating) {
+		printf("updating");
+		return -EBUSY;
+	}
+	if (vol->upd_marker) {
+		printf("damaged volume, update marker is set");
+		return -EBADF;
+	}
+	if (offp == vol->used_bytes)
+		return 0;
+
+	if (size == 0) {
+		printf("No size specified -> Using max size (%lld)\n",
+			vol->used_bytes);
+		size = vol->used_bytes;
+	}
+
+	if (vol->corrupted)
+		printf("read from corrupted volume %d", vol->vol_id);
+	if (offp + size > vol->used_bytes)
+		size = vol->used_bytes - offp;
+
+	tbuf_size = vol->usable_leb_size;
+	if (size < tbuf_size)
+		tbuf_size = ALIGN(size, ubi->min_io_size);
+	tbuf = malloc(tbuf_size);
+	if (!tbuf) {
+		printf("NO MEM\n");
+		return -ENOMEM;
+	}
+	len = size > tbuf_size ? tbuf_size : size;
+
+	tmp = offp;
+	off = do_div(tmp, vol->usable_leb_size);
+	lnum = tmp;
+	do {
+		if (off + len >= vol->usable_leb_size)
+			len = vol->usable_leb_size - off;
+
+		err = ubi_eba_read_leb(ubi, vol, lnum, tbuf, off, len, 0);
+		if (err) {
+			printf("read err %x\n", err);
+			err = -err;
+			break;
+		}
+		off += len;
+		if (off == vol->usable_leb_size) {
+			lnum += 1;
+			off -= vol->usable_leb_size;
+		}
+
+		size -= len;
+		offp += len;
+
+		memcpy(buf, tbuf, len);
+
+		buf += len;
+		len = size > tbuf_size ? tbuf_size : size;
+	} while (size);
+
+	free(tbuf);
+	return err;
+}

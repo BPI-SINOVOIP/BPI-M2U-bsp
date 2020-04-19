@@ -131,7 +131,7 @@ config IP_NF_TARGET_ULOG
 	  which has been obsoleted by the new "nfnetlink_log" code (see
 	  CONFIG_NETFILTER_NETLINK_LOG).
 
-	  This option adds a `ULOG' target, which allows you to create rules in
+	  This option adds a 'ULOG' target, which allows you to create rules in
 	  any iptables table. The packet is passed to a userspace logging
 	  daemon using netlink multicast sockets; unlike the LOG target
 	  which can only be viewed through syslog.

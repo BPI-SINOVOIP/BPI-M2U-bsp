@@ -24,3 +24,5 @@
 
 
 obj-$(CONFIG_SUNXI_RSB) += rsb.o
+obj-$(CONFIG_SUNXI_RSB_LEGACY) += rsb_legacy.o
+obj-$(CONFIG_SUNXI_RSB_NCAT) += rsb_ncat.o

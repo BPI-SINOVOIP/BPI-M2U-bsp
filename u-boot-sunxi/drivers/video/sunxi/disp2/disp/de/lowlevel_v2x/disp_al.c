@@ -11,24 +11,161 @@
  * @disp_size: the output size of specified de
  * @output_fps: the output fps of specified device
  * @tcon_type: tcon type, 0: tcon0(drive panel), 1: tcon1(general drive HDMI/TV)
+ * @direct_show: indicate if enable direct show function(bypass all CSCs)
+ * @direct_show_toggle: indicate if direct show state change
  */
 struct disp_al_private_data {
 	u32 output_type[DEVICE_NUM];
 	u32 output_mode[DEVICE_NUM];
 	u32 output_cs[DEVICE_NUM];
+	u32 output_color_range[DEVICE_NUM];
 	u32 tcon_id[DE_NUM];
 	u32 de_id[DEVICE_NUM];
 	struct disp_rect disp_size[DE_NUM];
 	u32 output_fps[DEVICE_NUM];
 	u32 tcon_type[DEVICE_NUM];
+	u32 de_backcolor[DE_NUM];
+	bool direct_show[DE_NUM];
+	bool direct_show_toggle[DE_NUM];
 };
 
 static struct disp_al_private_data al_priv;
 
+static int disp_al_validate_direct_show(unsigned int disp,
+			struct disp_layer_config_data *data,
+			unsigned int layer_num)
+{
+	int tcon_id = al_priv.tcon_id[disp];
+	bool direct_show = true;
+	unsigned char i, vi_chn;
+
+	/*
+	 * We need to check several conditions:
+	 * 1, the output must be TV(PAL/NTSC) type
+	 * 2, the output must be in yuv color space,
+	 * 3, only video channels are used,
+	 * 4, input format must be yuv format.
+	 * 5, input layer size must be in the p2p limit range
+	 * 6, the layer must be display on the fullscreen or non-scalely
+	 */
+	if (al_priv.output_type[tcon_id] != DISP_OUTPUT_TYPE_TV) {
+		direct_show = false;
+		goto exit;
+	}
+
+	if ((al_priv.disp_size[disp].width != CVBS_PAL_WIDTH)
+	    && (al_priv.disp_size[disp].width != CVBS_NTSC_WIDTH)) {
+		direct_show = false;
+		goto exit;
+	}
+
+	if ((al_priv.disp_size[disp].height != CVBS_PAL_HEIGHT)
+	    && (al_priv.disp_size[disp].height != CVBS_NTSC_HEIGHT)) {
+		direct_show = false;
+		goto exit;
+	}
+
+	if (al_priv.output_cs[tcon_id] != 1) {
+		direct_show = false;
+		goto exit;
+	}
+
+	vi_chn = de_feat_get_num_vi_chns(disp);
+	for (i = 0; i < layer_num; i++, data++) {
+		struct disp_rect64 *crop64;
+		struct disp_rect crop;
+		struct disp_rect *screen_win;
+
+		if (!data->config.enable)
+			continue;
+
+		if (data->config.channel >= vi_chn) {
+			direct_show = false;
+			goto exit;
+		}
+
+		if (data->config.info.fb.format < DISP_FORMAT_YUV444_I_AYUV) {
+			direct_show = false;
+			goto exit;
+		}
+
+		crop64 = &data->config.info.fb.crop;
+		crop.x = crop64->x >> VSU_FB_FRAC_BITWIDTH;
+		crop.y = crop64->y >> VSU_FB_FRAC_BITWIDTH;
+		crop.width = crop64->width >> VSU_FB_FRAC_BITWIDTH;
+		crop.height = crop64->height >> VSU_FB_FRAC_BITWIDTH;
+		if ((crop.width < P2P_FB_MIN_WIDTH)
+		    || (crop.width > P2P_FB_MAX_WIDTH)) {
+			direct_show = false;
+			goto exit;
+		}
+
+		if (crop.height != al_priv.disp_size[disp].height) {
+			direct_show = false;
+			goto exit;
+		}
+
+		screen_win = &data->config.info.screen_win;
+		if ((screen_win->width != al_priv.disp_size[disp].width)
+		    && (screen_win->width != crop.width)) {
+			direct_show = false;
+			goto exit;
+		}
+
+		if ((screen_win->height != al_priv.disp_size[disp].height)
+		    && (screen_win->height != crop.height)) {
+			direct_show = false;
+			goto exit;
+		}
+	}
+
+exit:
+	if (al_priv.direct_show[disp] != direct_show)
+		al_priv.direct_show_toggle[disp] = true;
+	else
+		al_priv.direct_show_toggle[disp] = false;
+	al_priv.direct_show[disp] = direct_show;
+
+	return 0;
+}
+
 int disp_al_layer_apply(unsigned int disp, struct disp_layer_config_data *data,
 			unsigned int layer_num)
 {
-	return de_al_lyr_apply(disp, data, layer_num);
+	bool direct_show;
+
+	disp_al_validate_direct_show(disp, data, layer_num);
+	direct_show = al_priv.direct_show[disp];
+
+	/*
+	 * If direct_show_toggle, we need to update the output cs of de .
+	 * When direct_show enable, we need to disable csc function,
+	 * And when direct show disable, we need to enable csc function as usual
+	 */
+	if (al_priv.direct_show_toggle[disp]) {
+		struct disp_csc_config csc_cfg;
+
+		memset(&csc_cfg, 0, sizeof(struct disp_csc_config));
+		if (direct_show) {
+			csc_cfg.out_fmt = DE_RGB;
+			csc_cfg.out_color_range = DISP_COLOR_RANGE_0_255;
+			csc_cfg.color = (16 << 16) | (128 << 8) | (128);
+		} else {
+			int tcon_id = al_priv.tcon_id[disp];
+
+			csc_cfg.out_fmt = al_priv.output_cs[tcon_id];
+			if ((al_priv.disp_size[disp].width < 1280)
+			    && (al_priv.disp_size[disp].height < 720))
+				csc_cfg.out_mode = DE_BT601;
+			else
+				csc_cfg.out_mode = DE_BT709;
+			csc_cfg.out_color_range =
+			    al_priv.output_color_range[tcon_id];
+			csc_cfg.color = al_priv.de_backcolor[disp];
+		}
+		de_al_mgr_apply_color(disp, &csc_cfg);
+	}
+	return de_al_lyr_apply(disp, data, layer_num, direct_show);
 }
 
 int disp_al_manager_init(unsigned int disp)
@@ -44,11 +181,18 @@ int disp_al_manager_exit(unsigned int disp)
 int disp_al_manager_apply(unsigned int disp, struct disp_manager_data *data)
 {
 	if (data->flag & MANAGER_ENABLE_DIRTY) {
+		struct disp_color *back_color = &data->config.back_color;
+
 		al_priv.disp_size[disp].width = data->config.size.width;
 		al_priv.disp_size[disp].height = data->config.size.height;
 		al_priv.tcon_id[disp] = data->config.hwdev_index;
 		al_priv.de_id[al_priv.tcon_id[disp]] = disp;
 		al_priv.output_cs[al_priv.tcon_id[disp]] = data->config.cs;
+		al_priv.output_color_range[al_priv.tcon_id[disp]] =
+		    data->config.color_range;
+		al_priv.de_backcolor[disp] =
+		    (back_color->alpha << 24) | (back_color->red << 16)
+		    | (back_color->green << 8) | (back_color->blue << 0);
 	}
 
 	if (al_priv.output_type[al_priv.tcon_id[disp]] ==
@@ -58,9 +202,11 @@ int disp_al_manager_apply(unsigned int disp, struct disp_manager_data *data)
 		 * else disable color remap function
 		 */
 		if (data->config.cs != 0)
-			tcon1_hdmi_color_remap(al_priv.tcon_id[disp], 1);
+			tcon1_hdmi_color_remap(al_priv.tcon_id[disp], 1,
+					       data->config.cs);
 		else
-			tcon1_hdmi_color_remap(al_priv.tcon_id[disp], 0);
+			tcon1_hdmi_color_remap(al_priv.tcon_id[disp], 0,
+					       data->config.cs);
 	}
 	de_update_clk_rate(data->config.de_freq);
 
@@ -94,7 +240,7 @@ int disp_al_manager_disable_irq(unsigned int disp)
 
 int disp_al_enhance_apply(unsigned int disp, struct disp_enhance_config *config)
 {
-	if (config->flags & ENHANCE_MODE_DIRTY) {
+	if (config->flags & ENH_MODE_DIRTY) {
 		struct disp_csc_config csc_config;
 
 		de_dcsc_get_config(disp, &csc_config);
@@ -177,7 +323,11 @@ static struct lcd_clk_info clk_tbl[] = {
 	{LCD_IF_HV, 6, 1, 1, 0},
 	{LCD_IF_CPU, 12, 1, 1, 0},
 	{LCD_IF_LVDS, 7, 1, 1, 0},
+#if defined(DSI_VERSION_40)
 	{LCD_IF_DSI, 4, 1, 4, 148500000},
+#else
+	{LCD_IF_DSI, 4, 1, 4, 0},
+#endif /*endif DSI_VERSION_40 */
 };
 
 /* lcd */
@@ -209,6 +359,7 @@ int disp_al_lcd_get_clk_info(u32 screen_id, struct lcd_clk_info *info,
 		}
 	}
 
+#if defined(DSI_VERSION_40)
 	if (panel->lcd_if == LCD_IF_DSI) {
 		u32 lane = panel->lcd_dsi_lane;
 		u32 bitwidth = 0;
@@ -230,6 +381,14 @@ int disp_al_lcd_get_clk_info(u32 screen_id, struct lcd_clk_info *info,
 
 		dsi_div = bitwidth / lane;
 	}
+#endif
+
+	if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+	    panel->lcd_if == LCD_IF_DSI) {
+		info->tcon_div = tcon_div / 2;
+		dsi_div /= 2;
+	} else
+		info->tcon_div = tcon_div;
 
 	if (0 == find)
 		__wrn("cant find clk info for lcd_if %d\n", panel->lcd_if);
@@ -271,8 +430,17 @@ int disp_al_lcd_cfg(u32 screen_id, disp_panel_para *panel,
 
 	if (LCD_IF_DSI == panel->lcd_if)	{
 #if defined(SUPPORT_DSI)
-		if (0 != dsi_cfg(screen_id, panel))
-			DE_WRN("dsi cfg fail!\n");
+		if (panel->lcd_if == LCD_IF_DSI) {
+			if (0 != dsi_cfg(screen_id, panel))
+				DE_WRN("dsi %d cfg fail!\n", screen_id);
+			if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+			    screen_id + 1 < DEVICE_DSI_NUM) {
+				if (0 != dsi_cfg(screen_id + 1, panel))
+					DE_WRN("dsi %d cfg fail!\n",
+					       screen_id + 1);
+			}
+		}
+
 #endif
 	}
 #else
@@ -290,6 +458,13 @@ int disp_al_lcd_cfg(u32 screen_id, disp_panel_para *panel,
 	return 0;
 }
 
+int disp_al_lcd_cfg_ext(u32 screen_id, panel_extend_para *extend_panel)
+{
+	tcon0_cfg_ext(screen_id, extend_panel);
+
+	return 0;
+}
+
 int disp_al_lcd_enable(u32 screen_id, disp_panel_para *panel)
 {
 #if !defined(TCON1_DRIVE_PANEL)
@@ -300,6 +475,9 @@ int disp_al_lcd_enable(u32 screen_id, disp_panel_para *panel)
 	} else if (LCD_IF_DSI == panel->lcd_if) {
 #if defined(SUPPORT_DSI)
 		dsi_open(screen_id, panel);
+		if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+		    screen_id + 1 < DEVICE_DSI_NUM)
+			dsi_open(screen_id + 1, panel);
 #endif
 	}
 
@@ -325,6 +503,10 @@ int disp_al_lcd_disable(u32 screen_id, disp_panel_para *panel)
 	} else if (LCD_IF_DSI == panel->lcd_if) {
 #if defined(SUPPORT_DSI)
 		dsi_close(screen_id);
+		if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+		    screen_id + 1 < DEVICE_DSI_NUM)
+			dsi_close(screen_id + 1);
+
 #endif
 	}
 	tcon0_close(screen_id);
@@ -435,11 +617,18 @@ int disp_al_lcd_tri_start(u32 screen_id, disp_panel_para *panel)
 int disp_al_lcd_io_cfg(u32 screen_id, u32 enable, disp_panel_para *panel)
 {
 #if defined(SUPPORT_DSI)
-	if (LCD_IF_DSI == panel->lcd_if) {
-		if (enable)
+	if (panel->lcd_if == LCD_IF_DSI) {
+		if (enable == 1) {
 			dsi_io_open(screen_id, panel);
-		else
+			if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+			    screen_id + 1 < DEVICE_DSI_NUM)
+				dsi_io_open(screen_id + 1, panel);
+		} else {
 			dsi_io_close(screen_id);
+			if (panel->lcd_tcon_mode == DISP_TCON_DUAL_DSI &&
+			    screen_id + 1 < DEVICE_DSI_NUM)
+				dsi_io_close(screen_id + 1);
+		}
 	}
 #endif
 
@@ -460,8 +649,16 @@ int disp_al_lcd_get_cur_line(u32 screen_id, disp_panel_para *panel)
 int disp_al_lcd_get_start_delay(u32 screen_id, disp_panel_para *panel)
 {
 #if defined(SUPPORT_DSI) && defined(DSI_VERSION_40)
+	u32 lcd_start_delay = 0;
+	u32 de_clk_rate = de_get_clk_rate() / 1000000;
+	if (panel) {
+		lcd_start_delay = ((tcon0_get_cpu_tri2_start_delay(screen_id)+1)
+				   << 3) * (panel->lcd_dclk_freq)
+			/ (panel->lcd_ht*de_clk_rate);
+
+	}
 	if (LCD_IF_DSI == panel->lcd_if)
-		return dsi_get_start_delay(screen_id);
+		return dsi_get_start_delay(screen_id)+lcd_start_delay;
 	else
 #endif
 		return tcon_get_start_delay(screen_id,
@@ -508,9 +705,11 @@ int disp_al_hdmi_cfg(u32 screen_id, struct disp_video_timings *video_info)
 	 * else disable color remap function
 	 */
 	if (al_priv.output_cs[screen_id] != 0)
-		tcon1_hdmi_color_remap(screen_id, 1);
+		tcon1_hdmi_color_remap(screen_id, 1,
+				       al_priv.output_cs[screen_id]);
 	else
-		tcon1_hdmi_color_remap(screen_id, 0);
+		tcon1_hdmi_color_remap(screen_id, 0,
+				       al_priv.output_cs[screen_id]);
 	tcon1_src_select(screen_id, LCD_SRC_DE, al_priv.de_id[screen_id]);
 
 	return 0;
@@ -538,10 +737,17 @@ int disp_al_tv_disable(u32 screen_id)
 
 int disp_al_tv_cfg(u32 screen_id, struct disp_video_timings *video_info)
 {
+	unsigned int pixel_clk;
+
+	pixel_clk = video_info->pixel_clk;
+#if defined(TV_UGLY_CLK_RATE)
+	pixel_clk = (pixel_clk == TV_UGLY_CLK_RATE) ?
+	    TV_COMPOSITE_CLK_RATE : pixel_clk;
+#endif
 	al_priv.output_type[screen_id] = (u32) DISP_OUTPUT_TYPE_TV;
 	al_priv.output_mode[screen_id] = (u32) video_info->tv_mode;
 	al_priv.output_fps[screen_id] =
-	    video_info->pixel_clk / video_info->hor_total_time
+	    pixel_clk / video_info->hor_total_time
 	    / video_info->ver_total_time;
 	al_priv.tcon_type[screen_id] = 1;
 
@@ -767,7 +973,8 @@ int disp_init_al(disp_bsp_init_para *para)
 	tcon_top_set_reg_base(0, para->reg_base[DISP_MOD_DEVICE]);
 #endif
 #if defined(SUPPORT_DSI)
-	dsi_set_reg_base(0, para->reg_base[DISP_MOD_DSI0]);
+	for (i = 0; i < DEVICE_DSI_NUM; ++i)
+		dsi_set_reg_base(i, para->reg_base[DISP_MOD_DSI0 + i]);
 #endif
 
 	if (1 == para->boot_info.sync) {
@@ -798,6 +1005,12 @@ int disp_init_al(disp_bsp_init_para *para)
 #if defined(SUPPORT_TV)
 		al_priv.tcon_type[tcon_id] =
 		    (DISP_OUTPUT_TYPE_TV == para->boot_info.type) ?
+		    1 : al_priv.tcon_type[tcon_id];
+#endif
+
+#if defined(SUPPORT_VGA)
+		al_priv.tcon_type[tcon_id] =
+		    (DISP_OUTPUT_TYPE_VGA == para->boot_info.type) ?
 		    1 : al_priv.tcon_type[tcon_id];
 #endif
 

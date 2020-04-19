@@ -29,7 +29,7 @@
 #include <asm/dma.h>
 #include "sunxi_dma.h"
 
-static int raw_flag;
+static int raw_flag = 1;
 static dma_addr_t hdmiraw_dma_addr = 0;
 static dma_addr_t hdmipcm_dma_addr = 0;
 static unsigned char *hdmiraw_dma_area;	/* DMA area */
@@ -93,7 +93,14 @@ static const struct snd_pcm_hardware sunxi_pcm_hardware = {
 	.periods_max		= 8,
 	.fifo_size		= 128,
 };
-int hdmi_transfer_format_61937_to_60958(int *out,short* temp, int samples)
+
+int sunxi_ahub_get_rawflag(void)
+{
+	return raw_flag;
+}
+
+int hdmi_transfer_format_61937_to_60958(int *out, short *temp,
+					int samples, int rate)
 {
 	int ret =0;
 	int i;
@@ -109,38 +116,72 @@ int hdmi_transfer_format_61937_to_60958(int *out,short* temp, int samples)
 	head.head0.V = 1;
 
 	for (i=0 ; i<192; i++)
-	{
 		channel_status[i] = 0;
-	}
+
 	channel_status[1] = 1;
-	//sample rates
-	channel_status[24] = 0;
-	channel_status[25] = 1;
-	channel_status[26] = 0;
-	channel_status[27] = 0;
+	/* sample rates */
+	if (rate == 32000) {
+		channel_status[24] = 1;
+		channel_status[25] = 1;
+		channel_status[26] = 0;
+		channel_status[27] = 0;
+	} else if (rate == 44100) {
+		channel_status[24] = 0;
+		channel_status[25] = 0;
+		channel_status[26] = 0;
+		channel_status[27] = 0;
+	} else if (rate == 48000) {
+		channel_status[24] = 0;
+		channel_status[25] = 1;
+		channel_status[26] = 0;
+		channel_status[27] = 0;
+	} else if (rate == (32000*4)) {
+		channel_status[24] = 1;
+		channel_status[25] = 0;
+		channel_status[26] = 0;
+		channel_status[27] = 0;
+	} else if (rate == (44100*4)) {
+		channel_status[24] = 0;
+		channel_status[25] = 0;
+		channel_status[26] = 1;
+		channel_status[27] = 1;
+	} else if (rate == (48000*4)) {
+		channel_status[24] = 0;
+		channel_status[25] = 1;
+		channel_status[26] = 1;
+		channel_status[27] = 1;
+		if (raw_flag == 12 || raw_flag == 11) {
+			channel_status[24] = 1;
+			channel_status[25] = 0;
+			channel_status[26] = 0;
+			channel_status[27] = 1;
+		}
+	} else {
+		channel_status[24] = 0;
+		channel_status[25] = 1;
+		channel_status[26] = 0;
+		channel_status[27] = 0;
+	}
 
 	for (i = 0 ;i<samples;i++,numtotal++) {
-		if( (numtotal%384 == 0) || (numtotal%384 == 1) )
-		{
+		if ((numtotal%384 == 0) || (numtotal%384 == 1))
 			head.head0.B = 1;
-		}
 		else
-		{
 			head.head0.B = 0;
-		}
+
 		head.head0.C = channel_status[(numtotal%384)/2];
 
-		if(numtotal%384 == 0)
-		{
+		if (numtotal%384 == 0)
 			numtotal = 0;
-		}
 
 		w1.wval = (*temp)&(0xffff);
 
-		head.head0.P = w1.bits.bit15 ^ w1.bits.bit14 ^ w1.bits.bit13 ^ w1.bits.bit12
-		              ^w1.bits.bit11 ^ w1.bits.bit10 ^ w1.bits.bit9 ^ w1.bits.bit8
-		              ^w1.bits.bit7 ^ w1.bits.bit6 ^ w1.bits.bit5 ^ w1.bits.bit4
-		              ^w1.bits.bit3 ^ w1.bits.bit2 ^ w1.bits.bit1 ^ w1.bits.bit0;
+		head.head0.P = w1.bits.bit15 ^ w1.bits.bit14 ^ w1.bits.bit13
+			^ w1.bits.bit12 ^ w1.bits.bit11 ^ w1.bits.bit10
+			^ w1.bits.bit9 ^ w1.bits.bit8 ^ w1.bits.bit7
+			^ w1.bits.bit6 ^ w1.bits.bit5 ^ w1.bits.bit4
+			^ w1.bits.bit3 ^ w1.bits.bit2 ^ w1.bits.bit1
+			^ w1.bits.bit0;
 
 		ret = (int)(head.head1)<<24;
 		ret |= (int)((w1.wval)&(0xffff))<<11;//8 or 12
@@ -233,7 +274,9 @@ static int sunxi_pcm_hdmi_hw_params(struct snd_pcm_substream *substream,
 	if (raw_flag > 1) {
 		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
 		slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+#ifndef CONFIG_SND_SUNXI_SOC_AHUB
 		strcpy(substream->pcm->card->id, "sndhdmiraw");
+#endif
 		if (!dev->dma_mask)
 			dev->dma_mask = &sunxi_pcm_mask;
 		if (!dev->coherent_dma_mask)
@@ -247,7 +290,9 @@ static int sunxi_pcm_hdmi_hw_params(struct snd_pcm_substream *substream,
 		hdmipcm_dma_addr = substream->dma_buffer.addr;
 		substream->dma_buffer.addr = (dma_addr_t)hdmiraw_dma_addr;
 	} else {
+#ifndef CONFIG_SND_SUNXI_SOC_AHUB
 		strcpy(substream->pcm->card->id, "sndhdmi");
+#endif
 	}
 
 	ret = dmaengine_slave_config(chan, &slave_config);
@@ -363,7 +408,10 @@ static int sunxi_pcm_copy(struct snd_pcm_substream *substream, int a,
 		}
 		if (raw_flag > 1) {
 			char* hdmihw_area = hdmiraw_dma_area + 2*frames_to_bytes(runtime, hwoff);
-			hdmi_transfer_format_61937_to_60958((int*)hdmihw_area, (short*)hwbuf, frames_to_bytes(runtime, frames));
+			hdmi_transfer_format_61937_to_60958((int *)hdmihw_area,
+				(short *)hwbuf,
+				frames_to_bytes(runtime, frames),
+				runtime->rate);
 		}
 	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		char *hwbuf = runtime->dma_area + frames_to_bytes(runtime, hwoff);

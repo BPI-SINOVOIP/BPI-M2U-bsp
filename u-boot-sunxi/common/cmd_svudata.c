@@ -28,12 +28,14 @@
 #include <malloc.h>
 #include <sys_partition.h>
 #include <securestorage.h>
+#include <sunxi_board.h>
 
 #define MAGIC		"sunxi"
 #define PART_NAME	"private"
 #define USER_DATA_MAXSIZE				(8 * 1024)
 #define USER_DATA_PARAMETER_MAX_COUNT	(30)
-
+#define ONCE_DEAL_LEN (1024*1024)
+#define SECTOR_SIZE (512)
 
 #define	NAME_SIZE	32
 #define VALUE_SIZE	128
@@ -68,7 +70,7 @@ int USER_DATA_NUM;									//用户的环境变量个擿
 char USER_DATA_NAME[10][NAME_SIZE] = {{'\0'}};		//用户的环境变量（从env.fex获取ﺿ
 
 void check_user_data(void);
-
+#ifdef CONFIG_SUNXI_PRIVATE_KEY
 /*
 ************************************************************************************************************
 *
@@ -166,66 +168,45 @@ int save_user_private_data(char *name, char *buffer, int length)
 	return -1;
 }
 
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
 int erase_all_private_data(void)
 {
-	int count = 0;
-	unsigned int flash_start = 0, flash_sectors = 0;;					//分区的地址偏移酿
-	unsigned int part_size;						//分区的大宿
-	int i = 0 , len = 1024 * 1024;
-	int ret = 0;
-	char *fill_zero = NULL;
+	u32 flash_start, flash_sectors;
+	u32 part_size, len;
+	int i, ret = 0, count;
+	u8 *fill_zero;
 
 	part_size = sunxi_partition_get_size_byname(PART_NAME);
-	if (part_size <= 0) {
+	if (part_size <= 0)
 		return -1;
-	}
 
 	flash_start = sunxi_partition_get_offset_byname(PART_NAME);
-	count = part_size / 2048;
 
-	fill_zero = (char *)malloc(len);
+	if (part_size * SECTOR_SIZE < ONCE_DEAL_LEN)
+		len = part_size * SECTOR_SIZE;
+	else
+		len = ONCE_DEAL_LEN;
+
+	count = (part_size * SECTOR_SIZE) / len;
+
+	fill_zero = (u8 *)malloc(len);
 	if(fill_zero == NULL)
-	{
-		printf("no enough memory to malloc \n");
 		return -1;
-	}
 
 	memset(fill_zero , 0x0, len);
-	flash_sectors = len / 512;
-	for(i = 0; i < count ; i++)
-	{
-		if(!sunxi_sprite_write(flash_start + i * flash_sectors, flash_sectors, (void *)fill_zero))
-		{
-			printf("sunxi_sprite_erase_private_key err: write flash from 0x%x, sectors 0x%x failed\n", flash_start + i * flash_sectors, flash_sectors);
+	flash_sectors = len / SECTOR_SIZE;
+	for(i = 0; i < count ; i++) {
+		if(!sunxi_sprite_write(flash_start + i * flash_sectors,
+				flash_sectors, (void *)fill_zero)) {
+				pr_error("erase private key err: from 0x%x, sectors 0x%x failed\n",
+				flash_start + i * flash_sectors, flash_sectors);
 			ret = -1;
 			goto erase_err;
 		}
 	}
-
-	sunxi_flash_flush();
-	printf("erase_private_data success\n");
+	pr_msg("erase_private_data success\n");
 
 erase_err:
-	if(fill_zero)
-	{
-		free(fill_zero);
-	}
+	free(fill_zero);
 
 	return ret;
 }
@@ -269,7 +250,7 @@ int read_private_key_by_name(const char * name, char *buffer, int buffer_len, in
 
 		user_data_head = (USER_DATA_HEAR *)user_data_buffer;
 		user_data_p = (USER_PRIVATE_DATA *)(user_data_buffer + sizeof(USER_DATA_HEAR));
-		
+
 		if (strncmp(user_data_head->magic_name, MAGIC, 5)) {
 			printf("private maybe empty\n");
 			return -1;
@@ -297,38 +278,6 @@ int read_private_key_by_name(const char * name, char *buffer, int buffer_len, in
 }
 
 
-#ifdef CONFIG_SUNXI_SECURE_STORAGE
-static int save_user_data_to_secure_storage(const char * name, char *data)
-{
-	char buffer[512];
-	int  data_len;
-	int  ret;
-    memset(buffer,0x00,sizeof(buffer));
-	printf("Also save user data %s to secure storage\n", (char*)name);
-	if(sunxi_secure_storage_init()){
-		printf("secure storage init fail\n");
-	}else{
-		ret = sunxi_secure_object_read("key_burned_flag", buffer, 512, &data_len);
-		if(ret)
-		{
-			printf("sunxi secure storage has no flag\n");
-		}
-		else
-		{
-			if(!strcmp(buffer, "key_burned"))
-			{
-				printf("find key burned flag\n");
-				return 0;
-			}
-			printf("do not find key burned flag\n");
-		}
-		sunxi_secure_object_write(name, data, strnlen(data, 512));	
-		sunxi_secure_storage_exit();
-	}
-	return 0 ;
-}
-#endif
-
 int do_save_user_data (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 
@@ -337,13 +286,7 @@ int do_save_user_data (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 		return 0;
 	}
 	if (argc == 3) {
-#ifdef CONFIG_SUNXI_PRIVATE_KEY
 		save_user_private_data(argv[1], argv[2], strnlen(argv[2], VALUE_SIZE));
-#endif
-
-#ifdef CONFIG_SUNXI_SECURE_STORAGE
-		save_user_data_to_secure_storage( argv[1], argv[2]);
-#endif
 	}
 
 	return 0;
@@ -355,22 +298,7 @@ U_BOOT_CMD(
 	"<name> <data>\n"
 );
 
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+
 static int user_data_list(void)
 {
 	int j;
@@ -394,12 +322,12 @@ static int user_data_list(void)
 
 		user_data_head = (USER_DATA_HEAR *)user_data_buffer;
 		user_data_p = (USER_PRIVATE_DATA *)(user_data_buffer + sizeof(USER_DATA_HEAR));
-		
+
 		if (strncmp(user_data_head->magic_name, MAGIC, 5)) {
 			printf("the (user) private space\n");
 			return 0;
 		}
-		
+
 		if (user_data_head->count > 0) {
 			printf("count = %d\n", user_data_head->count);
 			for (j = 0; j < user_data_head->count; j++) {
@@ -463,25 +391,145 @@ int erase_private_data(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 
 U_BOOT_CMD(
 	erase_userdata,	1,	1,	erase_private_data,
-	"check user data",
+	"erase user data",
 	"<command>\n"
 );
-/*
-************************************************************************************************************
-*
-*                                             function
-*
-*    name          :
-*
-*    parmeters     :
-*
-*    return        :
-*
-*    note          :
-*
-*
-************************************************************************************************************
-*/
+#endif
+
+#ifdef CONFIG_SUNXI_SECURE_STORAGE
+static int save_user_data_to_secure_storage(const char * name, char *data)
+{
+	char buffer[512];
+	int  data_len;
+	int  ret;
+    memset(buffer,0x00,sizeof(buffer));
+	printf("Also save user data %s to secure storage\n", (char*)name);
+	if(sunxi_secure_storage_init()){
+		printf("secure storage init fail\n");
+	}else{
+		ret = sunxi_secure_object_read("key_burned_flag", buffer, 512, &data_len);
+		if(ret)
+		{
+			printf("sunxi secure storage has no flag\n");
+		}
+		else
+		{
+			if(!strcmp(buffer, "key_burned"))
+			{
+				printf("find key burned flag\n");
+				return 0;
+			}
+			printf("do not find key burned flag\n");
+		}
+		sunxi_secure_object_write(name, data, strnlen(data, 512));
+		sunxi_secure_storage_exit();
+	}
+	return 0 ;
+}
+
+int do_probe_secure_storage(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	char *cmd, *name;
+
+	cmd = argv[1];
+	name = argv[2];
+
+	if(!strcmp(cmd, "read"))
+	{
+		if(argc == 2)
+		{
+			return sunxi_secure_storage_list();
+		}
+		if(argc == 3)
+		{
+			char buffer[4096];
+			int ret, data_len;
+
+			memset(buffer, 0, 4096);
+			ret = sunxi_secure_storage_init();
+			if(ret < 0)
+			{
+				printf("%s secure storage init err\n", __func__);
+
+				return -1;
+			}
+			ret = sunxi_secure_object_read(name, buffer, 4096, &data_len);
+			if(ret < 0)
+			{
+				printf("private data %s is not exist\n", name);
+
+				return -1;
+			}
+			printf("private data:\n");
+			sunxi_dump(buffer, strlen((const char *)buffer));
+
+			return 0;
+		}
+	}
+	else if(!strcmp(cmd, "erase"))
+	{
+		int ret;
+
+		ret = sunxi_secure_storage_init();
+		if(ret < 0)
+		{
+			printf("%s secure storage init err\n", __func__);
+
+			return -1;
+		}
+
+		if(argc == 2)
+		{
+			ret = sunxi_secure_storage_erase_all();
+			if(ret < 0)
+			{
+				printf("erase secure storage failed\n");
+				return -1;
+			}
+		}
+		else if(argc == 3)
+		{
+			if(!strcmp(name, "key_burned_flag"))
+			{
+				if(sunxi_secure_storage_erase_data_only("key_burned_flag"))
+				{
+					printf("erase key_burned_flag failed\n");
+				}
+			}
+		}
+		sunxi_secure_storage_exit();
+
+		return 0;
+	}
+	else if(!strcmp(cmd, "write"))
+	{
+		if(argc == 4)
+			save_user_data_to_secure_storage( argv[2], argv[3]);
+		else
+			printf("para error!\n");
+
+		return 0;
+	}
+	return -1;
+}
+
+U_BOOT_CMD(
+	pst, CONFIG_SYS_MAXARGS, 1, do_probe_secure_storage,
+	"read data from secure storage"
+	"erase flag in secure storage",
+	"pst read|erase [name]\n"
+	"pst read,  then dump all data\n"
+	"pst read name,  then dump the dedicate data\n"
+	"pst write name, string, write the name = string\n"
+	"pst erase,  then erase all secure storage data\n"
+	"pst erase key_burned_flag,  then erase the dedicate data\n"
+	"NULL"
+);
+#endif
+
+
+#ifdef CONFIG_SUNXI_USER_KEY
+
 int update_user_data(void)
 {
 	if(uboot_spare_head.boot_data.work_mode != WORK_MODE_BOOT)
@@ -491,30 +539,30 @@ int update_user_data(void)
 
 	check_user_data();											//从env中检测用户的环境变量
 
-#ifdef CONFIG_SUNXI_SECURE_STORAGE
+#if defined(CONFIG_SUNXI_SECURE_STORAGE)
 	int data_len;
 	int ret, k;
 	char buffer[512];
 	int updata_data_num = 0;
 
 	if(!sunxi_secure_storage_init())
-	{	
+	{
 		memset(buffer, 0, 512);
-		for (k = 0; k < USER_DATA_NUM; k++) 
+		for (k = 0; k < USER_DATA_NUM; k++)
 		{
 			ret = sunxi_secure_object_read(USER_DATA_NAME[k], buffer, 512, &data_len);
-			if(!ret && data_len < 512) 
+			if(!ret && data_len < 512)
 			{
 				//sunxi_dump(buffer, data_len);
 				setenv(USER_DATA_NAME[k], buffer);
-				printf("update %s = %s\n", USER_DATA_NAME[k], buffer);					
+				printf("update %s = %s\n", USER_DATA_NAME[k], buffer);
 				memset(buffer, 0, 512);
 				updata_data_num++;
 				strcpy(USER_DATA_NAME[k], "\0");
 			}
 		}
 	}
-#endif
+#elif defined(CONFIG_SUNXI_PRIVATE_KEY)
 
 	int i, j;
 	unsigned int part_offset;					//分区的地址偏移酿
@@ -533,10 +581,10 @@ int update_user_data(void)
 			printf("read flash error\n");
 			return 0;
 		}
-		
+
 		user_data_head = (USER_DATA_HEAR *)user_data_buffer;
 		user_data_p = (USER_PRIVATE_DATA *)(user_data_buffer + sizeof(USER_DATA_HEAR));
-	
+
 		if (strncmp(user_data_head->magic_name, MAGIC, 5)) { 				//校验数据是否有效
 			printf("the user data'magic is bad\n");
 			return 0;
@@ -560,6 +608,7 @@ int update_user_data(void)
 		return 0;
 	}
 	printf("the %s part isn't exist\n", PART_NAME);
+#endif
 	return 0;
 }
 
@@ -586,7 +635,7 @@ void check_user_data(void)
 	int i, j;
 
 	//command_p = getenv("boot_base");  //合并nand和mmc启动参数后的方法，暂时不璿
-	if((uboot_spare_head.boot_data.storage_type == 1) || (uboot_spare_head.boot_data.storage_type == 2))
+	if((get_boot_storage_type() == STORAGE_SD) || (get_boot_storage_type() == STORAGE_EMMC))
 	{
 		command_p = getenv("setargs_mmc");
 	}
@@ -653,4 +702,6 @@ void check_user_data(void)
 	}
 */
 }
+
+#endif
 

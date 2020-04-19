@@ -158,6 +158,7 @@ struct crypt_config {
 	unsigned long flags;
 	unsigned int key_size;
 	unsigned int key_parts;
+	bool emmc_sup_crypto;
 	u8 key[0];
 };
 
@@ -169,6 +170,10 @@ static struct kmem_cache *_crypt_io_pool;
 static void clone_init(struct dm_crypt_io *, struct bio *);
 static void kcryptd_queue_crypt(struct dm_crypt_io *io);
 static u8 *iv_of_dmreq(struct crypt_config *cc, struct dm_crypt_request *dmreq);
+#ifdef CONFIG_SUNXI_EMCE
+static void kcryptd_crypt_write_io_submit(struct dm_crypt_io *io, int async);
+extern int sunxi_emce_set_key(const u8 *mkey, u32 len);
+#endif
 
 /*
  * Use this to access cipher attributes that are the same for each CPU.
@@ -923,12 +928,20 @@ static void crypt_endio(struct bio *clone, int error)
 	/*
 	 * free the processed pages
 	 */
+#ifndef CONFIG_SUNXI_EMCE
 	if (rw == WRITE)
+#else
+	if ((!(cc->emmc_sup_crypto)) && (rw == WRITE))
+#endif
 		crypt_free_buffer_pages(cc, clone);
 
 	bio_put(clone);
 
+#ifndef CONFIG_SUNXI_EMCE
 	if (rw == READ && !error) {
+#else
+	if ((!(cc->emmc_sup_crypto)) && (rw == READ && !error)) {
+#endif
 		kcryptd_queue_crypt(io);
 		return;
 	}
@@ -949,7 +962,11 @@ static void clone_init(struct dm_crypt_io *io, struct bio *clone)
 	clone->bi_rw      = io->base_bio->bi_rw;
 }
 
+#ifndef CONFIG_SUNXI_EMCE
 static int kcryptd_io_read(struct dm_crypt_io *io, gfp_t gfp)
+#else
+static int kcryptd_io_only(struct dm_crypt_io *io, gfp_t gfp)
+#endif
 {
 	struct crypt_config *cc = io->cc;
 	struct bio *base_bio = io->base_bio;
@@ -973,10 +990,27 @@ static int kcryptd_io_read(struct dm_crypt_io *io, gfp_t gfp)
 	return 0;
 }
 
+#ifdef CONFIG_SUNXI_EMCE
+static int kcryptd_io_read(struct dm_crypt_io *io, gfp_t gfp)
+{
+	return kcryptd_io_only(io, gfp);
+}
+#endif
+
 static void kcryptd_io_write(struct dm_crypt_io *io)
 {
+#ifdef CONFIG_SUNXI_EMCE
+	if ((io->cc->emmc_sup_crypto)) {
+		crypt_inc_pending(io);
+		if (kcryptd_io_only(io, GFP_NOIO))
+			io->error = -ENOMEM;
+		crypt_dec_pending(io);
+	} else
+#endif
+	{
 	struct bio *clone = io->ctx.bio_out;
 	generic_make_request(clone);
+	}
 }
 
 static void kcryptd_io(struct work_struct *work)
@@ -1323,7 +1357,6 @@ static void crypt_dtr(struct dm_target *ti)
 		destroy_workqueue(cc->crypt_queue);
 
 	crypt_free_tfms(cc);
-
 	if (cc->bs)
 		bioset_free(cc->bs);
 
@@ -1499,17 +1532,40 @@ bad_mem:
 	return -ENOMEM;
 }
 
+#ifdef CONFIG_SUNXI_EMCE
+static void kcryptd_io_read_handle(struct dm_crypt_io *io)
+{
+	if (kcryptd_io_read(io, GFP_NOWAIT))
+		kcryptd_queue_io(io);
+}
+
+static void kcryptd_io_write_handle(struct dm_crypt_io *io)
+{
+	if (io->cc->emmc_sup_crypto)
+		kcryptd_queue_io(io);
+	else
+		kcryptd_queue_crypt(io);
+}
+
+int sunxi_crypt_need_crypt(struct bio *bio)
+{
+	return bio->bi_end_io == crypt_endio;
+}
+EXPORT_SYMBOL_GPL(sunxi_crypt_need_crypt);
+#endif
+
 /*
  * Construct an encryption mapping:
  * <cipher> <key> <iv_offset> <dev_path> <start>
  */
+
 static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 {
 	struct crypt_config *cc;
 	unsigned int key_size, opt_params;
 	unsigned long long tmpll;
 	int ret;
-	size_t iv_size_padding;
+	size_t iv_size_padding = 0;
 	struct dm_arg_set as;
 	const char *opt_string;
 	char dummy;
@@ -1524,7 +1580,6 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	}
 
 	key_size = strlen(argv[1]) >> 1;
-
 	cc = kzalloc(sizeof(*cc) + key_size * sizeof(u8), GFP_KERNEL);
 	if (!cc) {
 		ti->error = "Cannot allocate encryption context";
@@ -1533,10 +1588,18 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	cc->key_size = key_size;
 
 	ti->private = cc;
-	ret = crypt_ctr_cipher(ti, argv[0], argv[1]);
-	if (ret < 0)
-		goto bad;
 
+	if (strcmp(argv[3], "/dev/block/by-name/UDISK")) {
+		ret = crypt_ctr_cipher(ti, argv[0], argv[1]);
+		if (ret < 0)
+			goto bad;
+	} else {
+#ifndef CONFIG_SUNXI_EMCE
+		ret = crypt_ctr_cipher(ti, argv[0], argv[1]);
+		if (ret < 0)
+			goto bad;
+#endif
+	}
 	ret = -ENOMEM;
 	cc->io_pool = mempool_create_slab_pool(MIN_IOS, _crypt_io_pool);
 	if (!cc->io_pool) {
@@ -1544,6 +1607,41 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		goto bad;
 	}
 
+#ifdef CONFIG_SUNXI_EMCE
+	if (!strcmp(argv[3], "/dev/block/by-name/UDISK")) {
+		cc->emmc_sup_crypto = 1;
+		/*set key for emce*/
+		if (cc->key_size &&
+			crypt_decode_key(cc->key, argv[1], cc->key_size) < 0) {
+			ti->error = "crypt decode key fail";
+			goto bad;
+		}
+		set_bit(DM_CRYPT_KEY_VALID, &cc->flags);
+
+		if (sunxi_emce_set_key(cc->key, cc->key_size)) {
+			ti->error = "sunxi emce set key fail";
+			goto bad;
+		}
+	} else {
+		cc->emmc_sup_crypto = 0;
+		cc->dmreq_start = sizeof(struct ablkcipher_request);
+		cc->dmreq_start += crypto_ablkcipher_reqsize(any_tfm(cc));
+		cc->dmreq_start = ALIGN(cc->dmreq_start, __alignof__(struct dm_crypt_request));
+
+		if (crypto_ablkcipher_alignmask(any_tfm(cc)) < CRYPTO_MINALIGN)
+			 /* Allocate the padding exactly */
+			iv_size_padding = -(cc->dmreq_start + sizeof(struct dm_crypt_request))
+					& crypto_ablkcipher_alignmask(any_tfm(cc));
+		else {
+			/*
+			* If the cipher requires greater alignment than kmalloc
+			* alignment, we don't know the exact position of the
+			* initialization vector. We must assume worst case.
+			*/
+			iv_size_padding = crypto_ablkcipher_alignmask(any_tfm(cc));
+		}
+	}
+#else
 	cc->dmreq_start = sizeof(struct ablkcipher_request);
 	cc->dmreq_start += crypto_ablkcipher_reqsize(any_tfm(cc));
 	cc->dmreq_start = ALIGN(cc->dmreq_start, __alignof__(struct dm_crypt_request));
@@ -1560,6 +1658,7 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		 */
 		iv_size_padding = crypto_ablkcipher_alignmask(any_tfm(cc));
 	}
+#endif
 
 	cc->req_pool = mempool_create_kmalloc_pool(MIN_IOS, cc->dmreq_start +
 			sizeof(struct dm_crypt_request) + iv_size_padding + cc->iv_size);
@@ -1632,16 +1731,30 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		goto bad;
 	}
 
+#ifdef CONFIG_MMC_EMCE
+	if (!(cc->emmc_sup_crypto)) {
+		cc->crypt_queue = alloc_workqueue("kcryptd",
+						WQ_NON_REENTRANT|
+						WQ_CPU_INTENSIVE|
+						WQ_MEM_RECLAIM,
+						1);
+		if (!cc->crypt_queue) {
+			ti->error = "Couldn't create kcryptd queue";
+			goto bad;
+		}
+	}
+#else
 	cc->crypt_queue = alloc_workqueue("kcryptd",
-					  WQ_NON_REENTRANT|
-					  WQ_CPU_INTENSIVE|
-					  WQ_MEM_RECLAIM,
-					  1);
+						WQ_NON_REENTRANT|
+						WQ_CPU_INTENSIVE|
+						WQ_MEM_RECLAIM,
+						1);
 	if (!cc->crypt_queue) {
 		ti->error = "Couldn't create kcryptd queue";
 		goto bad;
 	}
 
+#endif
 	ti->num_flush_bios = 1;
 	ti->discard_zeroes_data_unsupported = true;
 
@@ -1668,14 +1781,20 @@ static int crypt_map(struct dm_target *ti, struct bio *bio)
 			bio->bi_sector = cc->start + dm_target_offset(ti, bio->bi_sector);
 		return DM_MAPIO_REMAPPED;
 	}
-
 	io = crypt_io_alloc(cc, bio, dm_target_offset(ti, bio->bi_sector));
 
+#ifdef CONFIG_SUNXI_EMCE
+	if (bio_data_dir(io->base_bio) == READ)
+		kcryptd_io_read_handle(io);
+	else
+		kcryptd_io_write_handle(io);
+#else
 	if (bio_data_dir(io->base_bio) == READ) {
 		if (kcryptd_io_read(io, GFP_NOWAIT))
 			kcryptd_queue_io(io);
 	} else
 		kcryptd_queue_crypt(io);
+#endif
 
 	return DM_MAPIO_SUBMITTED;
 }

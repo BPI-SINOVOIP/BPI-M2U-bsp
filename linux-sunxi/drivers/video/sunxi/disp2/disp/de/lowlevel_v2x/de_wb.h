@@ -22,6 +22,8 @@ s32 wb_ebios_writeback_enable(u32 sel, bool en);
 s32 wb_ebios_set_para(u32 sel, struct disp_capture_config *cfg);
 s32 wb_ebios_apply(u32 sel, struct disp_capture_config *cfg);
 s32 wb_ebios_update_regs(u32 sel);
+s32 wb_ebios_reset(u32 sel);
+s32 wb_ebios_dereset(u32 sel);
 u32 wb_ebios_get_status(u32 sel);
 s32 wb_ebios_enableint(u32 sel);
 s32 wb_ebios_disableint(u32 sel);

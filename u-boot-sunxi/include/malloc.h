@@ -939,6 +939,8 @@ extern ulong mem_malloc_brk;
 void mem_malloc_init(ulong start, ulong size);
 void *malloc_noncache(uint num_bytes);
 void  free_noncache(void *p);
+void *malloc_align(size_t size,size_t align);
+void free_align(void *ptr);
 
 #ifdef __cplusplus
 };  /* end of extern "C" */

@@ -46,14 +46,12 @@ void sunxi_serial_init(int uart_port, void *gpio_cfg, int gpio_max)
 {
 	u32 reg, i;
 	u32 uart_clk;
+
 #ifdef FPGA_PLATFORM
 	normal_gpio_set_t fpga_uart_gpio[2] =
 	{
-	//	{ 1, 5, 2, 1, 1, 0, {0}},//PA5: 2--RX
-	//	{ 1, 6, 2, 1, 1, 0, {0}},//PA6: 2--TX
-
-		{ 6, 2, 3, 1, 1, 0, {0}},//PF2: 3--RX
-		{ 6, 4, 3, 1, 1, 0, {0}},//PF4: 3--TX
+		{ 1, 5, 2, 1, 1, 0, {0}},//PA5: 2--RX
+		{ 1, 4, 2, 1, 1, 0, {0}},//PA4: 2--TX
 	};
 #endif
 

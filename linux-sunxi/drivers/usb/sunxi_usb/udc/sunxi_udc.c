@@ -48,6 +48,7 @@
 
 #if defined(CONFIG_AW_AXP)
 #include <linux/mfd/axp-mfd.h>
+#include <linux/power/axp_depend.h>
 #endif
 
 #define DRIVER_DESC	"SoftWinner USB Device Controller"
@@ -789,6 +790,8 @@ static int sunxi_udc_get_status(struct sunxi_udc *dev, struct usb_ctrlrequest *c
 	u8  ep_num  = crq->wIndex & 0x7F;
 	u8  is_in   = crq->wIndex & USB_DIR_IN;
 	void __iomem *fifo = 0;
+	u8 old_ep_index = 0;
+	int  ret = 0;
 
 	switch (crq->bRequestType & USB_RECIP_MASK) {
 	case USB_RECIP_INTERFACE:
@@ -807,15 +810,19 @@ static int sunxi_udc_get_status(struct sunxi_udc *dev, struct usb_ctrlrequest *c
 			return 1;
 		}
 
+		old_ep_index = USBC_GetActiveEp(g_sunxi_udc_io.usb_bsp_hdle);
 		USBC_SelectActiveEp(g_sunxi_udc_io.usb_bsp_hdle, ep_num);
 		if (ep_num == 0) {
 			status = USBC_Dev_IsEpStall(g_sunxi_udc_io.usb_bsp_hdle, USBC_EP_TYPE_EP0);
 		} else {
 			if (is_in) {
-				status = USBC_Dev_IsEpStall(g_sunxi_udc_io.usb_bsp_hdle, USBC_EP_TYPE_TX);
+				ret = readw(g_sunxi_udc_io.usb_vbase + USBC_REG_o_TXCSR);
+				status = ret & (0x1 << USBC_BP_TXCSR_D_SEND_STALL);
 			} else {
-				status = USBC_Dev_IsEpStall(g_sunxi_udc_io.usb_bsp_hdle, USBC_EP_TYPE_RX);
+				ret = readw(g_sunxi_udc_io.usb_vbase + USBC_REG_o_RXCSR);
+				status = ret & (0x1 << USBC_BP_RXCSR_D_SEND_STALL);
 			}
+
 		}
 		status = status ? 1 : 0;
 		if (status) {
@@ -825,6 +832,7 @@ static int sunxi_udc_get_status(struct sunxi_udc *dev, struct usb_ctrlrequest *c
 			buf[0] = 0x00;
 			buf[1] = 0x00;
 		}
+		USBC_SelectActiveEp(g_sunxi_udc_io.usb_bsp_hdle, old_ep_index);
 		break;
 
 	default:
@@ -843,7 +851,7 @@ static int sunxi_udc_get_status(struct sunxi_udc *dev, struct usb_ctrlrequest *c
 }
 
 static int sunxi_udc_set_halt(struct usb_ep *_ep, int value);
-static int sunxi_udc_set_halt_ex(struct usb_ep *_ep, int value);
+static int sunxi_udc_set_halt_ex(struct usb_ep *_ep, int value, int is_in);
 
 static void sunxi_udc_handle_ep0_idle(struct sunxi_udc *dev,
 						struct sunxi_udc_ep *ep,
@@ -851,6 +859,7 @@ static void sunxi_udc_handle_ep0_idle(struct sunxi_udc *dev,
 						u32 ep0csr)
 {
 	int len = 0, ret = 0, tmp = 0;
+	int is_in = 0;
 
 	/* start control request? */
 	if (!USBC_Dev_IsReadDataReady(g_sunxi_udc_io.usb_bsp_hdle, USBC_EP_TYPE_EP0)) {
@@ -937,7 +946,8 @@ static void sunxi_udc_handle_ep0_idle(struct sunxi_udc *dev,
 				}else{
 					int k = 0;
 					for(k = 0;k < SW_UDC_ENDPOINTS;k++){
-						sunxi_udc_set_halt_ex(&dev->ep[k].ep, 0);
+						is_in = crq->wIndex & USB_DIR_IN;
+						sunxi_udc_set_halt_ex(&dev->ep[k].ep, 0, is_in);
 					}
 				}
 
@@ -954,7 +964,12 @@ static void sunxi_udc_handle_ep0_idle(struct sunxi_udc *dev,
 				if(crq->wValue){
 					dev->devstatus &= ~(1 << USB_DEVICE_REMOTE_WAKEUP);
 				}else{
-					sunxi_udc_set_halt_ex(&dev->ep[crq->wIndex & 0x7f].ep, 0);
+					int k = 0;
+					is_in = crq->wIndex & USB_DIR_IN;
+					for (k = 0; k < SW_UDC_ENDPOINTS; k++) {
+						if (dev->ep[k].bEndpointAddress == (crq->wIndex & 0xff))
+							sunxi_udc_set_halt_ex(&dev->ep[k].ep, 0, is_in);
+					}
 				}
 
 			}else{
@@ -1017,8 +1032,13 @@ static void sunxi_udc_handle_ep0_idle(struct sunxi_udc *dev,
 
 			}else if(crq->bRequestType == USB_RECIP_ENDPOINT){
 				//--<3>--forbidden ep
+				int k = 0;
+				is_in = crq->wIndex & USB_DIR_IN;
 				USBC_Dev_ReadDataStatus(g_sunxi_udc_io.usb_bsp_hdle, USBC_EP_TYPE_EP0, 1);
-						sunxi_udc_set_halt_ex(&dev->ep[crq->wIndex & 0x7f].ep, 1);
+				for (k = 0; k < SW_UDC_ENDPOINTS; k++) {
+					if (dev->ep[k].bEndpointAddress == (crq->wIndex & 0xff))
+						sunxi_udc_set_halt_ex(&dev->ep[k].ep, 1, is_in);
+				}
 			}else{
 				DMSG_PANIC("PANIC : nonsupport set feature request. (%d)\n", crq->bRequestType);
 
@@ -1593,14 +1613,7 @@ static irqreturn_t sunxi_udc_irq(int dummy, void *_dev)
 		USBC_INT_ClearMiscPending(g_sunxi_udc_io.usb_bsp_hdle, USBC_INTUSB_SUSPEND);
 
 		if (dev->gadget.speed != USB_SPEED_UNKNOWN) {
-
-			/* disable usb controller */
-			if (dev->driver && dev->driver->disconnect) {
-				spin_unlock(&dev->lock);
-				dev->driver->disconnect(&dev->gadget);
-				spin_lock(&dev->lock);
-			}
-
+			schedule_work(&dev->vbus_det_work);
 			usb_connect = 0;
 		} else {
 			DMSG_INFO_UDC("ERR: usb speed is unkown\n");
@@ -1755,6 +1768,20 @@ static inline struct sunxi_udc *to_sunxi_udc(struct usb_gadget *gadget)
 static inline struct sunxi_udc_request *to_sunxi_udc_req(struct usb_request *req)
 {
 	return container_of(req, struct sunxi_udc_request, req);
+}
+
+static void sunxi_udc_ep_config_reset(struct sunxi_udc_ep *ep)
+{
+	if (ep->bmAttributes == USB_ENDPOINT_XFER_CONTROL)
+		ep->ep.maxpacket = EP0_FIFO_SIZE;
+	else if (ep->bmAttributes == USB_ENDPOINT_XFER_ISOC)
+		ep->ep.maxpacket = SW_UDC_EP_ISO_FIFO_SIZE;
+	else if (ep->bmAttributes == USB_ENDPOINT_XFER_BULK)
+		ep->ep.maxpacket = SW_UDC_EP_FIFO_SIZE;
+	else if (ep->bmAttributes == USB_ENDPOINT_XFER_INT)
+		ep->ep.maxpacket = SW_UDC_EP_FIFO_SIZE;
+	else
+		DMSG_PANIC("[ep_disable] ep type is invalid!\n");
 }
 
 static int sunxi_udc_ep_enable(struct usb_ep *_ep,
@@ -1936,6 +1963,7 @@ static int sunxi_udc_ep_disable(struct usb_ep *_ep)
 
 	ep->desc = NULL;
 	ep->halted = 1;
+	sunxi_udc_ep_config_reset(ep);
 
 	sunxi_udc_nuke (ep->dev, ep, -ESHUTDOWN);
 
@@ -2201,13 +2229,24 @@ static int sunxi_udc_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 			req, _ep->name, _req->length, _req->buf);
 
 		sunxi_udc_done(ep, req, -ECONNRESET);
+		/*
+		 * If dma is capable, we should disable the dma channel and
+		 * clean dma status, or it would cause dma hang when unexpected
+		 * abort occurs.
+		 */
+		if (is_sunxi_udc_dma_capable(req, ep)) {
+#ifdef SW_UDC_DMA_INNER
+			sunxi_udc_dma_chan_disable((dm_hdl_t)ep->dev->dma_hdle);
+			sunxi_udc_clean_dma_status(ep);
+#endif
+		}
 	}
 
 	spin_unlock_irqrestore(&ep->dev->lock, flags);
 	return retval;
 }
 
-static int sunxi_udc_set_halt_ex(struct usb_ep *_ep, int value)
+static int sunxi_udc_set_halt_ex(struct usb_ep *_ep, int value, int is_in)
 {
 	struct sunxi_udc_ep *ep = NULL;
 	u32 idx = 0;
@@ -2242,7 +2281,7 @@ static int sunxi_udc_set_halt_ex(struct usb_ep *_ep, int value)
 	if (idx == 0) {
 		USBC_Dev_EpClearStall(g_sunxi_udc_io.usb_bsp_hdle, USBC_EP_TYPE_EP0);
 	} else {
-		if ((ep->bEndpointAddress & USB_DIR_IN) != 0) {
+		if (is_in) {
 			if (value) {
 				USBC_Dev_EpSendStall(g_sunxi_udc_io.usb_bsp_hdle, USBC_EP_TYPE_TX);
 			} else {
@@ -2446,12 +2485,25 @@ static int sunxi_get_udc_base(struct platform_device *pdev, sunxi_udc_io_t *sunx
 
 	struct device_node *np = pdev->dev.of_node;
 
+	#ifdef CONFIG_ARCH_SUN3IW1
+	__u32 reg_value = 0;
+	#endif
 	sunxi_udc_io->usb_vbase  = of_iomap(np, 0);
 	if (sunxi_udc_io->usb_vbase == NULL) {
 		dev_err(&pdev->dev, "can't get usb_vbase resource\n");
 		return -EINVAL;
 	}
 
+	#ifdef CONFIG_ARCH_SUN3IW1
+	sunxi_udc_io->sram_vbase  = of_iomap(np, 1);
+	if (sunxi_udc_io->sram_vbase == NULL) {
+		dev_err(&pdev->dev, "can't get sram_vbase resource\n");
+		return -EINVAL;
+	}
+	reg_value = USBC_Readl(sunxi_udc_io->sram_vbase + 0x04);
+	reg_value |= 0x01;
+	USBC_Writel(reg_value, (sunxi_udc_io->sram_vbase + 0x04));
+	#endif
 	//DMSG_INFO("usbc base:%p\n", sunxi_udc_io->usb_vbase);
 	return 0;
 }
@@ -2475,24 +2527,6 @@ static int sunxi_get_udc_clock(struct platform_device *pdev, sunxi_udc_io_t *sun
 	}
 	return 0;
 }
-
-
-#ifdef  SUNXI_USB_FPGA
-static int sunxi_get_sram_base(struct platform_device *pdev, sunxi_udc_io_t *sunxi_udc_io)
-{
-	struct device_node *np = pdev->dev.of_node;
-
-	sunxi_udc_io->sram_vbase  = of_iomap(np, 1);
-	if (sunxi_udc_io->sram_vbase == NULL) {
-		dev_err(&pdev->dev, "can't get sram resource\n");
-		return -EINVAL;
-	}
-
-	//DMSG_INFO("sram_vbase:%p\n", sunxi_udc_io->sram_vbase);
-
-	return 0;
-}
-#endif
 
 /* gadget driver handling */
 static void sunxi_udc_reinit(struct sunxi_udc *dev)
@@ -2531,10 +2565,9 @@ static void sunxi_udc_enable(struct sunxi_udc *dev)
 	USBC_Dev_ConfigTransferMode(g_sunxi_udc_io.usb_bsp_hdle, USBC_TS_TYPE_BULK, USBC_TS_MODE_HS);
 
 	/* Enable reset and suspend interrupt interrupts */
-	USBC_INT_EnableUsbMiscUint(g_sunxi_udc_io.usb_bsp_hdle, USBC_BP_INTUSB_SUSPEND);
-	USBC_INT_EnableUsbMiscUint(g_sunxi_udc_io.usb_bsp_hdle, USBC_BP_INTUSB_RESUME);
-	USBC_INT_EnableUsbMiscUint(g_sunxi_udc_io.usb_bsp_hdle, USBC_BP_INTUSB_RESET);
-	USBC_INT_EnableUsbMiscUint(g_sunxi_udc_io.usb_bsp_hdle, USBC_BP_INTUSB_DISCONNECT);
+	USBC_INT_EnableUsbMiscUint(g_sunxi_udc_io.usb_bsp_hdle, USBC_INTUSB_SUSPEND);
+	USBC_INT_EnableUsbMiscUint(g_sunxi_udc_io.usb_bsp_hdle, USBC_INTUSB_RESUME);
+	USBC_INT_EnableUsbMiscUint(g_sunxi_udc_io.usb_bsp_hdle, USBC_INTUSB_RESET);
 
 	/* Enable ep0 interrupt */
 	USBC_INT_EnableEp(g_sunxi_udc_io.usb_bsp_hdle, USBC_EP_TYPE_TX, 0);
@@ -2645,14 +2678,7 @@ static int sunxi_udc_stop(struct usb_gadget *g,
 
 	DMSG_INFO_UDC("[%s]: usb_gadget_unregister_driver() '%s'\n", gadget_name, driver->driver.name);
 
-	if (driver->disconnect) {
-		driver->disconnect(&udc->gadget);
-	}
-
-	/* unbind gadget driver */
-	driver->unbind(&udc->gadget);
 	udc->gadget.dev.driver = NULL;
-	device_del(&udc->gadget.dev);
 	udc->driver = NULL;
 
 	/* Disable udc */
@@ -2769,7 +2795,8 @@ static struct sunxi_udc sunxi_udc = {
 		.bmAttributes	    = USB_ENDPOINT_XFER_INT,
 	},
 
-#if defined(CONFIG_ARCH_SUN50IW1)
+#if defined(CONFIG_ARCH_SUN50IW1) || defined(CONFIG_ARCH_SUN8IW6) \
+	|| defined(CONFIG_ARCH_SUN8IW5)
 	.ep[7] = {
 		.num			= 5,
 		.ep = {
@@ -2798,6 +2825,24 @@ static struct sunxi_udc sunxi_udc = {
 #endif
 
 };
+
+static void sunxi_vbus_det_work(struct work_struct *work)
+{
+	struct sunxi_udc *udc = NULL;
+
+	/* wait for axp vbus detect ready */
+	msleep(100);
+
+	udc = container_of(work, struct sunxi_udc, vbus_det_work);
+
+#if defined(CONFIG_AW_AXP)
+	if (!axp_usb_is_connected()
+			&& udc->driver && udc->driver->disconnect)
+#else
+	if (udc->driver && udc->driver->disconnect)
+#endif
+		udc->driver->disconnect(&udc->gadget);
+}
 
 void __iomem *get_otgc_vbase(void)
 {
@@ -2835,6 +2880,9 @@ int get_dp_dm_status_normal(void)
 }
 EXPORT_SYMBOL_GPL(get_dp_dm_status_normal);
 
+static int sunxi_get_udc_resource(struct platform_device *pdev,
+		sunxi_udc_io_t *sunxi_udc_io);
+
 int sunxi_usb_device_enable(void)
 {
 	struct platform_device *pdev	= g_udc_pdev;
@@ -2851,6 +2899,21 @@ int sunxi_usb_device_enable(void)
 	usb_connect 	= 0;
 	crq_bRequest 	= 0;
 	is_controller_alive = 1;
+
+#if defined(CONFIG_ARCH_SUN8IW6) || defined(CONFIG_ARCH_SUN3IW1) \
+	|| defined(CONFIG_ARCH_SUN8IW5)
+	retval = sunxi_get_udc_resource(pdev, &g_sunxi_udc_io);
+	if (retval != 0) {
+		DMSG_PANIC("ERR: sunxi_get_udc_resource, is fail\n");
+		return -ENODEV;
+	}
+
+	retval = sunxi_udc_io_init(usbd_port_no, &g_sunxi_udc_io);
+	if (retval != 0) {
+		DMSG_PANIC("ERR: sunxi_udc_io_init failed\n");
+		return -1;
+	}
+#endif
 
 	retval = sunxi_udc_bsp_init(&g_sunxi_udc_io);
 	if (retval != 0) {
@@ -2887,6 +2950,8 @@ int sunxi_usb_device_enable(void)
 		}
 	}
 
+	INIT_WORK(&udc->vbus_det_work, sunxi_vbus_det_work);
+
 	retval = request_irq(udc->irq_no, sunxi_udc_irq,
 			IRQF_DISABLED, gadget_name, udc);
 	if (retval != 0) {
@@ -2909,6 +2974,9 @@ err:
 	}
 
 	sunxi_udc_bsp_exit(&g_sunxi_udc_io);
+#if defined(CONFIG_ARCH_SUN8IW6) || defined(CONFIG_ARCH_SUN8IW5)
+	sunxi_udc_io_exit(&g_sunxi_udc_io);
+#endif
 
 	return retval;
 }
@@ -3004,14 +3072,6 @@ static int sunxi_get_udc_resource(struct platform_device *pdev, sunxi_udc_io_t *
 		dev_err(&pdev->dev, "can't get udc clock\n");
 		goto err0;
 	}
-
-#ifdef  SUNXI_USB_FPGA
-	retval =  sunxi_get_sram_base(pdev, sunxi_udc_io);
-	if(retval != 0){
-		dev_err(&pdev->dev, "can't get sram base\n");
-		goto err0;
-	}
-#endif
 
 	return 0;
 err0:

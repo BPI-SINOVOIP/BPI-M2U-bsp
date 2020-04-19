@@ -385,4 +385,13 @@ static inline int mtd_is_bitflip_or_eccerr(int err) {
 	return mtd_is_bitflip(err) || mtd_is_eccerr(err);
 }
 
+/* sunxi mtd functions */
+int sunxi_do_mtdparts(int flag, int argc, char * const argv[]);
+char *sunxi_get_mtdparts_name(u16 mtd_partnum);
+u64 sunxi_get_mtdpart_size(u16 mtd_partnum);
+u16 sunxi_get_mtd_num_parts(void);
+u64 sunxi_get_mtdpart_offset(u16 mtd_partnum);
+
+extern void set_default_env(const char *s);
+
 #endif /* __MTD_MTD_H__ */

@@ -33,6 +33,8 @@ source "drivers/media/platform/omap/Kconfig"
 
 source "drivers/media/platform/blackfin/Kconfig"
 
+source "drivers/media/platform/sunxi-eve/Kconfig"
+
 config VIDEO_SH_VOU
 	tristate "SuperH VOU video output driver"
 	depends on MEDIA_CAMERA_SUPPORT
@@ -128,7 +130,7 @@ source "drivers/media/platform/s5p-tv/Kconfig"
 config VIDEO_SUNXI_VFE
 	tristate "sunxi video front end (camera and etc)driver"
 	default m
-	
+
 if VIDEO_SUNXI_VFE
 source "drivers/media/platform/sunxi-vfe/Kconfig"
 endif
@@ -143,6 +145,12 @@ endif
 
 config VIDEO_SUNXI_TVD
 	tristate "sunxi tvd driver"
+	depends on ARCH_SUN8IW11
+	select VIDEOBUF2_DMA_CONTIG
+	default m
+
+config VIDEO_SUNXI_V4IN1
+	tristate "sunxi vfin1 driver"
 	depends on ARCH_SUN8IW11
 	default m
 

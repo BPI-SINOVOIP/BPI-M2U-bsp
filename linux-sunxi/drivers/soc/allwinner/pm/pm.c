@@ -11,6 +11,7 @@
 #include <linux/clk-private.h>
 #include <linux/clk/sunxi.h>
 #include <asm/cpuidle.h>
+
 static struct kobject *aw_pm_kobj;
 unsigned long cpu_resume_addr;
 /*
@@ -70,8 +71,11 @@ static int aw_pm_valid(suspend_state_t state)
 #if defined(CONFIG_ARCH_SUN9IW1P1) || \
 	defined(CONFIG_ARCH_SUN8IW5P1) || \
 	defined(CONFIG_ARCH_SUN8IW6P1) || \
+	defined(CONFIG_ARCH_SUN8IW17P1) || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1)
 	if (NORMAL_STANDBY == standby_type) {
 		printk
 		    ("Notice: sun9i & sun8iw5 & sun50i not need support normal standby, \
@@ -98,7 +102,6 @@ static int aw_pm_valid(suspend_state_t state)
 #endif
 
 	return 1;
-
 }
 
 /*
@@ -130,6 +133,9 @@ static int aw_pm_begin(suspend_state_t state)
 	/*cpufreq_user_event_notify(); */
 #endif
 
+#ifdef CONFIG_SUNXI_ARISC
+	arisc_clear_wakeup_source();
+#endif
 	/*must init perfcounter, because delay_us and delay_ms is depandant perf counter */
 
 	/*check rtc status, if err happened, do sth to fix it. */
@@ -257,6 +263,59 @@ static int aw_pm_prepare_late(void)
 #endif
 }
 
+#ifdef CONFIG_SUNXI_ARISC_COM_DIRECTLY
+static void __sunxi_suspend_cpu_die(void)
+{
+	unsigned long actlr;
+
+	/* step1: disable the data cache */
+	asm("mrc p15, 0, %0, c1, c0, 0" : "=r" (actlr));
+	actlr &= ~(1<<2);
+	asm volatile("mcr p15, 0, %0, c1, c0, 0\n" : : "r" (actlr));
+
+	/* step2: clean and ivalidate L1 cache */
+	flush_cache_all();
+
+	/* step3: execute a CLREX instruction */
+	asm("clrex" : : : "memory", "cc");
+
+	/*
+	 * step4: switch cpu from SMP mode to AMP mode,
+	 * aim is to disable cache coherency
+	 */
+	asm("mrc p15, 0, %0, c1, c0, 1" : "=r" (actlr));
+	actlr &= ~(1<<6);
+	asm("mcr p15, 0, %0, c1, c0, 1\n" : : "r" (actlr));
+
+	/* step5: execute an ISB instruction */
+	isb();
+
+	/* step6: execute a DSB instruction  */
+	dsb();
+
+	/*
+	 * step7: if define trustzone, switch to secure os
+	 * and then enter to wfi mode
+	 */
+#ifdef CONFIG_SUNXI_TRUSTZONE
+	call_firmware_op(suspend);
+#else
+	/* step7: execute a WFI instruction */
+	while (1)
+		asm("wfi" : : : "memory", "cc");
+#endif
+}
+
+int  aw_standby_enter(unsigned long arg)
+{
+	struct super_standby_para *para = (struct super_standby_para *)(arg);
+
+	arisc_standby_super(para, NULL, NULL);
+	__sunxi_suspend_cpu_die();
+}
+#endif
+
+#ifndef CONFIG_ARCH_SUN3IW1P1
 /*
 *********************************************************************************************************
 *                           aw_early_suspend
@@ -311,6 +370,13 @@ static int aw_early_suspend(void)
 	}
 #ifdef RESUME_FROM_RESUME1
 	super_standby_para_info.resume_entry = SRAM_FUNC_START_PA;
+#ifdef CONFIG_ARCH_SUN8IW17
+	super_standby_para_info.resume_code_src =
+		(unsigned int)(virt_to_phys((void *)&resume1_bin_start));
+	super_standby_para_info.resume_code_length =
+		(int)&resume1_bin_end - (int)&resume1_bin_start;
+	super_standby_para_info.cpu_resume_entry = virt_to_phys(cpu_resume);
+#endif
 	if ((NULL != extended_standby_manager_id)
 	    && (NULL != extended_standby_manager_id->pextended_standby))
 		super_standby_para_info.pextended_standby =
@@ -433,6 +499,9 @@ static int aw_early_suspend(void)
 	restore_mapping();
 	/* report which wake source wakeup system */
 	query_wakeup_source(&standby_info);
+#elif defined(CONFIG_SUNXI_ARISC_COM_DIRECTLY)
+	cpu_suspend((unsigned long)(&super_standby_para_info), aw_standby_enter);
+	arisc_cpux_ready_notify();
 #elif defined(CONFIG_ARCH_SUN50I)
 #if defined(CONFIG_ARM)
 	arm_cpuidle_suspend(3);
@@ -457,6 +526,8 @@ static int aw_early_suspend(void)
 	return 0;
 
 }
+
+#endif
 
 /*
 *********************************************************************************************************
@@ -487,6 +558,37 @@ static int verify_restore(void *src, void *dest, int count)
 }
 #endif
 
+#ifdef CONFIG_ARCH_SUN3IW1P1
+static int aw_normal_standby(suspend_state_t state)
+{
+	mem_device_save();
+
+	/* support for time to wakeup */
+	standby_info.standby_para.timeout = time_to_wakeup;
+
+	standby_info.standby_para.event = CPU0_MEM_WAKEUP | CPU0_WAKEUP_KEY
+				| CPU0_WAKEUP_TIMEOUT | CPU0_WAKEUP_GPIO;
+
+	standby_info.standby_para.cpux_gpiog_bitmap = WAKEUP_GPIO_GROUP('D') |
+				WAKEUP_GPIO_GROUP('E') | WAKEUP_GPIO_GROUP('F');
+
+	init_wakeup_src(standby_info.standby_para.event,
+				standby_info.standby_para.gpio_enable_bitmap,
+				standby_info.standby_para.cpux_gpiog_bitmap);
+
+	cpu_suspend((unsigned long)(&standby_info), aw_standby_enter);
+
+	exit_wakeup_src(standby_info.standby_para.event,
+				standby_info.standby_para.gpio_enable_bitmap,
+				standby_info.standby_para.cpux_gpiog_bitmap);
+
+	query_wakeup_source(&standby_info);
+
+	mem_device_restore();
+
+	return 0;
+}
+#else
 /*
 *********************************************************************************************************
 *                           aw_super_standby
@@ -529,7 +631,7 @@ static int aw_super_standby(suspend_state_t state)
 	return 0;
 
 }
-
+#endif
 /*
  *********************************************************************************************************
  *                           aw_pm_enter
@@ -574,8 +676,11 @@ static int aw_pm_enter(suspend_state_t state)
 
 #if (defined(CONFIG_ARCH_SUN8IW8P1) || \
 	defined(CONFIG_ARCH_SUN8IW6P1) || \
+	defined(CONFIG_ARCH_SUN8IW17P1) || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)) && \
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1)) && \
 	defined(CONFIG_AW_AXP)
 	if (unlikely(debug_mask & PM_STANDBY_PRINT_PWR_STATUS)) {
 		printk(KERN_INFO "power status as follow:");
@@ -587,15 +692,18 @@ static int aw_pm_enter(suspend_state_t state)
 	/* config sys_pwr_dm according to the sysconfig */
 	config_sys_pwr();
 #endif
-
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	extended_standby_manager_id = get_extended_standby_manager();
 	extended_standby_show_state();
 	save_pm_secure_mem_status(error_gen
 				  (MOD_SUSPEND_CPUXSYS,
 				   ERR_SUSPEND_CPUXSYS_SHOW_DEVICES_STATE_DONE));
-
+#endif
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	aw_normal_standby(state);
+#else
 	aw_super_standby(state);
-
+#endif
 #ifdef CONFIG_SUNXI_ARISC
 	arisc_query_wakeup_source(&mem_para_info.axp_event);
 	PM_DBG("platform wakeup, standby wakesource is:0x%x\n",
@@ -618,9 +726,12 @@ static int aw_pm_enter(suspend_state_t state)
 	aw_pm_show_dev_status();
 
 #if (defined(CONFIG_ARCH_SUN8IW8P1) || \
-		defined(CONFIG_ARCH_SUN8IW6P1) || \
-		defined(CONFIG_ARCH_SUN50IW1P1) || \
-		defined(CONFIG_ARCH_SUN50IW2P1)) && \
+	defined(CONFIG_ARCH_SUN8IW6P1) || \
+	defined(CONFIG_ARCH_SUN8IW17P1) || \
+	defined(CONFIG_ARCH_SUN50IW1P1) || \
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1)) && \
 	defined(CONFIG_AW_AXP)
 	resume_sys_pwr_state();
 #endif
@@ -810,7 +921,9 @@ static struct attribute_group attr_group = {
 static int __init aw_pm_init(void)
 {
 	int ret = 0;
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	u32 value[3] = { 0, 0, 0 };
+#endif
 #if 0
 	struct device_node *sram_a1_np;
 	void __iomem *sram_a1_vbase;
@@ -822,7 +935,11 @@ static int __init aw_pm_init(void)
 	PM_DBG("aw_pm_init!\n");
 
 	/*init debug state */
+#ifdef CONFIG_ARCH_SUN3IW1P1
+	pm_secure_mem_status_init();	/* sun3iw1p1 have no rtc */
+#else
 	pm_secure_mem_status_init("rtc");
+#endif
 	/*for auto test reason. */
 	/**(volatile __u32 *)(STANDBY_STATUS_REG  + 0x08) = BOOT_UPGRADE_FLAG;*/
 
@@ -830,15 +947,18 @@ static int __init aw_pm_init(void)
 	defined(CONFIG_ARCH_SUN8IW6P1) || \
 	defined(CONFIG_ARCH_SUN8IW10P1) || \
 	defined(CONFIG_ARCH_SUN8IW11P1) || \
+	defined(CONFIG_ARCH_SUN8IW17P1) || \
 	defined(CONFIG_ARCH_SUN50IW1P1) || \
-	defined(CONFIG_ARCH_SUN50IW2P1)) && \
+	defined(CONFIG_ARCH_SUN50IW2P1) || \
+	defined(CONFIG_ARCH_SUN50IW3P1) || \
+	defined(CONFIG_ARCH_SUN50IW6P1)) && \
 	defined(CONFIG_AW_AXP)
 	config_pmu_para();
 	/*init sys_pwr_dm */
 	init_sys_pwr_dm();
 	config_dynamic_standby();
 #endif
-
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	standby_space.np =
 	    of_find_compatible_node(NULL, NULL, "allwinner,standby_space");
 	if (IS_ERR(standby_space.np)) {
@@ -854,12 +974,16 @@ static int __init aw_pm_init(void)
 		printk(KERN_ERR "get standby_space1 err. \n");
 		return -EINVAL;
 	}
-#if defined(CONFIG_ARCH_SUN8IW10P1) || defined(CONFIG_ARCH_SUN8IW11P1)
+#endif
+#if defined(CONFIG_ARCH_SUN8IW10P1) || defined(CONFIG_ARCH_SUN8IW11P1) || \
+	defined(CONFIG_ARCH_SUN3IW1P1)
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	ret = fetch_and_save_dram_para(&(standby_info.dram_para));
 	if (ret) {
 		printk(KERN_ERR "get standby dram para err. \n");
 		return -EINVAL;
 	}
+#endif
 	mem_device_init();
 	/*sram_a1_np = of_find_compatible_node(NULL, NULL, "allwinner,sram_a1");
 	   if (IS_ERR(sram_a1_np)) {
@@ -880,10 +1004,12 @@ static int __init aw_pm_init(void)
 	   panic("Can't map sram_a1 registers");
 	   printk("%s: sram_a1_vbase = 0x%x\n", __func__, (unsigned int)sram_a1_vbase); */
 #endif
+#ifndef CONFIG_ARCH_SUN3IW1P1
 	standby_space.standby_mem_base = (phys_addr_t) value[0];
 	standby_space.extended_standby_mem_base = (phys_addr_t) value[0] + 0x400;	/*1K bytes offset */
 	standby_space.mem_offset = (phys_addr_t) value[1];
 	standby_space.mem_size = (size_t) value[2];
+#endif
 
 	suspend_set_ops(&aw_pm_ops);
 	aw_pm_kobj = kobject_create_and_add("aw_pm", power_kobj);
@@ -918,5 +1044,5 @@ module_param_named(suspend_freq, suspend_freq, int, S_IRUGO | S_IWUSR);
 module_param_named(suspend_delay_ms, suspend_delay_ms, int, S_IRUGO | S_IWUSR);
 module_param_named(standby_mode, standby_mode, int, S_IRUGO | S_IWUSR);
 module_param_named(time_to_wakeup, time_to_wakeup, ulong, S_IRUGO | S_IWUSR);
-subsys_initcall_sync(aw_pm_init);
+module_init(aw_pm_init);
 module_exit(aw_pm_exit);

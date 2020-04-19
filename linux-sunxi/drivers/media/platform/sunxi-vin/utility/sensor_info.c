@@ -71,7 +71,6 @@ int get_sensor_info(char *sensor_name, struct sensor_item *sensor_info)
 			return 0;
 		}
 	}
-	vin_warn("NOT found item:%s, you can add it to the sensor_list_t!\n",
-	     sensor_name);
+	vin_log(VIN_LOG_CONFIG, "%s is not in the sensor_list_t!\n", sensor_name);
 	return -1;
 }

@@ -970,7 +970,11 @@ static int eink_detect_fresh_thread(void *parg)
 	return ret;
 }
 
-s32 eink_update_image(struct disp_eink_manager* manager, void * src_image, enum eink_update_mode mode, struct area_info update_area)
+s32 eink_update_image(struct disp_eink_manager *manager,
+				struct disp_layer_config *config,
+				unsigned int layer_num,
+				enum eink_update_mode mode,
+				struct area_info update_area)
 {
 	int ret = 0;
 	if (suspend)
@@ -980,7 +984,8 @@ s32 eink_update_image(struct disp_eink_manager* manager, void * src_image, enum 
 		return -EAGAIN;
 
 	manager->enable(manager);
-	ret = manager->buffer_mgr->queue_image(manager->buffer_mgr, src_image, mode, update_area);
+	ret = manager->buffer_mgr->queue_image(manager->buffer_mgr, config,
+						layer_num, mode, update_area);
 
 #ifdef EINK_FLUSH_TIME_TEST
 	do_gettimeofday(&wb_end_timer);
@@ -989,6 +994,12 @@ s32 eink_update_image(struct disp_eink_manager* manager, void * src_image, enum 
 
 	return ret;
 }
+
+static int eink_op_skip(struct disp_eink_manager *manager, u32 skip)
+{
+	return manager->pipeline_mgr->op_skip(manager->pipeline_mgr, skip);
+}
+
 
 static int first_enable = 1;
 
@@ -1015,8 +1026,11 @@ s32 eink_enable(struct disp_eink_manager* manager)
 	else
 		__wrn("convert mgr is null.\n");
 	eink_param = &manager->private_data->param;
+
+	/* delete rtmx eink.
 	disp_al_rtmx_init(0, 0, 0, 0, eink_param->timing.width, eink_param->timing.height,\
 						eink_param->timing.width, eink_param->timing.height, (unsigned int)DISP_FORMAT_ARGB_8888);
+	*/
 	/* enable eink clk*/
 	if (first_enable)
 		ret = __eink_clk_enable(manager);
@@ -1380,6 +1394,7 @@ int disp_init_eink(disp_bsp_init_para * para)
 		manager->set_temperature = eink_set_temperature;
 		manager->get_temperature = eink_get_temperature;
 		manager->eink_panel_temperature = 28;
+		manager->op_skip = eink_op_skip;
 		/* functions for debug */
 #ifdef __EINK_TEST__
 		manager->clearwd = __eink_clear_wave_data;

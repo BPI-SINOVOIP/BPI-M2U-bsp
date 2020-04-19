@@ -53,7 +53,9 @@ typedef union {
 		unsigned int isp_ch3_en:1;
 		unsigned int res1:4;
 		unsigned int wdr_ch_seq:1;
-		unsigned int res2:15;
+		unsigned int wdr_exp_seq:1;
+		unsigned int wdr_ver_read_en:1;
+		unsigned int res2:13;
 	} bits;
 } SUN8IW6P1_ISP_FE_CFG_REG_t;
 
@@ -73,8 +75,8 @@ typedef union {
 		unsigned int tdnf_update:1;
 		unsigned int pltm_update:1;
 		unsigned int cem_update:1;
+		unsigned int contrast_update:1;
 		unsigned int res1:18;
-		unsigned int vcap_read_start:1;
 	} bits;
 } SUN8IW6P1_ISP_FE_CTRL_REG_t;
 
@@ -111,7 +113,9 @@ typedef union {
 		unsigned int bis_fifo_pd:1;
 		unsigned int cnr_fifo_pd:1;
 		unsigned int frame_lost_pd:1;
-		unsigned int res1:9;
+		unsigned int res1:7;
+		unsigned int d3d_w_finish_pd:1;
+		unsigned int wdr_w_finish_pd:1;
 		unsigned int d3d_hb_pd:1;
 		unsigned int pltm_fifo_pd:1;
 		unsigned int d3d_write_fifo_pd:1;
@@ -126,7 +130,9 @@ typedef union {
 typedef union {
 	unsigned int dwval;
 	struct {
-		unsigned int res0:15;
+		unsigned int top_ctrl_st:8;
+		unsigned int wdr_ctrl_st:3;
+		unsigned int res0:4;
 		unsigned int debug_sel:5;
 		unsigned int debug_en:1;
 		unsigned int res1:11;
@@ -200,7 +206,8 @@ typedef union {
 	unsigned int dwval;
 	struct {
 		unsigned int sram_addr:17;
-		unsigned int res0:15;
+		unsigned int res0:14;
+		unsigned int sram_clear:1;
 	} bits;
 } SUN8IW6P1_ISP_SRAM_RW_OFFSET_REG_t;
 
@@ -210,7 +217,6 @@ typedef union {
 		unsigned int sram_data;
 	} bits;
 } SUN8IW6P1_ISP_SRAM_RW_DATA_REG_t;
-
 
 #ifdef __cplusplus
 }

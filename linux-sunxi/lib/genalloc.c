@@ -187,7 +187,7 @@ int gen_pool_add_virt(struct gen_pool *pool, unsigned long virt, phys_addr_t phy
 	int nbytes = sizeof(struct gen_pool_chunk) +
 				BITS_TO_LONGS(nbits) * sizeof(long);
 
-	chunk = kmalloc_node(nbytes, GFP_KERNEL | __GFP_ZERO, nid);
+	chunk = kzalloc_node(nbytes, GFP_KERNEL, nid);
 	if (unlikely(chunk == NULL))
 		return -ENOMEM;
 
@@ -312,6 +312,35 @@ retry:
 	return addr;
 }
 EXPORT_SYMBOL(gen_pool_alloc);
+
+/**
+ * gen_pool_dma_alloc - allocate special memory from the pool for DMA usage
+ * @pool: pool to allocate from
+ * @size: number of bytes to allocate from the pool
+ * @dma: dma-view physical address return value.  Use NULL if unneeded.
+ *
+ * Allocate the requested number of bytes from the specified pool.
+ * Uses the pool allocation function (with first-fit algorithm by default).
+ * Can not be used in NMI handler on architectures without
+ * NMI-safe cmpxchg implementation.
+ */
+void *gen_pool_dma_alloc(struct gen_pool *pool, size_t size, dma_addr_t *dma)
+{
+	unsigned long vaddr;
+
+	if (!pool)
+		return NULL;
+
+	vaddr = gen_pool_alloc(pool, size);
+	if (!vaddr)
+		return NULL;
+
+	if (dma)
+		*dma = gen_pool_virt_to_phys(pool, vaddr);
+
+	return (void *)vaddr;
+}
+EXPORT_SYMBOL(gen_pool_dma_alloc);
 
 /**
  * gen_pool_free - free allocated special memory back to the pool
@@ -570,11 +599,11 @@ struct gen_pool *devm_gen_pool_create(struct device *dev, int min_alloc_order,
 
 	return pool;
 }
+EXPORT_SYMBOL(devm_gen_pool_create);
 
 /**
  * dev_get_gen_pool - Obtain the gen_pool (if any) for a device
  * @dev: device to retrieve the gen_pool from
- * @name: Optional name for the gen_pool, usually NULL
  *
  * Returns the gen_pool for the device if one is present, or NULL.
  */
@@ -610,6 +639,7 @@ struct gen_pool *of_get_named_gen_pool(struct device_node *np,
 	if (!np_pool)
 		return NULL;
 	pdev = of_find_device_by_node(np_pool);
+	of_node_put(np_pool);
 	if (!pdev)
 		return NULL;
 	return dev_get_gen_pool(&pdev->dev);

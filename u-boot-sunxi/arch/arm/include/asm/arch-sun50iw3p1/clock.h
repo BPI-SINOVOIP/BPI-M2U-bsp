@@ -30,9 +30,10 @@ extern int sunxi_clock_get_corepll(void);
 extern int sunxi_clock_set_corepll(int frequency);
 extern int sunxi_clock_get_pll6(void);
 extern int sunxi_clock_get_ahb(void);
-extern int sunxi_clock_get_apb(void);
+extern int sunxi_clock_get_apb1(void);
+extern int sunxi_clock_get_apb2(void);
+
 extern int sunxi_clock_get_axi(void);
-extern int sunxi_clock_get_ahb2(void);
 extern int sunxi_clock_get_mbus(void);
 
 extern void set_pll( void );

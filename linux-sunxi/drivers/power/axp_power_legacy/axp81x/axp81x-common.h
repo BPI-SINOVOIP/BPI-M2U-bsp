@@ -83,6 +83,8 @@
 
 #define AXP_VOL_MAX                     AXP81X_VOL_MAX
 #define AXP_CAP                         AXP81X_CAP
+#define AXP_HOTOVER_CTL                 AXP81X_HOTOVER_CTL
+#define AXP_IPS_SET                     AXP81X_IPS_SET
 
 #define CHARGE_VOLTAGE_LEVEL0           AXP81X_CHARGE_VOLTAGE_LEVEL0
 #define CHARGE_VOLTAGE_LEVEL1           AXP81X_CHARGE_VOLTAGE_LEVEL1

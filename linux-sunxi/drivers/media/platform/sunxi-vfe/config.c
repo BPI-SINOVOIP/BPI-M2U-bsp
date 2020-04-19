@@ -1,8 +1,8 @@
-/* 
+/*
  ***************************************************************************************
- * 
+ *
  * config.c
- * 
+ *
  * Hawkview ISP - config.c module
  * 
  * Copyright (c) 2014 by Allwinnertech Co., Ltd.  http://www.allwinnertech.com
@@ -10,17 +10,18 @@
  * Version		  Author         Date		    Description
  * 
  *   2.0		  Yang Feng   	2014/03/11	      Second Version
- * 
+ *
  ****************************************************************************************
  */
 
 #include "config.h"
 #include "platform_cfg.h"
 #include "isp_cfg/isp_cfg.h"
-#define SIZE_OF_LSC_TBL_MOD0     7*768*2
-#define SIZE_OF_LSC_TBL_MOD1     8*768*2
-#define SIZE_OF_HDR_TBL     4*256*2
-#define SIZE_OF_GAMMA_TBL   256*2
+#define SIZE_OF_LSC_TBL_MOD0 (7*768*2)
+#define SIZE_OF_LSC_TBL_MOD1 (8*768*2)
+#define SIZE_OF_LSC_TBL_MOD2 (12*768*2)
+#define SIZE_OF_HDR_TBL (4*256*2)
+#define SIZE_OF_GAMMA_TBL (256*2)
 
 void set_used(struct sensor_config_init *sensor_cfg, void *value, int len)
 {
@@ -46,8 +47,8 @@ void set_power_settings_enable(struct sensor_config_init *sensor_cfg, void *valu
 
 void set_iovdd(struct sensor_config_init *sensor_cfg, void *value, int len)
 {
-	strcpy(sensor_cfg->sub_power_str[ENUM_IOVDD],(char *)value);
-	vfe_dbg(0,"sub_power_str[ENUM_IOVDD] = %s!\n", sensor_cfg->sub_power_str[ENUM_IOVDD]);
+	strcpy(sensor_cfg->sub_power_str[ENUM_IOVDD], (char *)value);
+	vfe_dbg(0, "sub_power_str[ENUM_IOVDD] = %s!\n", sensor_cfg->sub_power_str[ENUM_IOVDD]);
 }
 void set_iovdd_vol(struct sensor_config_init *sensor_cfg, void *value, int len)
 {
@@ -129,7 +130,7 @@ struct SensorParamAttribute
 	char *sub;
 	int len;
 	enum ini_item_type type;
-	void (*set_param)(struct sensor_config_init *, void *, int);
+	void (*set_param)(struct sensor_config_init *, void *, int len);
 };
 
 static struct SensorParamAttribute SensorParamCommon[] =
@@ -188,8 +189,8 @@ int fetch_sensor_list(struct sensor_config_init *sensor_cfg_ini , char *main, st
 			{
 				if(SensorCommon->set_param)
 				{
-					SensorCommon->set_param(sensor_cfg_ini, (void *)&subkey.value->val, SensorCommon->len);
-					vfe_dbg(0,"fetch sensor cfg ini: %s->%s  = %d\n",main, SensorCommon->sub,subkey.value->val);
+					SensorCommon->set_param(sensor_cfg_ini, (void *)&subkey.value.val, SensorCommon->len);
+					vfe_dbg(0, "fetch sensor cfg ini: %s->%s  = %d\n", main, SensorCommon->sub, subkey.value.val);
 				}
 			}
 		}
@@ -201,14 +202,14 @@ int fetch_sensor_list(struct sensor_config_init *sensor_cfg_ini , char *main, st
 			}
 			else
 			{
-				if(SensorCommon->set_param)
+				if (SensorCommon->set_param)
 				{
-					if(!strcmp(subkey.value->str, "\"\""))
+					if (!strcmp(subkey.value.str, "\"\""))
 					{
-						strcpy(subkey.value->str,"");
+						strcpy(subkey.value.str, "");
 					}
-					SensorCommon->set_param(sensor_cfg_ini, (void *)subkey.value->str, SensorCommon->len);
-					vfe_dbg(0,"fetch sensor cfg ini: %s->%s  = %s\n",main, SensorCommon->sub,subkey.value->str);
+					SensorCommon->set_param(sensor_cfg_ini, (void *)subkey.value.str, SensorCommon->len);
+					vfe_dbg(0, "fetch sensor cfg ini: %s->%s  = %s\n", main, SensorCommon->sub, subkey.value.str);
 				}
 			}
 		}
@@ -242,8 +243,8 @@ int fetch_sensor_list(struct sensor_config_init *sensor_cfg_ini , char *main, st
 				{
 					if(SensorDetect->set_param)
 					{
-						SensorDetect->set_param(sensor_cfg_ini, (void *)&subkey.value->val, j);
-						vfe_dbg(0,"fetch sensor cfg ini: %s->%s  = %d\n",main, sub_name,subkey.value->val);
+						SensorDetect->set_param(sensor_cfg_ini, (void *)&subkey.value.val, j);
+						vfe_dbg(0, "fetch sensor cfg ini: %s->%s  = %d\n", main, sub_name, subkey.value.val);
 					}
 				}
 			}
@@ -255,14 +256,14 @@ int fetch_sensor_list(struct sensor_config_init *sensor_cfg_ini , char *main, st
 				}
 				else
 				{
-					if(SensorDetect->set_param)
+					if (SensorDetect->set_param)
 					{
-						if(!strcmp(subkey.value->str, "\"\""))
+						if (!strcmp(subkey.value.str, "\"\""))
 						{
-							strcpy(subkey.value->str,"");
+							strcpy(subkey.value.str, "");
 						}
-						SensorDetect->set_param(sensor_cfg_ini, (void *)subkey.value->str, j);
-						vfe_dbg(0,"fetch sensor cfg ini: %s->%s  = %s\n",main, sub_name,subkey.value->str);
+						SensorDetect->set_param(sensor_cfg_ini, (void *)subkey.value.str, j);
+						vfe_dbg(0, "fetch sensor cfg ini: %s->%s  = %s\n", main, sub_name, subkey.value.str);
 					}
 				}
 			}
@@ -547,6 +548,7 @@ int fetch_config(struct vfe_dev *dev)
 				fetch_fun[j].fun(np, property_name, dev->ccm_cfg[i]);
 			}			
 		}
+		strcpy(dev->ccm_cfg[i]->isp_cfg_name, dev->ccm_cfg[i]->ccm);
 		i++;
 	}
 	dev->dev_qty = i;
@@ -615,6 +617,7 @@ struct isp_init_config isp_init_def_cfg = {
       .focus_change_interval = 2     ,
 
       .isp_dbg_level       = 0,
+      .isp_log_param	= 0,
       .isp_focus_len       = 0,
       .isp_gain               = 64,
       .isp_exp_line        = 7680,
@@ -644,8 +647,7 @@ struct isp_init_config isp_init_def_cfg = {
       .define_ae_table           = 0,
       .ae_max_lv                  = 1800,
       .fno                             = 280,
-      .ae_lum_low_th            = 125,
-      .ae_lum_high_th           = 135,
+      .ae_hist_mod_en            = 0,
       .ae_window_overexp_weigth = 16,
       .ae_hist_overexp_weight   = 32,
       .ae_video_speed           = 4,
@@ -658,26 +660,47 @@ struct isp_init_config isp_init_def_cfg = {
       .adaptive_frame_rate      = 1,
       .high_quality_mode_en     = 0,
       .force_frame_rate         = 0,
-
+	.ae_touch_dist_ind = 2,
+	.ae_lum_berfore_gamma = 0,
       /*isp awb param */
       .awb_interval                 = 4,
       .awb_speed = 8,
       //.awb_mode_select          = 1,
       .awb_color_temper_low     = 2500,
       .awb_color_temper_high    = 7500,
+      .awb_base_temper = 6500,
       .awb_skin_color_num = 0,
-      //.r_gain_2900k              = 385,
-      //.b_gain_2900k             = 140,
-      //.awb_coeff                 = {31,135},
-      //.awb_tolerance            = 10,
-      /*isp af param */
+      .awb_special_color_num = 0,
+      .awb_rgain_favor = 256,
+	.awb_bgain_favor = 256,
+
+      .af_use_otp = 0,
       .vcm_min_code             = 0,
       .vcm_max_code             = 650,
-      //.color_matrix_inv =
-      //{
-      //  .matrix = {{256,0,0},{0,256,0},{0,0,256}},
-      //  .offset = {0, 0, 0},
-      //},
+      .af_interval_time = 100,
+	.af_speed_ind = 16, /*0~43*/
+	.af_auto_fine_en = 1,
+	.af_single_fine_en = 0,
+	.af_fine_step = 24,
+	.af_move_cnt = 4,
+	.af_still_cnt = 1,
+	.af_move_monitor_cnt = 6,
+	.af_still_monitor_cnt = 2,
+	.af_stable_min = 250,
+	.af_stable_max = 260,
+	.af_low_light_ind = 40,
+	.af_near_tolerance = 5,
+	.af_far_tolerance = 7,
+	.af_tolerance_off = 0,
+	.af_peak_th = 100,
+	.af_dir_th = 10,
+
+	.af_change_ratio = 20,
+	.af_move_minus = 1,
+	.af_still_minus = 1,
+	.af_scene_motion_th = 10,
+	.af_tolerance_tbl_len = 0,
+
     },
     .isp_tunning_settings =
     {
@@ -689,7 +712,7 @@ struct isp_init_config isp_init_def_cfg = {
       .dpc_th_slop               = 4,
       .dpc_otf_min_th            = 16,
       .dpc_otf_max_th            = 1024,
-
+	.cfa_dir_th = 500,
       .front_camera = 0,
       .defog_value   =200,
       .hor_visual_angle = 60,
@@ -727,358 +750,235 @@ struct isp_init_config isp_init_def_cfg = {
     },
 };
 
-void set_isp_test_mode(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.isp_test_mode = *(int *)value; }
-void set_isp_test_exptime(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.isp_test_exptime = *(int *)value;}
-void set_exp_line_start(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.exp_line_start      = *(int *)value; }
-void set_exp_line_step(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.exp_line_step       = *(int *)value; }
-void set_exp_line_end(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.exp_line_end        = *(int *)value; }
-void set_exp_change_interval(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.exp_change_interval = *(int *)value; }
+#define SET_ISP_SINGLE_VALUE(struct_name, key) \
+static void set_##key(struct isp_init_config *isp_ini_cfg,\
+			       void *value,\
+			       int len)\
+{\
+	isp_ini_cfg->struct_name.key = *(int *)value;\
+}
 
-void set_isp_test_gain(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.isp_test_gain = *(int *)value; }
-void set_gain_start(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.gain_start           = *(int *)value; }
-void set_gain_step(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.gain_step            = *(int *)value; }
-void set_gain_end (struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.gain_end             = *(int *)value; }
-void set_gain_change_interval(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.gain_change_interval = *(int *)value; }
+#define SET_ISP_ARRAY_VALUE(struct_name, key) \
+static void set_##key(struct isp_init_config *isp_ini_cfg,\
+			       void *value,\
+			       int len)\
+{\
+	int i, *tmp;\
+	tmp = (int *)value;\
+	for (i = 0; i < len; i++) {\
+		isp_ini_cfg->struct_name.key[i] = tmp[i];\
+	} \
+}
 
-void set_isp_test_focus(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.isp_test_focus        = *(int *)value; }
-void set_focus_start(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.focus_start           = *(int *)value; }
-void set_focus_step(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.focus_step            = *(int *)value; }
-void set_focus_end(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.focus_end             = *(int *)value; }
-void set_focus_change_interval(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.focus_change_interval = *(int *)value; }
+#define SET_ISP_ISO_VALUE(struct_name) \
+static void set_##struct_name(struct isp_init_config *isp_ini_cfg,\
+			       void *value,\
+			       int len)\
+{\
+	int i, *tmp, *cfg_pt;\
+	tmp = (int *)value;\
+	cfg_pt = &isp_ini_cfg->isp_iso_settings.struct_name.sharp_coeff[0];\
+	for (i = 0; i < len; i++) {\
+		cfg_pt[i] = tmp[i];\
+	} \
+}
 
-void set_isp_dbg_level(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.isp_dbg_level = *(int *)value; }
-void set_isp_focus_len(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.isp_focus_len = *(int *)value; }
-void set_isp_gain(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.isp_gain = *(int *)value; }
-void set_isp_exp_line(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.isp_exp_line = *(int *)value; }
-void set_isp_color_temp(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.isp_color_temp = *(int *)value; }
+#define SET_ISP_CM_VALUE(num) \
+static void set_color_matrix##num(struct isp_init_config *isp_ini_cfg,\
+			       void *value,\
+			       int len)\
+{\
+	int *tmp = (int *)value;\
+	struct isp_rgb2rgb_gain_offset *color_matrix = &isp_ini_cfg->isp_tunning_settings.color_matrix_ini[num];\
+	color_matrix->matrix[0][0] = tmp[0];\
+	color_matrix->matrix[0][1] = tmp[1];\
+	color_matrix->matrix[0][2] = tmp[2];\
+	color_matrix->matrix[1][0] = tmp[3];\
+	color_matrix->matrix[1][1] = tmp[4];\
+	color_matrix->matrix[1][2] = tmp[5];\
+	color_matrix->matrix[2][0] = tmp[6];\
+	color_matrix->matrix[2][1] = tmp[7];\
+	color_matrix->matrix[2][2] = tmp[8];\
+	color_matrix->offset[0] = tmp[9];\
+	color_matrix->offset[1] = tmp[10];\
+	color_matrix->offset[2] = tmp[11];\
+}
 
-void set_ae_forced(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.ae_forced = *(int *)value; }
-void set_lum_forced(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.lum_forced  = *(int *)value; }
-void set_sprite_en(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.sprite_en = *(int *)value; }
-void set_lsc_en(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.lsc_en  = *(int *)value; }
-void set_ae_en (struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.ae_en  = *(int *)value; }
-void set_af_en (struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.af_en  = *(int *)value; }
-void set_awb_en(struct isp_init_config *isp_ini_cfg, void *value, int len){ isp_ini_cfg->isp_test_settings.awb_en  = *(int *)value; }
-void set_drc_en(struct isp_init_config *isp_ini_cfg, void *value, int len)  { isp_ini_cfg->isp_test_settings.drc_en  = *(int *)value; }
-void set_defog_en(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.defog_en = *(int *)value; }
-void set_satur_en(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.satur_en = *(int *)value; }
-void set_tdf_en(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.tdf_en = *(int *)value; }
-void set_pri_contrast_en(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.pri_contrast_en = *(int *)value; }
-void set_hdr_gamma_en(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.hdr_gamma_en = *(int *)value; }
-void set_disc_en(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.disc_en = *(int *)value; }
-void set_linear_en(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_test_settings.linear_en = *(int *)value; }
-void set_define_ae_table(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.define_ae_table = *(int *)value; }
+#define ISP_FILE_SINGLE_ATTR(main_key, sub_key)\
+{\
+	#main_key,  #sub_key, 1,  set_##sub_key,\
+}
 
-void set_ae_table_preview_length(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_table_preview_length = *(int *)value; }
-void set_ae_table_capture_length(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_table_capture_length = *(int *)value; }
-void set_ae_table_video_length(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_table_video_length = *(int *)value; }
+#define ISP_FILE_ARRAY_ATTR(main_key, sub_key, len)\
+{\
+	#main_key, #sub_key, len,  set_##sub_key,\
+}
 
-void set_ae_max_lv(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_max_lv = *(int *)value; }
-void set_fno(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.fno = *(int *)value; }
-void set_ae_lum_low_th(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_lum_low_th = *(int *)value; }
-void set_ae_lum_high_th(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_lum_high_th = *(int *)value; }
-void set_ae_window_overexp_weigth(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_window_overexp_weigth = *(int *)value; }
-void set_ae_hist_overexp_weight(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_hist_overexp_weight = *(int *)value; }
-void set_ae_video_speed(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_video_speed = *(int *)value; }
-void set_ae_capture_speed(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_capture_speed = *(int *)value; }
-void set_ae_tolerance(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_tolerance = *(int *)value; }
-void set_ae_min_frame_rate(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.ae_min_frame_rate = *(int *)value; }
-void set_exp_delay_frame(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.exp_delay_frame = *(int *)value; }
-void set_gain_delay_frame(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.gain_delay_frame = *(int *)value; }
-void set_exp_comp_step(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.exp_comp_step = *(int *)value; }
+#define ISP_FILE_ISO_ATTR(main_key, sub_key, len)\
+{\
+	#main_key, #sub_key, len,  set_##main_key,\
+}
 
-void set_high_quality_mode_en(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.high_quality_mode_en = *(int *)value; }
-void set_adaptive_frame_rate(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.adaptive_frame_rate = *(int *)value; }
-void set_force_frame_rate(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.force_frame_rate = *(int *)value; }
+#define ISP_FILE_CM_ATTR(prefix, main_key, sub_key)\
+{\
+	#prefix#main_key, #sub_key, 12 ,  set_##main_key,\
+}
 
-void set_awb_interval(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.awb_interval = *(int *)value; }
-void set_awb_speed(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.awb_speed = *(int *)value; }
+SET_ISP_SINGLE_VALUE(isp_test_settings, isp_test_mode);
+SET_ISP_SINGLE_VALUE(isp_test_settings, isp_test_exptime);
+SET_ISP_SINGLE_VALUE(isp_test_settings, exp_line_start);
+SET_ISP_SINGLE_VALUE(isp_test_settings, exp_line_step);
+SET_ISP_SINGLE_VALUE(isp_test_settings, exp_line_end);
+SET_ISP_SINGLE_VALUE(isp_test_settings, exp_change_interval);
+SET_ISP_SINGLE_VALUE(isp_test_settings, isp_test_gain);
+SET_ISP_SINGLE_VALUE(isp_test_settings, gain_start);
+SET_ISP_SINGLE_VALUE(isp_test_settings, gain_step);
+SET_ISP_SINGLE_VALUE(isp_test_settings, gain_end);
+SET_ISP_SINGLE_VALUE(isp_test_settings, gain_change_interval);
 
-//void set_awb_mode_select(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.awb_mode_select = *(int *)value; }
-//void set_awb_tolerance(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.awb_tolerance = *(int *)value; }
+SET_ISP_SINGLE_VALUE(isp_test_settings, isp_test_focus);
+SET_ISP_SINGLE_VALUE(isp_test_settings, focus_start);
+SET_ISP_SINGLE_VALUE(isp_test_settings, focus_step);
+SET_ISP_SINGLE_VALUE(isp_test_settings, focus_end);
+SET_ISP_SINGLE_VALUE(isp_test_settings, focus_change_interval);
+SET_ISP_SINGLE_VALUE(isp_test_settings, isp_dbg_level);
+SET_ISP_SINGLE_VALUE(isp_test_settings, isp_log_param);
+SET_ISP_SINGLE_VALUE(isp_test_settings, isp_focus_len);
+SET_ISP_SINGLE_VALUE(isp_test_settings, isp_gain);
+SET_ISP_SINGLE_VALUE(isp_test_settings, isp_exp_line);
+SET_ISP_SINGLE_VALUE(isp_test_settings, isp_color_temp);
+SET_ISP_SINGLE_VALUE(isp_test_settings, ae_forced);
+SET_ISP_SINGLE_VALUE(isp_test_settings, lum_forced);
+SET_ISP_SINGLE_VALUE(isp_test_settings, sprite_en);
+SET_ISP_SINGLE_VALUE(isp_test_settings, lsc_en);
+SET_ISP_SINGLE_VALUE(isp_test_settings, ae_en);
 
-void set_awb_color_temper_low(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.awb_color_temper_low = *(int *)value; }
-void set_awb_color_temper_high(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.awb_color_temper_high = *(int *)value; }
-//void set_r_gain_2900k(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.r_gain_2900k = *(int *)value; }
-//void set_b_gain_2900k(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.b_gain_2900k = *(int *)value; }
-void set_vcm_min_code(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.vcm_min_code = *(int *)value; }
-void set_vcm_max_code(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.vcm_max_code = *(int *)value; }
-void set_flash_gain(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.flash_gain = *(int *)value; }
-void set_flash_delay_frame(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.flash_delay_frame = *(int *)value; }
+SET_ISP_SINGLE_VALUE(isp_test_settings, af_en);
+SET_ISP_SINGLE_VALUE(isp_test_settings, awb_en);
+SET_ISP_SINGLE_VALUE(isp_test_settings, drc_en);
+SET_ISP_SINGLE_VALUE(isp_test_settings, defog_en);
+SET_ISP_SINGLE_VALUE(isp_test_settings, satur_en);
+SET_ISP_SINGLE_VALUE(isp_test_settings, tdf_en);
+SET_ISP_SINGLE_VALUE(isp_test_settings, pri_contrast_en);
+SET_ISP_SINGLE_VALUE(isp_test_settings, hdr_gamma_en);
+SET_ISP_SINGLE_VALUE(isp_test_settings, disc_en);
+SET_ISP_SINGLE_VALUE(isp_test_settings, linear_en);
 
-void set_flicker_type(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.flicker_type = *(int *)value; }
-void set_flicker_ratio(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.flicker_ratio = *(int *)value; }
+SET_ISP_SINGLE_VALUE(isp_3a_settings, define_ae_table);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_table_preview_length);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_table_capture_length);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_table_video_length);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_max_lv);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, fno);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_hist_mod_en);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_window_overexp_weigth);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_hist_overexp_weight);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_video_speed);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_capture_speed);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_tolerance);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_min_frame_rate);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, exp_delay_frame);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, gain_delay_frame);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, exp_comp_step);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_touch_dist_ind);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, ae_lum_berfore_gamma);
 
-void set_dpc_th_slop(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.dpc_th_slop = *(int *)value; }
-void set_dpc_otf_min_th(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.dpc_otf_min_th = *(int *)value; }
-void set_dpc_otf_max_th(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.dpc_otf_max_th = *(int *)value; }
-void set_front_camera(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.front_camera = *(int *)value; }
-void set_defog_value(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.defog_value = *(int *)value; }
 
-void set_hor_visual_angle(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.hor_visual_angle = *(int *)value; }
-void set_ver_visual_angle(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.ver_visual_angle = *(int *)value; }
-void set_focus_length(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.focus_length = *(int *)value; }
+SET_ISP_SINGLE_VALUE(isp_3a_settings, high_quality_mode_en);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, adaptive_frame_rate);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, force_frame_rate);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, awb_interval);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, awb_speed);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, awb_color_temper_low);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, awb_color_temper_high);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, awb_base_temper);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, awb_rgain_favor);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, awb_bgain_favor);
 
-void set_use_bright_contrast(struct isp_init_config *isp_ini_cfg, void *value, int len)  { isp_ini_cfg->isp_tunning_settings.use_bright_contrast= *(int *)value; }
-void set_low_bright_supp(struct isp_init_config *isp_ini_cfg, void *value, int len)  { isp_ini_cfg->isp_tunning_settings.low_bright_supp = *(int *)value; }
-void set_low_bright_drc(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.low_bright_drc = *(int *)value; }
-void set_color_denoise_level(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.color_denoise_level = *(int *)value; }
-void set_lsc_mod(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.lsc_mod = *(int *)value; }
+SET_ISP_SINGLE_VALUE(isp_3a_settings, awb_light_num);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, awb_ext_light_num);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, awb_skin_color_num);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, awb_special_color_num);
+
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_use_otp);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, vcm_min_code);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, vcm_max_code);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_interval_time);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_speed_ind);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_auto_fine_en);
+
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_single_fine_en);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_fine_step);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_move_cnt);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_still_cnt);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_move_monitor_cnt);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_still_monitor_cnt);
+
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_stable_min);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_stable_max);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_low_light_ind);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_near_tolerance);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_far_tolerance);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_tolerance_off);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_peak_th);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_dir_th);
+
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_change_ratio);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_move_minus);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_still_minus);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_scene_motion_th);
+SET_ISP_SINGLE_VALUE(isp_3a_settings, af_tolerance_tbl_len);
+
+
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, flash_gain);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, flash_delay_frame);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, flicker_type);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, flicker_ratio);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, dpc_th_slop);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, dpc_otf_min_th);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, dpc_otf_max_th);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, cfa_dir_th);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, front_camera);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, defog_value);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, hor_visual_angle);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, ver_visual_angle);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, focus_length);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, use_bright_contrast);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, low_bright_supp);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, low_bright_drc);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, color_denoise_level);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, lsc_mod);
+SET_ISP_SINGLE_VALUE(isp_tunning_settings, gamma_num);
+
 void set_lsc_center_x(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.lsc_center[0] = *(int *)value; }
 void set_lsc_center_y(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.lsc_center[1] = *(int *)value; }
-void set_gamma_num(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_tunning_settings.gamma_num = *(int *)value; }
 
-//for new awb
-void set_awb_light_num(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.awb_light_num = *(int *)value; }
-void set_awb_ext_light_num(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.awb_ext_light_num = *(int *)value; }
-void set_awb_skin_color_num(struct isp_init_config *isp_ini_cfg, void *value, int len) { isp_ini_cfg->isp_3a_settings.awb_skin_color_num = *(int *)value; }
+SET_ISP_ARRAY_VALUE(isp_3a_settings, awb_light_info);
+SET_ISP_ARRAY_VALUE(isp_3a_settings, awb_ext_light_info);
+SET_ISP_ARRAY_VALUE(isp_3a_settings, awb_skin_color_info);
+SET_ISP_ARRAY_VALUE(isp_3a_settings, awb_special_color_info);
+SET_ISP_ARRAY_VALUE(isp_3a_settings, awb_preset_gain);
+SET_ISP_ARRAY_VALUE(isp_3a_settings, ae_table_preview);
+SET_ISP_ARRAY_VALUE(isp_3a_settings, ae_table_capture);
+SET_ISP_ARRAY_VALUE(isp_3a_settings, ae_table_video);
+SET_ISP_ARRAY_VALUE(isp_3a_settings, ae_win_weight);
+SET_ISP_ARRAY_VALUE(isp_3a_settings, af_std_code_tbl);
+SET_ISP_ARRAY_VALUE(isp_3a_settings, af_tolerance_value_tbl);
 
-void set_awb_light_info(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_3a_settings.awb_light_info[i] = tmp[i];
-	}
-}
-void set_awb_ext_light_info(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_3a_settings.awb_ext_light_info[i] = tmp[i];
-	}
-}
-void set_awb_skin_color_info(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_3a_settings.awb_skin_color_info[i] = tmp[i];
-	}
-}
+SET_ISP_ARRAY_VALUE(isp_tunning_settings, bayer_gain_offset);
+SET_ISP_ARRAY_VALUE(isp_tunning_settings, csc_coeff);
 
-void set_awb_preset_gain(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_3a_settings.awb_preset_gain[i] = tmp[i];
-	}
-}
+SET_ISP_ISO_VALUE(isp_iso_100_cfg);
+SET_ISP_ISO_VALUE(isp_iso_200_cfg);
+SET_ISP_ISO_VALUE(isp_iso_400_cfg);
+SET_ISP_ISO_VALUE(isp_iso_800_cfg);
+SET_ISP_ISO_VALUE(isp_iso_1600_cfg);
+SET_ISP_ISO_VALUE(isp_iso_3200_cfg);
 
+SET_ISP_CM_VALUE(0);
+SET_ISP_CM_VALUE(1);
+SET_ISP_CM_VALUE(2);
 
-void set_ae_table_preview(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_3a_settings.ae_table_preview[i] = tmp[i];
-	}
-}
-void set_ae_table_capture(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_3a_settings.ae_table_capture[i] = tmp[i];
-	}
-}
-void set_ae_table_video(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_3a_settings.ae_table_video[i] = tmp[i];
-	}
-}
-void set_ae_win_weight(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_3a_settings.ae_win_weight[i] = tmp[i];
-	}
-}
-
-/*
-void set_awb_light_param(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_3a_settings.awb_light_param[i] = tmp[i];
-	}
-}
-
-void set_awb_coeff(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_3a_settings.awb_coeff[i] = tmp[i];
-	}
-}
-*/
-void set_isp_iso_100_cfg(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp, *cfg_pt;
-	tmp = (int *)value;
-	cfg_pt = &isp_ini_cfg->isp_iso_settings.isp_iso_100_cfg.sharp_coeff[0];
-	for(i = 0; i < len; i++)
-	{
-		cfg_pt[i] = tmp[i];
-	}
-}
-void set_isp_iso_200_cfg(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp, *cfg_pt;
-	tmp = (int *)value;
-	cfg_pt = &isp_ini_cfg->isp_iso_settings.isp_iso_200_cfg.sharp_coeff[0];
-	for(i = 0; i < len; i++)
-	{
-		cfg_pt[i] = tmp[i];
-	}
-}
-void set_isp_iso_400_cfg(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp, *cfg_pt;
-	tmp = (int *)value;
-	cfg_pt = &isp_ini_cfg->isp_iso_settings.isp_iso_400_cfg.sharp_coeff[0];
-	for(i = 0; i < len; i++)
-	{
-		cfg_pt[i] = tmp[i];
-	}
-}
-void set_isp_iso_800_cfg(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp, *cfg_pt;
-	tmp = (int *)value;
-	cfg_pt = &isp_ini_cfg->isp_iso_settings.isp_iso_800_cfg.sharp_coeff[0];
-	for(i = 0; i < len; i++)
-	{
-		cfg_pt[i] = tmp[i];
-	}
-}
-void set_isp_iso_1600_cfg(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp, *cfg_pt;
-	tmp = (int *)value;
-	cfg_pt = &isp_ini_cfg->isp_iso_settings.isp_iso_1600_cfg.sharp_coeff[0];
-	for(i = 0; i < len; i++)
-	{
-		cfg_pt[i] = tmp[i];
-	}
-}
-void set_isp_iso_3200_cfg(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp, *cfg_pt;
-	tmp = (int *)value;
-	cfg_pt = &isp_ini_cfg->isp_iso_settings.isp_iso_3200_cfg.sharp_coeff[0];
-	for(i = 0; i < len; i++)
-	{
-		cfg_pt[i] = tmp[i];
-	}
-}
-
-void set_color_matrix0(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int *tmp = (int *)value;
-	struct isp_rgb2rgb_gain_offset *color_matrix = &isp_ini_cfg->isp_tunning_settings.color_matrix_ini[0];
-	color_matrix->matrix[0][0] = tmp[0];
-	color_matrix->matrix[0][1] = tmp[1];
-	color_matrix->matrix[0][2] = tmp[2];
-	color_matrix->matrix[1][0] = tmp[3];
-	color_matrix->matrix[1][1] = tmp[4];
-	color_matrix->matrix[1][2] = tmp[5];
-	color_matrix->matrix[2][0] = tmp[6];
-	color_matrix->matrix[2][1] = tmp[7];
-	color_matrix->matrix[2][2] = tmp[8];
-	color_matrix->offset[0] = tmp[9];
-	color_matrix->offset[1] = tmp[10];
-	color_matrix->offset[2] = tmp[11];
-}
-void set_color_matrix1(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int *tmp = (int *)value;
-	struct isp_rgb2rgb_gain_offset *color_matrix = &isp_ini_cfg->isp_tunning_settings.color_matrix_ini[1];
-	color_matrix->matrix[0][0] = tmp[0];
-	color_matrix->matrix[0][1] = tmp[1];
-	color_matrix->matrix[0][2] = tmp[2];
-	color_matrix->matrix[1][0] = tmp[3];
-	color_matrix->matrix[1][1] = tmp[4];
-	color_matrix->matrix[1][2] = tmp[5];
-	color_matrix->matrix[2][0] = tmp[6];
-	color_matrix->matrix[2][1] = tmp[7];
-	color_matrix->matrix[2][2] = tmp[8];
-	color_matrix->offset[0] = tmp[9];
-	color_matrix->offset[1] = tmp[10];
-	color_matrix->offset[2] = tmp[11];
-}
-void set_color_matrix2(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int *tmp = (int *)value;
-	struct isp_rgb2rgb_gain_offset *color_matrix = &isp_ini_cfg->isp_tunning_settings.color_matrix_ini[2];
-	color_matrix->matrix[0][0] = tmp[0];
-	color_matrix->matrix[0][1] = tmp[1];
-	color_matrix->matrix[0][2] = tmp[2];
-	color_matrix->matrix[1][0] = tmp[3];
-	color_matrix->matrix[1][1] = tmp[4];
-	color_matrix->matrix[1][2] = tmp[5];
-	color_matrix->matrix[2][0] = tmp[6];
-	color_matrix->matrix[2][1] = tmp[7];
-	color_matrix->matrix[2][2] = tmp[8];
-	color_matrix->offset[0] = tmp[9];
-	color_matrix->offset[1] = tmp[10];
-	color_matrix->offset[2] = tmp[11];
-}
-/*
-void set_color_matrix_inv(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int *tmp = (int *)value;
-	struct isp_rgb2rgb_gain_offset *color_matrix = &isp_ini_cfg->isp_3a_settings.color_matrix_inv;
-	color_matrix->matrix[0][0] = tmp[0];
-	color_matrix->matrix[0][1] = tmp[1];
-	color_matrix->matrix[0][2] = tmp[2];
-	color_matrix->matrix[1][0] = tmp[3];
-	color_matrix->matrix[1][1] = tmp[4];
-	color_matrix->matrix[1][2] = tmp[5];
-	color_matrix->matrix[2][0] = tmp[6];
-	color_matrix->matrix[2][1] = tmp[7];
-	color_matrix->matrix[2][2] = tmp[8];
-	color_matrix->offset[0] = tmp[9];
-	color_matrix->offset[1] = tmp[10];
-	color_matrix->offset[2] = tmp[11];
-}*/
-
-void set_isp_gain_offset(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_tunning_settings.bayer_gain_offset[i] = tmp[i];
-	}
-}
-void set_isp_csc(struct isp_init_config *isp_ini_cfg, void *value, int len)
-{
-	int i,*tmp;
-	tmp = (int *)value;
-	for(i = 0; i < len; i++)
-	{
-		isp_ini_cfg->isp_tunning_settings.csc_coeff[i] = tmp[i];
-	}
-}
 
 struct IspParamAttribute
 {
@@ -1097,155 +997,177 @@ struct FileAttribute
 
 static struct IspParamAttribute IspTestParam[] =
 {
-	{ "isp_test_cfg", "isp_test_mode"        , 1 ,  set_isp_test_mode         ,},
-	{ "isp_test_cfg", "isp_test_exptime"     , 1 ,  set_isp_test_exptime      ,},
-	{ "isp_test_cfg", "exp_line_start"       , 1 ,  set_exp_line_start        ,},
-	{ "isp_test_cfg", "exp_line_step"        , 1 ,  set_exp_line_step         ,},
-	{ "isp_test_cfg", "exp_line_end"         , 1 ,  set_exp_line_end          ,},
-	{ "isp_test_cfg", "exp_change_interval"  , 1 ,  set_exp_change_interval   ,},
-	{ "isp_test_cfg", "isp_test_gain"        , 1 ,  set_isp_test_gain         ,},
-	{ "isp_test_cfg", "gain_start"           , 1 ,  set_gain_start            ,},
-	{ "isp_test_cfg", "gain_step"            , 1 ,  set_gain_step             ,},
-	{ "isp_test_cfg", "gain_end"             , 1 ,  set_gain_end              ,},
-	{ "isp_test_cfg", "gain_change_interval" , 1 ,  set_gain_change_interval  ,},
-	{ "isp_test_cfg", "isp_test_focus"       , 1 ,  set_isp_test_focus        ,},
-	{ "isp_test_cfg", "focus_start"          , 1 ,  set_focus_start           ,},
-	{ "isp_test_cfg", "focus_step"           , 1 ,  set_focus_step            ,},
-	{ "isp_test_cfg", "focus_end"            , 1 ,  set_focus_end             ,},
-	{ "isp_test_cfg", "focus_change_interval", 1 ,  set_focus_change_interval ,},
-
-	{ "isp_test_cfg", "isp_dbg_level",    1 ,  set_isp_dbg_level    ,},
-	{ "isp_test_cfg", "isp_focus_len",    1 ,  set_isp_focus_len    ,},
-	{ "isp_test_cfg", "isp_gain",         1 ,  set_isp_gain         ,},
-	
-	{ "isp_test_cfg", "isp_exp_line",     1 ,  set_isp_exp_line     ,},
-	{ "isp_test_cfg", "isp_color_temp",         1 ,  set_isp_color_temp         ,},
-	{ "isp_test_cfg", "ae_forced",     1 ,  set_ae_forced     ,},
-	{ "isp_test_cfg", "lum_forced",         1 ,  set_lum_forced         ,},
-
-	{ "isp_en_cfg",   "sprite_en",        1 ,  set_sprite_en        ,},
-	{ "isp_en_cfg",   "lsc_en",           1 ,  set_lsc_en           ,},
-	{ "isp_en_cfg",   "ae_en",            1 ,  set_ae_en            ,},
-	{ "isp_en_cfg",   "af_en",            1 ,  set_af_en            ,},
-	{ "isp_en_cfg",   "awb_en",           1 ,  set_awb_en           ,},
-	{ "isp_en_cfg",   "drc_en",           1 ,  set_drc_en           ,},
-	{ "isp_en_cfg",   "defog_en",         1 ,  set_defog_en         ,},
-	{ "isp_en_cfg",   "satur_en",         1 ,  set_satur_en         ,},
-	{ "isp_en_cfg",   "tdf_en",		  1 ,  set_tdf_en 		,},
-
-	{ "isp_en_cfg",   "pri_contrast_en",  1 ,  set_pri_contrast_en  ,},
-	{ "isp_en_cfg",   "hdr_gamma_en",     1 ,  set_hdr_gamma_en     ,},
-	{ "isp_en_cfg",   "disc_en",         1 ,  set_disc_en         ,},
-	{ "isp_en_cfg",   "linear_en",		  1 ,  set_linear_en 		,},
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, isp_test_mode),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, isp_test_exptime),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, exp_line_start),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, exp_line_step),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, exp_line_end),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, exp_change_interval),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, isp_test_gain),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, gain_start),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, gain_step),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, gain_end),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, gain_change_interval),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, isp_test_focus),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, focus_start),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, focus_step),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, focus_end),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, focus_change_interval),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, isp_dbg_level),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, isp_log_param),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, isp_focus_len),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, isp_gain),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, isp_exp_line),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, isp_color_temp),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, ae_forced),
+	ISP_FILE_SINGLE_ATTR(isp_test_cfg, lum_forced),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, sprite_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, lsc_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, ae_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, af_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, awb_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, drc_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, defog_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, satur_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, tdf_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, pri_contrast_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, hdr_gamma_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, disc_en),
+	ISP_FILE_SINGLE_ATTR(isp_en_cfg, linear_en),
 };
 
 static struct IspParamAttribute Isp3aParam[] =
 {
-	{ "isp_ae_cfg",   "define_ae_table",          1 ,  set_define_ae_table          ,},
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, define_ae_table),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_max_lv),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, fno),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_table_preview_length),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_table_capture_length),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_table_video_length),
 
-	{ "isp_ae_cfg",   "ae_max_lv",          1 ,  set_ae_max_lv,},
-	{ "isp_ae_cfg",   "fno"            ,          1 ,  set_fno                      ,},
+	ISP_FILE_ARRAY_ATTR(isp_ae_cfg,	ae_table_preview, 28),
+	ISP_FILE_ARRAY_ATTR(isp_ae_cfg,	ae_table_capture, 28),
+	ISP_FILE_ARRAY_ATTR(isp_ae_cfg,	ae_table_video,	28),
+	ISP_FILE_ARRAY_ATTR(isp_ae_cfg,	ae_win_weight, 64),
 
-	{ "isp_ae_cfg",   "ae_table_preview_length",          1 ,  set_ae_table_preview_length          ,},
-	{ "isp_ae_cfg",   "ae_table_capture_length",          1 ,  set_ae_table_capture_length          ,},
-	{ "isp_ae_cfg",   "ae_table_video_length",          1 ,  set_ae_table_video_length          ,},
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_hist_mod_en),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_window_overexp_weigth),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_hist_overexp_weight),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_video_speed),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_capture_speed),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_tolerance),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_min_frame_rate),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, exp_delay_frame),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, gain_delay_frame),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, exp_comp_step),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, high_quality_mode_en),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, adaptive_frame_rate),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, force_frame_rate),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_touch_dist_ind),
+	ISP_FILE_SINGLE_ATTR(isp_ae_cfg, ae_lum_berfore_gamma),
 
-	{ "isp_ae_cfg",   "ae_table_preview_",          28 ,  set_ae_table_preview           ,},
-	{ "isp_ae_cfg",   "ae_table_capture_",          28 ,  set_ae_table_capture           ,},
-	{ "isp_ae_cfg",   "ae_table_video_",          28 ,  set_ae_table_video           ,},
-	{ "isp_ae_cfg",   "ae_win_weight_",          64 ,  set_ae_win_weight           ,},
+	ISP_FILE_SINGLE_ATTR(isp_awb_cfg, awb_interval),
+	ISP_FILE_SINGLE_ATTR(isp_awb_cfg, awb_speed),
+	ISP_FILE_SINGLE_ATTR(isp_awb_cfg, awb_color_temper_low),
+	ISP_FILE_SINGLE_ATTR(isp_awb_cfg, awb_color_temper_high),
+	ISP_FILE_SINGLE_ATTR(isp_awb_cfg, awb_base_temper),
 
-	{ "isp_ae_cfg",   "ae_lum_low_th",            1 ,  set_ae_lum_low_th            ,},
-	{ "isp_ae_cfg",   "ae_lum_high_th",           1 ,  set_ae_lum_high_th           ,},
-	{ "isp_ae_cfg",   "ae_window_overexp_weigth", 1 ,  set_ae_window_overexp_weigth ,},
-	{ "isp_ae_cfg",   "ae_hist_overexp_weight",   1 ,  set_ae_hist_overexp_weight   ,},
-	{ "isp_ae_cfg",   "ae_video_speed",           1 ,  set_ae_video_speed           ,},
-	{ "isp_ae_cfg",   "ae_capture_speed",         1 ,  set_ae_capture_speed         ,},
-	{ "isp_ae_cfg",   "ae_tolerance",             1 ,  set_ae_tolerance             ,},
-	{ "isp_ae_cfg",   "ae_min_frame_rate",        1 ,  set_ae_min_frame_rate        ,},
-	{ "isp_ae_cfg",   "exp_delay_frame",          1 ,  set_exp_delay_frame          ,},
-	{ "isp_ae_cfg",   "gain_delay_frame",         1 ,  set_gain_delay_frame         ,},
-	{ "isp_ae_cfg",   "exp_comp_step",         1 ,  set_exp_comp_step         ,},
+	ISP_FILE_SINGLE_ATTR(isp_awb_cfg, awb_light_num),
+	ISP_FILE_SINGLE_ATTR(isp_awb_cfg, awb_ext_light_num),
+	ISP_FILE_SINGLE_ATTR(isp_awb_cfg, awb_skin_color_num),
+	ISP_FILE_SINGLE_ATTR(isp_awb_cfg, awb_special_color_num),
 
+	ISP_FILE_SINGLE_ATTR(isp_awb_cfg, awb_rgain_favor),
+	ISP_FILE_SINGLE_ATTR(isp_awb_cfg, awb_bgain_favor),
 
-	{ "isp_ae_cfg",   "high_quality_mode_en",     1 , set_high_quality_mode_en      ,},
-	{ "isp_ae_cfg",   "adaptive_frame_rate",      1 , set_adaptive_frame_rate       ,},
-	{ "isp_ae_cfg",   "force_frame_rate",         1 , set_force_frame_rate          ,},
+	ISP_FILE_ARRAY_ATTR(isp_awb_cfg, awb_light_info, 100),
+	ISP_FILE_ARRAY_ATTR(isp_awb_cfg, awb_ext_light_info, 60),
+	ISP_FILE_ARRAY_ATTR(isp_awb_cfg, awb_skin_color_info, 40),
+	ISP_FILE_ARRAY_ATTR(isp_awb_cfg, awb_special_color_info, 40),
 
-	{ "isp_awb_cfg",  "awb_interval",          1 ,  set_awb_interval          ,},
-	{ "isp_awb_cfg",  "awb_speed",          1 ,  set_awb_speed	,},
+	{ "isp_awb_cfg", "awb_perset_gain", 22, set_awb_preset_gain, },
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_use_otp),
 
-	//{ "isp_awb_cfg",  "awb_mode_select",          1 ,  set_awb_mode_select          ,},
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, vcm_min_code),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, vcm_max_code),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_interval_time),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_speed_ind),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_auto_fine_en),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_single_fine_en),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_fine_step),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_move_cnt),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_still_cnt),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_move_monitor_cnt),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_still_monitor_cnt),
 
-	//{ "isp_awb_cfg",  "awb_tolerance",          1 ,  set_awb_tolerance          ,},
-	//{ "isp_awb_cfg",  "awb_light_param_",        21 ,  set_awb_light_param              ,},
-	//{ "isp_awb_cfg",  "awb_coeff_",               30 , set_awb_coeff                    ,},
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_stable_min),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_stable_max),
 
-	//{ "isp_awb_cfg",   "matrix_inv_",        12 ,  set_color_matrix_inv  ,},
-	{ "isp_awb_cfg",  "awb_color_temper_low",     1 ,  set_awb_color_temper_low     ,},
-	{ "isp_awb_cfg",  "awb_color_temper_high",    1 ,  set_awb_color_temper_high    ,},
-//	{ "isp_awb_cfg",  "r_gain_2900k",             1 ,  set_r_gain_2900k             ,},
-//	{ "isp_awb_cfg",  "b_gain_2900k",             1 ,  set_b_gain_2900k             ,},
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_low_light_ind),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_near_tolerance),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_far_tolerance),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_tolerance_off),
 
-	{ "isp_awb_cfg",  "awb_light_num",    1 ,  set_awb_light_num    ,},
-	{ "isp_awb_cfg",  "awb_ext_light_num",             1 ,  set_awb_ext_light_num             ,},
-	{ "isp_awb_cfg",  "awb_skin_color_num",             1 ,  set_awb_skin_color_num             ,},
-	{ "isp_awb_cfg",  "awb_light_info_",             100 ,  set_awb_light_info           ,},
-	{ "isp_awb_cfg",  "awb_ext_light_info_",             60 ,  set_awb_ext_light_info             ,},
-	{ "isp_awb_cfg",  "awb_skin_color_info_",             40 ,  set_awb_skin_color_info             ,},
-	{ "isp_awb_cfg",  "awb_perset_gain_",             22 ,  set_awb_preset_gain             ,},
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_peak_th),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_dir_th),
 
-	{ "isp_af_cfg",   "vcm_min_code",             1 ,  set_vcm_min_code             ,},
-	{ "isp_af_cfg",   "vcm_max_code",             1 ,  set_vcm_max_code             ,},
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_change_ratio),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_move_minus),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_still_minus),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_scene_motion_th),
+	ISP_FILE_SINGLE_ATTR(isp_af_cfg, af_tolerance_tbl_len),
+	ISP_FILE_ARRAY_ATTR(isp_af_cfg,	af_std_code_tbl, 20),
+	ISP_FILE_ARRAY_ATTR(isp_af_cfg,	af_tolerance_value_tbl, 20),
 };
 static struct IspParamAttribute IspIsoParam[] =
 {
-	{ "isp_iso_100_cfg" ,      "iso_param_",      41,  set_isp_iso_100_cfg ,},
-	{ "isp_iso_200_cfg" ,      "iso_param_",      41,  set_isp_iso_200_cfg ,},
-	{ "isp_iso_400_cfg" ,      "iso_param_",      41,  set_isp_iso_400_cfg ,},
-	{ "isp_iso_800_cfg" ,      "iso_param_",      41 ,  set_isp_iso_800_cfg ,},
-	{ "isp_iso_1600_cfg" ,     "iso_param_",      41 ,  set_isp_iso_1600_cfg,},
-	{ "isp_iso_3200_cfg" ,     "iso_param_",      41 ,  set_isp_iso_3200_cfg,},
+	ISP_FILE_ISO_ATTR(isp_iso_100_cfg, iso_param, 64),
+	ISP_FILE_ISO_ATTR(isp_iso_200_cfg, iso_param, 64),
+	ISP_FILE_ISO_ATTR(isp_iso_400_cfg, iso_param, 64),
+	ISP_FILE_ISO_ATTR(isp_iso_800_cfg, iso_param, 64),
+	ISP_FILE_ISO_ATTR(isp_iso_1600_cfg, iso_param, 64),
+	ISP_FILE_ISO_ATTR(isp_iso_3200_cfg, iso_param, 64),
 };
+
 static struct IspParamAttribute IspTuningParam[] =
 {
-	{ "isp_drc_cfg" ,           "use_bright_contrast",    1 ,  set_use_bright_contrast    ,},
-	{ "isp_drc_cfg" ,           "low_bright_supp",    1 ,  set_low_bright_supp    ,},
-	{ "isp_drc_cfg" ,           "low_bright_drc",     1 ,  set_low_bright_drc     ,},
-	{ "isp_tuning_cfg" ,        "color_denoise_level",1 ,  set_color_denoise_level,},
-	{ "isp_tuning_cfg" ,        "flash_gain",         1 ,  set_flash_gain         ,},
-	{ "isp_tuning_cfg" ,        "flash_delay_frame",         1 ,  set_flash_delay_frame         ,},
+	ISP_FILE_SINGLE_ATTR(isp_drc_cfg, use_bright_contrast),
+	ISP_FILE_SINGLE_ATTR(isp_drc_cfg, low_bright_supp),
+	ISP_FILE_SINGLE_ATTR(isp_drc_cfg, low_bright_drc),
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, color_denoise_level),
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, flash_gain),
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, flash_delay_frame),
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, cfa_dir_th),
+
+	ISP_FILE_SINGLE_ATTR(isp_dpc_cfg, dpc_th_slop),
+	ISP_FILE_SINGLE_ATTR(isp_dpc_cfg, dpc_otf_min_th),
+	ISP_FILE_SINGLE_ATTR(isp_dpc_cfg, dpc_otf_max_th),
+
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, flicker_type),
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, flicker_ratio),
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, front_camera),
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, defog_value),
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, hor_visual_angle),
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, ver_visual_angle),
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, focus_length),
+	ISP_FILE_SINGLE_ATTR(isp_tuning_cfg, gamma_num),
+	ISP_FILE_SINGLE_ATTR(isp_lsc, lsc_mod),
+	ISP_FILE_SINGLE_ATTR(isp_lsc, lsc_center_x),
+	ISP_FILE_SINGLE_ATTR(isp_lsc, lsc_center_y),
 	
-	{ "isp_dpc_cfg" ,        "dpc_th_slop",1 ,  set_dpc_th_slop,},
-	{ "isp_dpc_cfg" ,        "dpc_otf_min_th",         1 ,  set_dpc_otf_min_th         ,},
-	{ "isp_dpc_cfg" ,        "dpc_otf_max_th",         1 ,  set_dpc_otf_max_th         ,},
-
-	{ "isp_tuning_cfg" ,        "flicker_type",       1 ,  set_flicker_type       ,},
-	{ "isp_tuning_cfg" ,        "flicker_ratio",       1 ,  set_flicker_ratio       ,},
-	{ "isp_tuning_cfg" ,        "front_camera",       1 ,  set_front_camera       ,},
-	{ "isp_tuning_cfg" ,        "defog_value",        1 ,  set_defog_value        ,},
-	{ "isp_tuning_cfg" ,        "hor_visual_angle",       1 ,  set_hor_visual_angle       ,},
-	{ "isp_tuning_cfg" ,        "ver_visual_angle",       1 ,  set_ver_visual_angle       ,},
-	{ "isp_tuning_cfg" ,        "focus_length",        1 ,  set_focus_length        ,},
-	{ "isp_tuning_cfg" ,        "gamma_num",        1 ,  set_gamma_num        ,},
-
-	{ "isp_lsc" ,               "lsc_mod",       1 ,  set_lsc_mod       ,},
-	{ "isp_lsc" ,               "lsc_center_x",       1 ,  set_lsc_center_x       ,},
-	{ "isp_lsc" ,               "lsc_center_y",       1 ,  set_lsc_center_y       ,},
-	{ "isp_gain_offset" ,       "gain_offset_",       8 ,  set_isp_gain_offset    ,},
-	{ "isp_csc" ,               "csc_coeff_",         6 ,  set_isp_csc            ,},
-	{ "isp_color_matrix0" ,      "matrix_",            12 ,  set_color_matrix0      ,},
-	{ "isp_color_matrix1" ,      "matrix_",            12 ,  set_color_matrix1      ,},
-	{ "isp_color_matrix2" ,      "matrix_",            12 ,  set_color_matrix2      ,},
-
+	{ "isp_gain_offset", "gain_offset", 8, set_bayer_gain_offset, },
+	ISP_FILE_ARRAY_ATTR(isp_csc, csc_coeff, 6),
+	ISP_FILE_CM_ATTR(isp_, color_matrix0, matrix),
+	ISP_FILE_CM_ATTR(isp_, color_matrix1, matrix),
+	ISP_FILE_CM_ATTR(isp_, color_matrix2, matrix),
 };
 
 static struct FileAttribute FileAttr [] =
 {
-	 { "isp_test_param.ini",    ARRAY_SIZE(IspTestParam)  , &IspTestParam[0],  },
-	 { "isp_3a_param.ini",      ARRAY_SIZE(Isp3aParam)    , &Isp3aParam[0],    },
-	 { "isp_iso_param.ini",     ARRAY_SIZE(IspIsoParam)   , &IspIsoParam[0],   },
-	 { "isp_tuning_param.ini",  ARRAY_SIZE(IspTuningParam), &IspTuningParam[0],},
+	{ "isp_test_param.ini", ARRAY_SIZE(IspTestParam), &IspTestParam[0], },
+	{ "isp_3a_param.ini", ARRAY_SIZE(Isp3aParam), &Isp3aParam[0], },
+	{ "isp_iso_param.ini", ARRAY_SIZE(IspIsoParam), &IspIsoParam[0], },
+	{ "isp_tuning_param.ini", ARRAY_SIZE(IspTuningParam), &IspTuningParam[0], },
 };
 
 int fetch_isp_cfg(struct isp_init_config *isp_ini_cfg, struct cfg_section *cfg_section, struct FileAttribute *file_attr)
@@ -1267,57 +1189,68 @@ int fetch_isp_cfg(struct isp_init_config *isp_ini_cfg, struct cfg_section *cfg_s
 		{
 			if (CFG_ITEM_VALUE_TYPE_INT != cfg_get_one_subkey(cfg_section,param->main, param->sub, &subkey))
 			{
-				vfe_dbg(0,"Warning: %s->%s,apply default value!\n",param->main, param->sub);
+				vfe_dbg(0, "Warning: %s->%s,apply default value!\n", param->main, param->sub);
 			}
 			else
 			{
 				if(param->set_param)
 				{
-					param->set_param(isp_ini_cfg, (void *)&subkey.value->val, param->len);
-					vfe_dbg(0,"fetch_isp_cfg_single: %s->%s  = %d\n",param->main, param->sub,subkey.value->val);
+					param->set_param(isp_ini_cfg, (void *)&subkey.value.val, param->len);
+					vfe_dbg(0, "fetch_isp_cfg_single: %s->%s  = %d\n", param->main, param->sub, subkey.value.val);
 				}
 			}
-		}
-		else if(param->len > 1)
+		} else if (param->len > 1)
 		{
-			if(!strcmp(param->sub, "awb_light_info_"))
-			{
+			if (!strcmp(param->sub, "awb_light_info")) {
 				param->len = 10 * isp_ini_cfg->isp_3a_settings.awb_light_num;
 			}
-			if(!strcmp(param->sub, "awb_ext_light_info_"))
-			{
+			if (!strcmp(param->sub, "awb_ext_light_info")) {
 				param->len = 10 * isp_ini_cfg->isp_3a_settings.awb_ext_light_num;
 			}
-			if(!strcmp(param->sub, "awb_skin_color_info_"))
-			{
+			if (!strcmp(param->sub, "awb_skin_color_info")) {
 				param->len = 10 * isp_ini_cfg->isp_3a_settings.awb_skin_color_num;
 			}
+			if (!strcmp(param->sub, "awb_special_color_info")) {
+				param->len = 10 * isp_ini_cfg->isp_3a_settings.awb_special_color_num;
+			}
 
-			array_value = (int*)kzalloc(param->len*sizeof(int),GFP_KERNEL);
+			if (!strcmp(param->sub, "af_std_code_tbl")) {
+				param->len = isp_ini_cfg->isp_3a_settings.af_tolerance_tbl_len;
+			}
+			if (!strcmp(param->sub, "af_tolerance_value_tbl")) {
+				param->len = isp_ini_cfg->isp_3a_settings.af_tolerance_tbl_len;
+			}
+			if (param->len) {
+				array_value = (int *)vmalloc(param->len*sizeof(int));
+				memset(array_value, 0, param->len*sizeof(int));
+			} else {
+				array_value = NULL;
+			}
 			for(j = 0;j<param->len;j++)
 			{
-				sprintf(sub_name, "%s%d",param->sub, j);
+				sprintf(sub_name, "%s_%d", param->sub, j);
 				if (CFG_ITEM_VALUE_TYPE_INT != cfg_get_one_subkey(cfg_section,param->main,sub_name,&subkey))
 				{
-					vfe_warn("fetch %s from %s failed, set %s = 0!\n",sub_name,param->main, sub_name);
+					if (strcmp(param->sub, "iso_param"))
+						vfe_warn("fetch %s from %s failed, set %s = 0!\n", sub_name, param->main, sub_name);
 					array_value[j] = 0;
 				}
 				else
 				{
-					array_value[j] = subkey.value->val;
-					vfe_dbg(0,"fetch_isp_cfg_array: %s->%s  = %d\n",param->main, sub_name, subkey.value->val);
+					array_value[j] = subkey.value.val;
+					vfe_dbg(0, "fetch_isp_cfg_array: %s->%s  = %d\n", param->main, sub_name, subkey.value.val);
 				}
 			}
-			if(param->set_param)
+			if (param->set_param && array_value)
 			{
 				param->set_param(isp_ini_cfg, (void *)array_value, param->len);
 			}
 
-			if(array_value)
-				kfree(array_value);
+			if (array_value)
+				vfree(array_value);
 		}
 	}
-	 vfe_dbg(0,"fetch isp_cfg done!\n");
+	 vfe_dbg(0, "fetch isp_cfg done!\n");
 	return 0;
 }
 int fetch_isp_tbl(struct isp_init_config *isp_ini_cfg, char* tbl_patch)
@@ -1334,21 +1267,21 @@ int fetch_isp_tbl(struct isp_init_config *isp_ini_cfg, char* tbl_patch)
 	strcat(isp_lsc_tbl_path, "lsc_tbl.bin");
 
 	vfe_print("Fetch table form \"%s\", gamma num = %d\n",isp_gamma_tbl_path, isp_ini_cfg->isp_tunning_settings.gamma_num);
-	buf = (char*)kzalloc(SIZE_OF_LSC_TBL_MOD1,GFP_KERNEL);
+	buf = (char *)kzalloc(SIZE_OF_LSC_TBL_MOD2, GFP_KERNEL);
 
 	/* fetch gamma_tbl table! */
-	if(isp_ini_cfg->isp_tunning_settings.gamma_num > 1 && isp_ini_cfg->isp_tunning_settings.gamma_num <= 5 )
-		len = cfg_read_file(isp_gamma_tbl_path,buf, ISP_GAMMA_MEM_SIZE * isp_ini_cfg->isp_tunning_settings.gamma_num);
+	if (isp_ini_cfg->isp_tunning_settings.gamma_num > 1 && isp_ini_cfg->isp_tunning_settings.gamma_num <= 5)
+		len = cfg_read_file(isp_gamma_tbl_path, buf, ISP_GAMMA_MEM_SIZE * isp_ini_cfg->isp_tunning_settings.gamma_num);
 	else
-		len = cfg_read_file(isp_gamma_tbl_path,buf, ISP_GAMMA_MEM_SIZE);
-	if(len < 0)
+		len = cfg_read_file(isp_gamma_tbl_path, buf, ISP_GAMMA_MEM_SIZE);
+	if (len < 0)
 	{
 		vfe_warn("read gamma_tbl from gamma_tbl.bin failed!\n");
 		ret =  -1;
 	}
 	else
 	{
-		if(isp_ini_cfg->isp_tunning_settings.gamma_num > 1){
+		if (isp_ini_cfg->isp_tunning_settings.gamma_num > 1) {
 		
 			memcpy(isp_ini_cfg->isp_tunning_settings.gamma_tbl_ini, buf, len);
 			memcpy(isp_ini_cfg->isp_tunning_settings.gamma_tbl, buf, ISP_GAMMA_MEM_SIZE);
@@ -1363,10 +1296,14 @@ int fetch_isp_tbl(struct isp_init_config *isp_ini_cfg, char* tbl_patch)
 	}
 
 	/* fetch lsc table! */
-	if(0 == isp_ini_cfg->isp_tunning_settings.lsc_mod){
-		len = cfg_read_file(isp_lsc_tbl_path,buf,SIZE_OF_LSC_TBL_MOD0);
-	}else{
-		len = cfg_read_file(isp_lsc_tbl_path,buf,SIZE_OF_LSC_TBL_MOD1);
+	if (0 == isp_ini_cfg->isp_tunning_settings.lsc_mod) {
+		len = cfg_read_file(isp_lsc_tbl_path, buf, SIZE_OF_LSC_TBL_MOD0);
+	} else if (1 == isp_ini_cfg->isp_tunning_settings.lsc_mod) {
+		len = cfg_read_file(isp_lsc_tbl_path, buf, SIZE_OF_LSC_TBL_MOD1);
+	} else {
+		len = cfg_read_file(isp_lsc_tbl_path, buf, SIZE_OF_LSC_TBL_MOD2);
+		if (len != SIZE_OF_LSC_TBL_MOD2)
+			vfe_warn("read lsc_tbl from lsc_tbl.bin len = %d, but %d is required\n", len, SIZE_OF_LSC_TBL_MOD2);
 	}
 	if(len < 0)
 	{
@@ -1405,7 +1342,7 @@ int match_isp_cfg(struct vfe_dev *dev,int isp_id)
 {
 	int ret;
 	struct isp_cfg_item isp_cfg_tmp;
-	struct isp_init_config *isp_ini_cfg = &dev->isp_gen_set[isp_id].isp_ini_cfg;
+	struct isp_init_config *isp_ini_cfg = &dev->isp_gen_set[isp_id]->isp_ini_cfg;
 	ret = get_isp_cfg(dev->ccm_cfg[isp_id]->isp_cfg_name,&isp_cfg_tmp);
 	if(ret < 0)
 	{
@@ -1425,7 +1362,6 @@ int read_ini_info(struct vfe_dev *dev,int isp_id, char *main_path)
 	char isp_cfg_path[128],isp_tbl_path[128],file_name_path[128];
 	struct cfg_section *cfg_section;
 	struct file* fp;
-
 	if(dev->ccm_cfg[isp_id] != NULL && strcmp(dev->ccm_cfg[isp_id]->isp_cfg_name, "") != 0)
 	{
 		sprintf(isp_cfg_path, "%s%s/",main_path, dev->ccm_cfg[isp_id]->isp_cfg_name);
@@ -1455,7 +1391,7 @@ int read_ini_info(struct vfe_dev *dev,int isp_id, char *main_path)
 	}
 	vfe_print("read ini start\n");
 	
-	dev->isp_gen_set[isp_id].isp_ini_cfg = isp_init_def_cfg;
+	dev->isp_gen_set[isp_id]->isp_ini_cfg = isp_init_def_cfg;
 	for(i=0; i< ARRAY_SIZE(FileAttr); i++)
 	{
 		sprintf(file_name_path,"%s%s",isp_cfg_path,FileAttr[i].file_name);
@@ -1467,13 +1403,13 @@ int read_ini_info(struct vfe_dev *dev,int isp_id, char *main_path)
 			cfg_section_release(&cfg_section);
 			goto read_ini_info_end;
 		}
-		fetch_isp_cfg(&dev->isp_gen_set[isp_id].isp_ini_cfg, cfg_section,&FileAttr[i]);
+		fetch_isp_cfg(&dev->isp_gen_set[isp_id]->isp_ini_cfg, cfg_section, &FileAttr[i]);
 		cfg_section_release(&cfg_section);
 	}
-	ret = fetch_isp_tbl(&dev->isp_gen_set[isp_id].isp_ini_cfg, &isp_tbl_path[0]);
+	ret = fetch_isp_tbl(&dev->isp_gen_set[isp_id]->isp_ini_cfg, &isp_tbl_path[0]);
 	if(ret == -1)
     	{
-    		dev->isp_gen_set[isp_id].isp_ini_cfg = isp_init_def_cfg;
+		dev->isp_gen_set[isp_id]->isp_ini_cfg = isp_init_def_cfg;
         }
 read_ini_info_end:
 	vfe_dbg(0,"read ini end\n");

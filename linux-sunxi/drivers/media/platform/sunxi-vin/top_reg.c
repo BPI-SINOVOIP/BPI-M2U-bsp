@@ -20,6 +20,116 @@
 
 #include "utility/vin_io.h"
 
+/*isp_id isp_input pasrer_id parser_ch*/
+static int isp_input[4][4][4][4] = {
+#if defined(CONFIG_ARCH_SUN50IW3P1) || defined(CONFIG_ARCH_SUN50IW6P1)
+
+	/*isp0 input0~3*/
+		/*parser0*/     /*parse1*/    /*parser2*/    /*parser3*/
+	{
+		{{0, 0, 0, 0}, {1, 2, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+		{{0, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+		{{0, 0, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+		{{0, 0, 0, 0}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 0} }
+	},
+
+	/*isp1 input0~3*/
+	{
+		{{1, 2, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+		{{0, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+		{{0, 0, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+		{{0, 0, 0, 0}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 0} }
+	},
+/*
+	{
+		{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}},
+		{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}},
+		{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}},
+		{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
+	},
+
+	{
+		{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}},
+		{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}},
+		{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}},
+		{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
+	}
+*/
+#else
+	/*isp0 input0~3*/
+	{
+		{{0, 4, 0, 0}, {1, 5, 0, 0}, {2, 6, 0, 0}, {3, 7, 0, 0} },
+		{{0, 0, 0, 0}, {0, 1, 0, 0}, {0, 2, 0, 0}, {0, 3, 0, 0} },
+		{{0, 0, 0, 0}, {0, 0, 1, 0}, {0, 0, 2, 0}, {0, 0, 3, 0} },
+		{{0, 0, 0, 0}, {0, 0, 0, 1}, {0, 0, 0, 2}, {0, 0, 0, 3} }
+	},
+
+	/*isp1 input0~3*/
+	{
+		{{0, 4, 0, 0}, {1, 5, 0, 0}, {2, 6, 0, 0}, {3, 7, 0, 0} },
+		{{0, 0, 0, 0}, {0, 1, 0, 0}, {0, 2, 0, 0}, {0, 3, 0, 0} },
+		{{0, 0, 0, 0}, {0, 0, 1, 0}, {0, 0, 2, 0}, {0, 0, 3, 0} },
+		{{0, 0, 0, 0}, {0, 0, 0, 1}, {0, 0, 0, 2}, {0, 0, 0, 3} }
+	},
+
+	/*isp2 input0~3*/
+	{
+		{{0, 4, 0, 0}, {1, 5, 0, 0}, {2, 6, 0, 0}, {3, 7, 0, 0} },
+		{{0, 0, 0, 0}, {0, 1, 0, 0}, {0, 2, 0, 0}, {0, 3, 0, 0} },
+		{{0, 0, 0, 0}, {0, 0, 1, 0}, {0, 0, 2, 0}, {0, 0, 3, 0} },
+		{{0, 0, 0, 0}, {0, 0, 0, 1}, {0, 0, 0, 2}, {0, 0, 0, 3} }
+	},
+
+	/*isp3 input0~3*/
+	{
+		{{0, 4, 0, 0}, {1, 5, 0, 0}, {2, 6, 0, 0}, {3, 7, 0, 0} },
+		{{0, 0, 0, 0}, {0, 1, 0, 0}, {0, 2, 0, 0}, {0, 3, 0, 0} },
+		{{0, 0, 0, 0}, {0, 0, 1, 0}, {0, 0, 2, 0}, {0, 0, 3, 0} },
+		{{0, 0, 0, 0}, {0, 0, 0, 1}, {0, 0, 0, 2}, {0, 0, 0, 3} }
+	}
+#endif
+};
+
+/*vipp_id isp_id isp_ch*/
+static int vipp_input[8][4][4] = {
+#if defined(CONFIG_ARCH_SUN50IW3P1) || defined(CONFIG_ARCH_SUN50IW6P1)
+	/*vipp0*/
+	/*isp0*/        /*isp1*/      /*isp2*/       /*isp3*/
+	{{0, 0, 0, 0}, {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+
+	{{0, 2, 0, 0}, {1, 3, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+
+	{{0, 0, 2, 0}, {1, 0, 3, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+
+	{{0, 0, 0, 2}, {1, 4, 0, 3}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+/*
+	{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}},
+
+	{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}},
+
+	{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}},
+
+	{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}},
+*/
+#else
+	{{0, 0, 0, 0}, {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+
+	{{0, 2, 0, 0}, {1, 3, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+
+	{{0, 0, 2, 0}, {1, 0, 3, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+
+	{{0, 0, 0, 2}, {1, 4, 0, 3}, {0, 0, 0, 0}, {0, 0, 0, 0} },
+
+	{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {1, 0, 0, 0} },
+
+	{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 2, 0, 0}, {1, 3, 0, 0} },
+
+	{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 2, 0}, {1, 0, 3, 0} },
+
+	{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 2}, {1, 4, 0, 3} }
+#endif
+};
+
 volatile void __iomem *csic_top_base[MAX_CSIC_TOP_NUM];
 
 int csic_top_set_base_addr(unsigned int sel, unsigned long addr)
@@ -67,146 +177,19 @@ void csic_top_version_read_en(unsigned int sel, unsigned int en)
 			CSIC_VER_EN_MASK, en << CSIC_VER_EN);
 }
 
-#ifdef ISP_VIPP_SEL_SEPARATE
-void csic_isp0_input0_select(unsigned int sel, enum isp0_input0 isp0_in0)
+void csic_isp_input_select(unsigned int sel, unsigned int isp, unsigned int in,
+				unsigned int psr, unsigned int ch)
 {
-	vin_reg_writel(csic_top_base[sel] + CSIC_ISP0_IN0_REG_OFF, isp0_in0);
+	vin_reg_writel(csic_top_base[sel] + CSIC_ISP0_IN0_REG_OFF + isp * 16 + in * 4,
+			isp_input[isp][in][psr][ch]);
 }
 
-void csic_isp0_input1_select(unsigned int sel, enum isp0_input1 isp0_in1)
+void csic_vipp_input_select(unsigned int sel, unsigned int vipp,
+				unsigned int isp, unsigned int ch)
 {
-	vin_reg_writel(csic_top_base[sel] + CSIC_ISP0_IN1_REG_OFF, isp0_in1);
+	vin_reg_writel(csic_top_base[sel] + CSIC_VIPP0_IN_REG_OFF + vipp * 4,
+			vipp_input[vipp][isp][ch]);
 }
-
-void csic_isp0_input2_select(unsigned int sel, enum isp0_input2 isp0_in2)
-{
-	vin_reg_writel(csic_top_base[sel] + CSIC_ISP0_IN2_REG_OFF, isp0_in2);
-}
-
-void csic_isp0_input3_select(unsigned int sel, enum isp0_input3 isp0_in3)
-{
-	vin_reg_writel(csic_top_base[sel] + CSIC_ISP0_IN3_REG_OFF, isp0_in3);
-}
-
-void csic_isp1_input0_select(unsigned int sel, enum isp1_input0 isp1_in0)
-{
-	vin_reg_writel(csic_top_base[sel] + CSIC_ISP1_IN0_REG_OFF, isp1_in0);
-}
-
-void csic_isp1_input1_select(unsigned int sel, enum isp1_input1 isp1_in1)
-{
-	vin_reg_writel(csic_top_base[sel] + CSIC_ISP1_IN1_REG_OFF, isp1_in1);
-}
-
-void csic_isp1_input2_select(unsigned int sel, enum isp1_input2 isp1_in2)
-{
-	vin_reg_writel(csic_top_base[sel] + CSIC_ISP1_IN2_REG_OFF, isp1_in2);
-}
-
-void csic_isp1_input3_select(unsigned int sel, enum isp1_input3 isp1_in3)
-{
-	vin_reg_writel(csic_top_base[sel] + CSIC_ISP1_IN3_REG_OFF, isp1_in3);
-}
-
-void csic_vipp0_input_select(unsigned int sel, enum vipp0_input vipp0_in)
-{
-	vin_reg_writel(csic_top_base[sel] + CSIC_VIPP0_IN_REG_OFF, vipp0_in);
-}
-
-void csic_vipp1_input_select(unsigned int sel, enum vipp1_input vipp1_in)
-{
-	vin_reg_writel(csic_top_base[sel] + CSIC_VIPP1_IN_REG_OFF, vipp1_in);
-}
-
-void csic_vipp2_input_select(unsigned int sel, enum vipp2_input vipp2_in)
-{
-	vin_reg_writel(csic_top_base[sel] + CSIC_VIPP2_IN_REG_OFF, vipp2_in);
-}
-
-void csic_vipp3_input_select(unsigned int sel, enum vipp3_input vipp3_in)
-{
-	vin_reg_writel(csic_top_base[sel] + CSIC_VIPP3_IN_REG_OFF, vipp3_in);
-}
-
-#else
-void csic_isp_input_select(unsigned int sel, unsigned int x, unsigned int y,
-				union csic_isp_input isp_in)
-{
-	int i = 0;
-
-	if (0 == x) {
-		switch (y) {
-		case 0:
-			vin_reg_writel(csic_top_base[sel] + CSIC_ISP0_IN0_REG_OFF,
-					isp_in.isp0_in0);
-			break;
-		case 1:
-			vin_reg_writel(csic_top_base[sel] + CSIC_ISP0_IN1_REG_OFF,
-					isp_in.isp0_in1);
-			break;
-
-		case 2:
-			vin_reg_writel(csic_top_base[sel] + CSIC_ISP0_IN2_REG_OFF,
-					isp_in.isp0_in2);
-			break;
-		case 3:
-			vin_reg_writel(csic_top_base[sel] + CSIC_ISP0_IN3_REG_OFF,
-					isp_in.isp0_in3);
-			break;
-		default:
-			break;
-		}
-	} else if (1 == x) {
-		switch (y) {
-		case 0:
-			vin_reg_writel(csic_top_base[sel] + CSIC_ISP1_IN0_REG_OFF,
-					isp_in.isp1_in0);
-			break;
-		case 1:
-			vin_reg_writel(csic_top_base[sel] + CSIC_ISP1_IN1_REG_OFF,
-					isp_in.isp1_in1);
-			break;
-
-		case 2:
-			vin_reg_writel(csic_top_base[sel] + CSIC_ISP1_IN2_REG_OFF,
-					isp_in.isp1_in2);
-			break;
-		case 3:
-			vin_reg_writel(csic_top_base[sel] + CSIC_ISP1_IN3_REG_OFF,
-					isp_in.isp1_in3);
-			break;
-		default:
-			break;
-		}
-	}
-}
-
-void csic_vipp_input_select(unsigned int sel, unsigned int x,
-				union csic_vipp_input vipp_in)
-{
-	switch (x) {
-	case 0:
-		vin_reg_writel(csic_top_base[sel] + CSIC_VIPP0_IN_REG_OFF,
-				vipp_in.vipp0_in);
-		break;
-	case 1:
-		vin_reg_writel(csic_top_base[sel] + CSIC_VIPP1_IN_REG_OFF,
-				vipp_in.vipp1_in);
-		break;
-
-	case 2:
-		vin_reg_writel(csic_top_base[sel] + CSIC_VIPP2_IN_REG_OFF,
-				vipp_in.vipp2_in);
-		break;
-	case 3:
-		vin_reg_writel(csic_top_base[sel] + CSIC_VIPP3_IN_REG_OFF,
-				vipp_in.vipp3_in);
-		break;
-	default:
-		break;
-	}
-}
-#endif
 
 void csic_feature_list_get(unsigned int sel, struct csic_feature_list *fl)
 {

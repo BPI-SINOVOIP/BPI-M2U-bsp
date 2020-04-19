@@ -28,6 +28,7 @@
 #include <linux/power/aw_pm.h>
 #include <linux/power/scenelock.h>
 static struct scene_lock  ohci_standby_lock[4];
+static void sunxi_ohci_resume_work(struct work_struct *work);
 #endif
 #include "sunxi_hci.h"
 
@@ -62,7 +63,6 @@ static struct sunxi_hci_hcd *g_sunxi_ohci[4];
 static u32 ohci_first_probe[4] = {1, 1, 1, 1};
 static u32 ohci_enable[4] = {1, 1, 1, 1};
 
-extern int usb_disabled(void);
 int sunxi_usb_disable_ohci(__u32 usbc_no);
 int sunxi_usb_enable_ohci(__u32 usbc_no);
 
@@ -137,19 +137,29 @@ static int close_ohci_clock(struct sunxi_hci_hcd *sunxi_ohci)
 	return sunxi_ohci->close_clock(sunxi_ohci, 1);
 }
 
+static void sunxi_ohci_set_vbus(struct sunxi_hci_hcd *sunxi_xhci, int is_on)
+{
+	sunxi_xhci->set_power(sunxi_xhci, is_on);
+}
+
+static void sunxi_ohci_set_passby(struct sunxi_hci_hcd *sunxi_xhci, int is_on)
+{
+	sunxi_xhci->usb_passby(sunxi_xhci, is_on);
+}
+
 static void sunxi_start_ohci(struct sunxi_hci_hcd *sunxi_ohci)
 {
 	open_ohci_clock(sunxi_ohci);
-	sunxi_ohci->usb_passby(sunxi_ohci, 1);
-	sunxi_ohci->set_power(sunxi_ohci, 1);
+	sunxi_ohci_set_passby(sunxi_ohci, 1);
+	sunxi_ohci_set_vbus(sunxi_ohci, 1);
 
 	return;
 }
 
 static void sunxi_stop_ohci(struct sunxi_hci_hcd *sunxi_ohci)
 {
-	sunxi_ohci->set_power(sunxi_ohci, 0);
-	sunxi_ohci->usb_passby(sunxi_ohci, 0);
+	sunxi_ohci_set_vbus(sunxi_ohci, 0);
+	sunxi_ohci_set_passby(sunxi_ohci, 0);
 	close_ohci_clock(sunxi_ohci);
 
 	return;
@@ -283,9 +293,10 @@ static int sunxi_insmod_ohci(struct platform_device *pdev)
 	sunxi_ohci->probe = 1;
 
 #ifdef	CONFIG_PM
-	if(sunxi_ohci->wakeup_suspend){
+	if (sunxi_ohci->wakeup_suspend)
 		scene_lock_init(&ohci_standby_lock[sunxi_ohci->usbc_no], SCENE_USB_STANDBY,  "ohci_standby");
-	}
+	else
+		INIT_WORK(&sunxi_ohci->resume_work, sunxi_ohci_resume_work);
 #endif
 	/* Disable ohci, when driver probe */
 	if(sunxi_ohci->host_init_state == 0){
@@ -370,11 +381,10 @@ static int sunxi_ohci_hcd_probe(struct platform_device *pdev)
 	ret = init_sunxi_hci(pdev, SUNXI_USB_OHCI);
 	if(ret != 0){
 		dev_err(&pdev->dev, "init_sunxi_hci is fail\n");
-		return 0;
+		return -1;
 	}
 
 	sunxi_insmod_ohci(pdev);
-
 
 	sunxi_ohci = pdev->dev.platform_data;
 	if(sunxi_ohci == NULL){
@@ -417,7 +427,7 @@ static void sunxi_ohci_hcd_shutdown(struct platform_device* pdev)
 
 	sunxi_ohci = pdev->dev.platform_data;
 	if(sunxi_ohci == NULL){
-		DMSG_PANIC("ERR: sunxi_ohci is null\n");
+		DMSG_PANIC("ERR: %s sunxi_ohci is null\n", __func__);
 		return ;
 	}
 
@@ -426,23 +436,25 @@ static void sunxi_ohci_hcd_shutdown(struct platform_device* pdev)
 		return ;
 	}
 
-	DMSG_INFO("[%s]: ohci shutdown start\n", sunxi_ohci->hci_name);
+	pr_debug("[%s]: ohci shutdown start\n", sunxi_ohci->hci_name);
 
 #ifdef	CONFIG_PM
 	if(sunxi_ohci->wakeup_suspend){
 		scene_lock_destroy(&ohci_standby_lock[sunxi_ohci->usbc_no]);
 	}
 #endif
+	sunxi_ohci_set_vbus(sunxi_ohci, 0);
+
 	usb_hcd_platform_shutdown(pdev);
 
 	/* disable usb otg INTUSBE, To solve usb0 device mode catch audio udev on reboot system is fail*/
-	if(sunxi_ohci->otg_vbase){
-		USBC_Writel(0, (sunxi_ohci->otg_vbase + SUNXI_USBC_REG_INTUSBE));
-	}
+	if (sunxi_ohci->usbc_no == 0)
+		if (sunxi_ohci->otg_vbase) {
+			writel(0, (sunxi_ohci->otg_vbase
+						+ SUNXI_USBC_REG_INTUSBE));
+		}
 
-	sunxi_stop_ohci(sunxi_ohci);
-
-	DMSG_INFO("[%s]: ohci shutdown end\n", sunxi_ohci->hci_name);
+	pr_debug("[%s]: ohci shutdown end\n", sunxi_ohci->hci_name);
 
 	return;
 }
@@ -515,11 +527,24 @@ static int sunxi_ohci_hcd_suspend(struct device *dev)
 		 * any locks =P But that will be a different fix.
 		 */
 		ohci_suspend(hcd, device_may_wakeup(dev));
-
 		sunxi_stop_ohci(sunxi_ohci);
+
+		cancel_work_sync(&sunxi_ohci->resume_work);
 	}
 
 	return 0;
+}
+
+static void sunxi_ohci_resume_work(struct work_struct *work)
+{
+	struct sunxi_hci_hcd *sunxi_ohci = NULL;
+
+	sunxi_ohci = container_of(work, struct sunxi_hci_hcd, resume_work);
+
+	/* Waiting hci to resume. */
+	msleep(5000);
+
+	sunxi_ohci_set_vbus(sunxi_ohci, 1);
 }
 
 static int sunxi_ohci_hcd_resume(struct device *dev)
@@ -563,13 +588,12 @@ static int sunxi_ohci_hcd_resume(struct device *dev)
 	}else{
 		DMSG_INFO("[%s]: sunxi_ohci_hcd_resume\n", sunxi_ohci->hci_name);
 
-#ifdef  SUNXI_USB_FPGA
-		fpga_config_use_hci(sunxi_ohci);
-#endif
-		sunxi_start_ohci(sunxi_ohci);
-
+		open_ohci_clock(sunxi_ohci);
+		sunxi_ohci_set_passby(sunxi_ohci, 1);
 		set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 		ohci_resume(hcd, false);
+
+		schedule_work(&sunxi_ohci->resume_work);
 	}
 
 	return 0;

@@ -23,6 +23,8 @@
 #include <linux/hwspinlock.h>
 #include "message_manager_i.h"
 
+#define ARISC_SPINLOCK_TIMEOUT   (100)
+
 /* the start and end of message pool */
 static struct arisc_message *message_start;
 static struct arisc_message *message_end;
@@ -71,7 +73,6 @@ int arisc_message_manager_init(void *addr, u32 size)
 		message_cache.cache[i] = NULL;
 	}
 	atomic_set(&(message_cache.number), 0);
-
 	/* initialzie semaphore allocator */
 	for (i = 0; i < ARISC_SEM_CACHE_MAX; i++) {
 		sem_cache.cache[i] = NULL;
@@ -409,3 +410,10 @@ int arisc_message_valid(struct arisc_message *pmessage)
 	return 0;
 }
 
+void flush_message_pool(void)
+{
+#if defined CONFIG_ARM
+	dmac_flush_range((void *)(message_start),
+			 (void *)(message_end));
+#endif
+}

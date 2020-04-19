@@ -8,10 +8,22 @@
 #include "./lowlevel_sun8iw10/disp_al.h"
 #elif defined(CONFIG_ARCH_SUN8IW11P1)
 #include "./lowlevel_v2x/disp_al.h"
+#elif defined(CONFIG_ARCH_SUN8IW12P1)
+#include "./lowlevel_v2x/disp_al.h"
+#elif defined(CONFIG_ARCH_SUN8IW17P1)
+#include "./lowlevel_v2x/disp_al.h"
 #elif defined(CONFIG_ARCH_SUN50IW1P1)
 #include "./lowlevel_sun50iw1/disp_al.h"
 #elif defined(CONFIG_ARCH_SUN50IW2P1)
 #include "./lowlevel_v2x/disp_al.h"
+#elif defined(CONFIG_ARCH_SUN8IW7P1)
+#include "./lowlevel_v2x/disp_al.h"
+#elif defined(CONFIG_ARCH_SUN50IW3P1)
+#include "./lowlevel_v3x/disp_al.h"
+#elif defined(CONFIG_ARCH_SUN50IW6P1)
+#include "./lowlevel_v3x/disp_al.h"
+#else
+#error "undefined platform!!!"
 #endif
 
 extern struct disp_device* disp_get_lcd(u32 disp);
@@ -46,5 +58,7 @@ extern s32 disp_init_capture(disp_bsp_init_para *para);
 
 u32 dump_layer_config(struct disp_layer_config_data *data);
 
+void *disp_vmap(unsigned long phys_addr, unsigned long size);
+void disp_vunmap(const void *vaddr);
 #endif
 

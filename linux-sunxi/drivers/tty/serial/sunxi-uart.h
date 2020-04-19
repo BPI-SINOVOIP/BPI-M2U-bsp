@@ -32,6 +32,8 @@ struct sw_uart_port {
 	struct uart_port port;
 	char   name[16];
 	struct clk *mclk;
+	struct clk *sclk;
+	struct clk *pclk;
 	unsigned char id;
 	unsigned char ier;
 	unsigned char lcr;
@@ -165,6 +167,14 @@ struct sw_uart_port {
 
 /* The global infor of UART channel. */
 
+#if defined(CONFIG_ARCH_SUN8IW5)
+#define SUNXI_UART_NUM			5
+#endif
+
+#if defined(CONFIG_ARCH_SUN8IW8)
+#define SUNXI_UART_NUM			3
+#endif
+
 #if defined(CONFIG_ARCH_SUN8IW11)
 #define SUNXI_UART_NUM			8
 #endif
@@ -177,6 +187,10 @@ struct sw_uart_port {
 #define SUNXI_UART_NUM			4
 #endif
 
+#if defined(CONFIG_ARCH_SUN3IW1)
+#define SUNXI_UART_NUM			3
+#endif
+
 #ifndef SUNXI_UART_NUM
 #define SUNXI_UART_NUM			1
 #endif
@@ -186,6 +200,15 @@ struct sw_uart_port {
 #ifndef CONFIG_EVB_PLATFORM
 #undef SUNXI_UART_NUM
 #define SUNXI_UART_NUM			1
+#endif
+
+#if defined(CONFIG_ARCH_SUN50IW3) \
+	|| defined(CONFIG_ARCH_SUN50IW6)
+#define SUNXI_UART_FIFO_SIZE		256
+#elif defined(CONFIG_ARCH_SUN3IW1)
+#define SUNXI_UART_FIFO_SIZE		32
+#else
+#define SUNXI_UART_FIFO_SIZE		64
 #endif
 
 #define SUNXI_UART_DEV_NAME			"uart"

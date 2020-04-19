@@ -1,0 +1,81 @@
+/*
+ * Allwinner Technology CO., Ltd. sun3iw1p1 evb board.
+ *
+ * evb board support.
+ */
+
+/dts-v1/;
+#include "sun3iw1p1-r6.dtsi"
+
+/ {
+
+  memory@80000000 {
+		reg = <0x00000000 0x80000000 0x00000000 0x2000000>;
+	};
+
+	soc: soc {
+		spi0: spi@01c05000 {
+			interrupts = <10>;
+			status = "okay";
+
+			nor_flash@0 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				compatible = "st,m25p64";
+				spi-max-frequency = <50000000>;
+				reg = <0>;	/* Chip select 0 */
+			};
+		};
+
+		spi1: spi@01c06000 {
+			interrupts = <11>;
+			status = "okay";
+
+			mmc_slot: mmc-slot@0 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				compatible = "mmc-spi-slot";
+				spi-max-frequency = <25000000>;
+				device_type = "mmc-spi";
+				reg = <0>;	/* Chip select 0 */
+				voltage-ranges = <3300 3300>;
+			};
+		};
+
+		twi0: twi@0x01c27000{
+			clock-frequency = <100000>;
+			status = "okay";
+		};
+
+		twi1: twi@0x01c27400{
+			interrupts = <8>;
+			status = "okay";
+		};
+
+		twi2: twi@0x01c27800{
+			clock-frequency = <100000>;
+			status = "okay";
+
+			nau8540@1d{
+				compatible = "nuvoton,nau8540";
+				i2c-max-frequency = <100000>;
+				reg = <0x1d>;
+            		};
+			io_expand: io_expand@0x38 {
+				compatible = "nxp,pcf8574a";
+				i2c-max-frequency = <100000>;
+				reg = <0x38>;
+			};
+			touchscreen0: touchscreen0@0x4A {
+				compatible = "atmel,mxt336t";
+				reg = <0x4A>;
+				atmel,suspend_mode = <0>;
+			};
+			touchscreen1: touchscreen1@0x48 {
+				compatible = "ctp_icn85xx";
+				reg = <0x48>;
+			};
+		};
+	};
+
+};

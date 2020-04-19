@@ -46,9 +46,11 @@ struct vfe_coor {
 
 /* buffer for one video frame */
 struct vfe_buffer {
-	struct vb2_buffer	vb;	
+	struct vb2_buffer	vb;
 	struct list_head	list;
 	struct vfe_fmt		*fmt;
+	enum vb2_buffer_state	state;
+	void *paddr;
 };
 
 struct vfe_dmaqueue {
@@ -62,8 +64,8 @@ struct vfe_isp_stat_buf {
 	unsigned int              id;
 	struct list_head          queue;
 	struct isp_stat_buffer    isp_stat_buf;
-	void                      *paddr;  
-	void						*dma_addr;  
+	void                      *paddr;
+	void						*dma_addr;
 };
 
 struct vfe_isp_stat_buf_queue {
@@ -81,7 +83,7 @@ struct vfe_ctrl_para {
 	struct isp_h3a_coor_win 				ae_coor[MAX_AE_WIN_NUM];//pointer
 	unsigned int                            gsensor_rot; //interger
 	unsigned int							prev_exp_line;
-	unsigned int			                prev_ana_gain;  
+	unsigned int			                prev_ana_gain;
 	unsigned int			                prev_focus_pos;
 	unsigned int			                prev_exp_gain;
 };
@@ -124,7 +126,7 @@ struct vfe_power {
 	unsigned int		iovdd_vol; /* voltage of sensor module for interface */
 	unsigned int		avdd_vol; /* voltage of sensor module for analog */
 	unsigned int		dvdd_vol; /* voltage of sensor module for core */
-	unsigned int		afvdd_vol; /* voltage of sensor module for vcm sink */	
+	unsigned int		afvdd_vol; /* voltage of sensor module for vcm sink */
 	unsigned int		flvdd_vol; /* voltage of sensor module for flash led */
 };
 struct camera_instance {
@@ -135,7 +137,7 @@ struct camera_instance {
 	int vflip;
 	int hflip;
 	char act_name[I2C_NAME_SIZE];
-	int act_i2c_addr;	
+	int act_i2c_addr;
 	char isp_cfg_name[I2C_NAME_SIZE];
 };
 
@@ -199,37 +201,34 @@ struct vfe_dev {
 	struct mutex            stream_lock;
 	struct delayed_work 	probe_work;
 	/* various device info */
-	struct video_device     *vfd;
-	struct vfe_dmaqueue     vidq;
+	struct video_device     *vfd[MAX_CH_NUM];
+	struct vfe_dmaqueue     vidq[MAX_CH_NUM];
 	struct vfe_isp_stat_buf_queue  isp_stat_bq;
-	/* Several counters */
-	unsigned                ms;
-	unsigned long           jiffies;
 	/* video capture */
-	struct vb2_queue		vb_vidq;	
-	struct mutex            buf_lock;	
-	struct vb2_alloc_ctx 	*alloc_ctx;
+	struct vb2_queue		vb_vidq[MAX_CH_NUM];
+	struct mutex            buf_lock;
+	struct vb2_alloc_ctx 	*alloc_ctx[MAX_CH_NUM];
 	unsigned int            capture_mode;
 	/*working state*/
 	unsigned long           generating;
 	unsigned long           opened;
 	struct mutex            opened_lock;
 	/* about system resource */
-	int                     irq;  
+	int                     irq;
 #ifdef VFE_GPIO
 	struct pinctrl		 	*pctrl;
 	struct pinctrl_state 	*pctrl_state;
-#endif  
+#endif
 	struct vfe_regs         regs;
 	struct vfe_gpio_cfg	  	*gpio;
 
 	struct vfe_power        *power;
 	struct regulator   		*vfe_system_power[3];
 	int vfe_sensor_power_cnt;
-	/* about vfe channel */ 
+	/* about vfe channel */
 	unsigned int            cur_ch;
 	/* about some global info*/
-	unsigned int            first_flag;       /* indicate the first time triggering irq */
+	unsigned int            first_flag[MAX_CH_NUM];
 	long unsigned int       sec,usec;
 	unsigned int            dev_qty;
 	unsigned int            is_same_module;   /* the modules connected on the same bus are the same modle */
@@ -259,8 +258,9 @@ struct vfe_dev {
 	struct vfe_mm  			isp_lut_tbl_buf_mm[MAX_INPUT_NUM];
 	struct vfe_mm			isp_drc_tbl_buf_mm[MAX_INPUT_NUM];
 	struct vfe_mm			isp_stat_buf_mm[MAX_ISP_STAT_BUF];
-	struct isp_gen_settings  isp_gen_set[MAX_INPUT_NUM];
-	struct isp_gen_settings  *isp_gen_set_pt; 
+	struct vfe_mm		buf_ext[MAX_CH_NUM];
+	struct isp_gen_settings  *isp_gen_set[MAX_INPUT_NUM];
+	struct isp_gen_settings  *isp_gen_set_pt;
 	struct mutex            isp_3a_result_mutex;
 	struct isp_3a_result    isp_3a_result[MAX_INPUT_NUM];
 	struct isp_3a_result    *isp_3a_result_pt;
@@ -271,7 +271,10 @@ struct vfe_dev {
 	unsigned int			platform_id;
 	unsigned int 			vfe_s_input_flag;
 	struct v4l2_ctrl_handler  ctrl_handler;
-	struct timer_list		timer_for_reset;
+	struct vfe_dmaqueue       vidq_special;
+	struct vfe_dmaqueue       done_special;
+	int special_active;
+	void (*vfe_buffer_process)(int id);
 };
 
 #endif  /* __VFE__H__ */

@@ -27,6 +27,16 @@
 #include <asm/arch/ccmu.h>
 #include <asm/arch/platform.h>
 
+#define set_wbit(addr, v)   (*((volatile unsigned long  *)(addr)) |=  (unsigned long)(v))
+#define clr_wbit(addr, v)   (*((volatile unsigned long  *)(addr)) &= ~(unsigned long)(v))
+
+//#define CCM_DEBUG
+#ifdef  CCM_DEBUG
+#define ccm_debug(fmt,args...)	printf(fmt ,##args)
+#else
+#define ccm_debug(fmt,args...) do {} while(0)
+#endif
+
 typedef struct core_pll_freq_tbl {
     int FactorN;
     int FactorK;
@@ -628,4 +638,63 @@ int sunxi_clock_set_corepll(int frequency)
 	return  0;
 }
 
+void ccm_module_disable(u32 clk_id)
+{
+	switch(clk_id>>8) {
+		case AHB1_BUS0:
+			clr_wbit(CCMU_AHB1_RST_REG0, 0x1U<<(clk_id&0xff));
+			ccm_debug("\nread CCM_AHB1_RST_REG0[0x%x]\n",readl(CCMU_AHB1_RST_REG0));
+			break;
+	}
+}
+
+void ccm_module_enable(u32 clk_id)
+{
+	switch(clk_id>>8) {
+		case AHB1_BUS0:
+			set_wbit(CCMU_AHB1_RST_REG0, 0x1U<<(clk_id&0xff));
+			ccm_debug("\nread enable CCM_AHB1_RST_REG0[0x%x]\n",readl(CCMU_AHB1_RST_REG0));
+			break;
+		default:
+			break;
+	}
+}
+
+void ccm_clock_enable(u32 clk_id)
+{
+	switch(clk_id>>8) {
+		case AXI_BUS:
+			set_wbit(CCMU_AXI_GATE_CTRL, 0x1U<<(clk_id&0xff));
+			break;
+		case AHB1_BUS0:
+			set_wbit(CCMU_AHB1_GATE0_CTRL, 0x1U<<(clk_id&0xff));
+			ccm_debug("read s CCM_AHB1_GATE0_CTRL[0x%x]\n",readl(CCMU_AHB1_GATE0_CTRL));
+			break;
+	}
+}
+
+void ccm_clock_disable(u32 clk_id)
+{
+	switch(clk_id>>8) {
+		case AXI_BUS:
+			clr_wbit(CCMU_AXI_GATE_CTRL, 0x1U<<(clk_id&0xff));
+			break;
+		case AHB1_BUS0:
+			clr_wbit(CCMU_AHB1_GATE0_CTRL, 0x1U<<(clk_id&0xff));
+			ccm_debug("read dis CCM_AHB1_GATE0_CTRL[0x%x]\n",readl(CCMU_AHB1_GATE0_CTRL));
+			break;
+	}
+}
+
+void ccm_module_reset(u32 clk_id)
+{
+	ccm_module_disable(clk_id);
+	ccm_module_enable(clk_id);
+}
+
+u32 ccm_get_pll_periph_clk(void)
+{
+
+	return sunxi_clock_get_pll6();
+}
 

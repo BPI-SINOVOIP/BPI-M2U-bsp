@@ -261,35 +261,33 @@ ENTRY(secondary_cpu_start)
 #endif
 	bic	    r0, #CR_V		        @ V = 0
 	MCR     p15, 0, r0, c1, c0, 0   @Write SCTLR
-
+#ifdef CONFIG_ARM_A7
+	@ enable smp
+	MRC     p15, 0, r0, c1, c0, 1
+	ORR     r0, r0, #0x040
+	MCR     p15, 0, r0, c1, c0, 1
+#endif
 	@ set sp
-	ldr r0, =secondary_cpu_svc_stack
-	ldr sp, [r0, #0x4]
+	ldr r0, =secondary_cpu_mode_stack
+	ldr sp, [r0, #0x0]
 
 	@ set r9
 	ldr r0, =secondary_cpu_data_groups
 	ldr r9, [r0, #0x4]
 
-	@ set tlb addr
-	ldr r0, =secondary_cpu_data_groups
-	ldr r1, [r0, #0]
-	orr r1, r1, #(1 << 0) | (1 << 1) | (2 << 3)
-	mcr p15, 0, r1, c2, c0, 0
-	mcr p15, 0, r1, c2, c0, 1
-
-	ldr r0, =0xffffffff
-	mcr p15, 0, r0, c3, c0, 0
-
-	mov r0, #0
-	mcr p15, 0, r0, c8, c7, 0
-
-	isb
-
-	mrc p15, 0, r0, c1, c0, 0
-	orr r0, #((1<<0) | (1<<2))
-	mcr p15, 0, r0, c1, c0, 0
+	@ set irq sp
+	mrs r0, cpsr
+	bic	r0, r0, #0x1f		@ clear all mode bits
+	orr	r0, r0, #0x12		@ set IRQ mode
+	msr	cpsr ,r0
+	ldr r1, =secondary_cpu_mode_stack
+	ldr sp, [r1, #0x4]
+	bic	r0, r0, #0x1f		@ clear all mode bits
+	orr	r0, r0, #0x13		@ set SVC mode
+	msr	cpsr, r0
 
 	b  sunxi_secendary_cpu_task
+	b .
 ENDPROC(secondary_cpu_start)
 
 
@@ -347,35 +345,68 @@ ENTRY(third_cpu_start)
 	mcr	p15, 0, r0, c1, c0, 0	@ Write CP15 SCTRL Register
 #endif
 
+#ifdef CONFIG_ARM_A7
+	@ enable smp
+	MRC     p15, 0, r0, c1, c0, 1
+	ORR     r0, r0, #0x040
+	MCR     p15, 0, r0, c1, c0, 1
+#endif
 	@ set sp
-	ldr r0, =secondary_cpu_svc_stack
+	ldr r0, =secondary_cpu_mode_stack
 	ldr sp, [r0, #0x8]
 
 	@ set r9
 	ldr r0, =secondary_cpu_data_groups
 	ldr r9, [r0, #0x4]
 
-	@ set tlb addr
-	ldr r0, =secondary_cpu_data_groups
-	ldr r1, [r0, #0]
-	orr r1, r1, #(1 << 0) | (1 << 1) | (2 << 3)
-	mcr p15, 0, r1, c2, c0, 0
-	mcr p15, 0, r1, c2, c0, 1
-
-	ldr r0, =0xffffffff
-	mcr p15, 0, r0, c3, c0, 0
-
-	mov r0, #0
-	mcr p15, 0, r0, c8, c7, 0
-
-	isb
-
-	mrc p15, 0, r0, c1, c0, 0
-	orr r0, #((1<<0) | (1<<2))
-	mcr p15, 0, r0, c1, c0, 0
-
 	b  sunxi_third_cpu_task
+	b .
 ENDPROC(third_cpu_start)
+
+/* void cpu_spin_lock(lock address) - lock mutex */
+ENTRY(cpu_spin_lock)
+    mov r2, #SPINLOCK_LOCK
+_spinlock_loop:
+    ldrex r1, [r0]
+    cmp r1, #SPINLOCK_UNLOCK
+    wfene
+    bne _spinlock_loop
+    strex r1, r2, [r0]
+    cmp r1, #0
+    wfene
+    bne _spinlock_loop
+    dmb
+    bx lr
+ENDPROC(cpu_spin_lock)
+
+/* int cpu_spin_trylock(lock address) - return 0 on success */
+ENTRY(cpu_spin_trylock)
+    mov r2, #SPINLOCK_LOCK
+    mov r1, r0
+_trylock_loop:
+    ldrex r0, [r1]
+    cmp r0, #0
+    bne _trylock_out
+    strex r0, r2, [r1]
+    cmp r0, #0
+    bne _trylock_loop
+    dmb
+    bx lr
+_trylock_out:
+    clrex
+    dmb
+    bx lr
+ENDPROC(cpu_spin_trylock)
+
+/* void cpu_spin_unlock(lock address) - unlock mutex */
+ENTRY(cpu_spin_unlock)
+    dmb
+    mov r1, #SPINLOCK_UNLOCK
+    str r1, [r0]
+    dsb
+    sev
+    bx lr
+ENDPROC(cpu_spin_unlock)
 #endif
 
 ENTRY(get_core_pos)
@@ -396,5 +427,20 @@ ENTRY(get_core_pos)
 	bx	lr
 ENDPROC(get_core_pos)
 
+.globl  cpu0_set_irq_stack;
+
+ENTRY(cpu0_set_irq_stack)
 
 
+	@ set irq sp
+	mrs r1, cpsr
+	bic	r1, r1, #0x1f		@ clear all mode bits
+	orr	r1, r1, #0x12		@ set IRQ mode
+	msr	cpsr, r1
+	mov sp, r0
+	bic	r1, r1, #0x1f		@ clear all mode bits
+	orr	r1, r1, #0x13		@ set SVC mode
+	msr	cpsr, r1
+
+	bx  lr
+ENDPROC(cpu0_set_irq_stack)

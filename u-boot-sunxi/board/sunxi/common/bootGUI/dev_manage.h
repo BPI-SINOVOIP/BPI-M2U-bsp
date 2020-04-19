@@ -1,9 +1,6 @@
 #ifndef __DEV_MANAGE_H__
 #define __DEV_MANAGE_H__
 
-#include "video_hal.h"
-#include <common.h>
-
 enum {
 	DISP_OUTPUT_TYPE_NONE   = 0,
 	DISP_OUTPUT_TYPE_LCD    = 1,

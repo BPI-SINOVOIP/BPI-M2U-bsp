@@ -55,6 +55,8 @@
 #include <linux/compiler.h>
 #include <private_uboot.h>
 #include <fdt_support.h>
+#include <private_toc.h>
+#include <sys_config_old.h>
 
 /*
  * Pointer to initial global data area
@@ -118,7 +120,7 @@ void blue_led_off(void) __attribute__((weak, alias("__blue_led_off")));
 #if defined(CONFIG_WATCHDOG)
 static int init_func_watchdog_init(void)
 {
-	puts("       Watchdog enabled\n");
+	printf("       Watchdog enabled\n");
 	WATCHDOG_RESET();
 
 	return 0;
@@ -171,7 +173,7 @@ static int display_text_info(void)
 
 static int announce_dram_init(void)
 {
-	puts("DRAM:  ");
+	printf("DRAM:  ");
 	return 0;
 }
 
@@ -189,7 +191,7 @@ static int init_func_ram(void)
 	if (gd->ram_size > 0)
 		return 0;
 
-	puts("*** failed ***\n");
+	printf("*** failed ***\n");
 	return 1;
 }
 #endif
@@ -237,13 +239,13 @@ void dram_init_banksize(void)
 #if defined(CONFIG_HARD_I2C) || defined(CONFIG_SYS_I2C)
 static int init_func_i2c(void)
 {
-	puts("I2C:   ");
+	printf("I2C:   ");
 #ifdef CONFIG_SYS_I2C
 	i2c_init_all();
 #else
 	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 #endif
-	puts("ready\n");
+	printf("ready\n");
 	return 0;
 }
 #endif
@@ -251,9 +253,9 @@ static int init_func_i2c(void)
 #if defined(CONFIG_HARD_SPI)
 static int init_func_spi(void)
 {
-	puts("SPI:   ");
+	printf("SPI:   ");
 	spi_init();
-	puts("ready\n");
+	printf("ready\n");
 	return 0;
 }
 #endif
@@ -349,15 +351,15 @@ static int setup_fdt(void)
 	gd->fdt_blob = (ulong *)&_end;
 #elif defined(CONFIG_OF_HOSTFILE)
 	if (read_fdt_from_file()) {
-		puts("Failed to read control FDT\n");
+		printf("Failed to read control FDT\n");
 		return -1;
 	}
 #elif defined(CONFIG_SUNXI)
-	if(uboot_spare_head.boot_data.dtb_offset != 0)
+	void *fdt = NULL;
+	fdt = (void*)(ulong)(CONFIG_DTB_STORE_IN_DRAM_BASE);
+
+	if (fdt_totalsize(fdt))
 	{
-		void *fdt = NULL;
-		//gd->mon_len > dtb_offset, so bss and fdt will use the same memory, move fdt to other place
-		fdt = (void*)(ulong)(uboot_spare_head.boot_data.dtb_offset+CONFIG_SYS_TEXT_BASE);
 		gd->fdt_blob =(void*)CONFIG_SUNXI_FDT_ADDR;
 		memcpy((void*)gd->fdt_blob,  fdt, fdt_totalsize(fdt));
 
@@ -422,12 +424,24 @@ static int setup_dest_addr(void)
 	return 0;
 }
 
-#if defined(CONFIG_LOGBUFFER) && !defined(CONFIG_ALT_LB_ADDR)
+#if defined(CONFIG_SUNXI_DEBUG_BUF)
+static int reserve_debugbuffer(void)
+{
+	/* reserve kernel log buffer */
+	gd->relocaddr -= CONFIG_SUNXI_DEBUG_BUF_SIZE;
+	debug("Reserving %dk for uboot debugbuffer at %08lx\n", CONFIG_SUNXI_DEBUG_BUF_SIZE,
+		gd->relocaddr);
+	return 0;
+}
+#endif
+
+
+#if defined(CONFIG_SUNXI_LOGBUFFER)
 static int reserve_logbuffer(void)
 {
 	/* reserve kernel log buffer */
-	gd->relocaddr -= LOGBUFF_RESERVE;
-	debug("Reserving %dk for kernel logbuffer at %08lx\n", LOGBUFF_LEN,
+	gd->relocaddr -= SUNXI_DISPLAY_FRAME_BUFFER_SIZE;
+	debug("Reserving %dk for kernel logbuffer at %08lx\n", SUNXI_DISPLAY_FRAME_BUFFER_SIZE,
 		gd->relocaddr);
 	return 0;
 }
@@ -542,6 +556,7 @@ static int reserve_malloc(void)
 			TOTAL_MALLOC_LEN >> 10, gd->start_addr_sp);
 
 #ifdef CONFIG_NONCACHE_MEMORY
+	gd->start_addr_sp &= ~(1024 * 1024 - 1);
 	gd->start_addr_sp -= CONFIG_NONCACHE_MEMORY_SIZE;
 	debug("Reserving %dk for nocache malloc() at: %08lx\n",
 			CONFIG_NONCACHE_MEMORY_SIZE >> 10, gd->start_addr_sp);
@@ -587,16 +602,30 @@ static int reserve_sysconfig(void)
 	 * reserve memory for sysconfig
 	 * round down to next 4 kB limit
 	 */
-	ulong sys_config_size = (uboot_spare_head.boot_head.length - uboot_spare_head.boot_head.uboot_length);
-	sys_config_size = ((sys_config_size + 4096-1)/4096)*4096;
+	ulong soc_config_size = 0;
+	script_head_t *orign_head ;
+	orign_head = (script_head_t *)CONFIG_SOCCFG_STORE_IN_DRAM_BASE;
+	soc_config_size = orign_head->length;
+	soc_config_size = roundup(soc_config_size,4*1024);
+	//soccfg addr after reloc
+	gd->start_addr_sp -= soc_config_size;
+	set_script_reloc_buf(SOC_SCRIPT,gd->start_addr_sp);
+	set_script_reloc_size(SOC_SCRIPT,soc_config_size);
 
+	debug("Reserving %ldk for soc config at: %08lx\n", soc_config_size >> 10,get_script_reloc_buf(SOC_SCRIPT));
 
-	gd->start_addr_sp -= sys_config_size;
+#ifdef USE_BOARD_CONFIG
+	ulong bd_config_size = 0;
+	orign_head = (script_head_t *)CONFIG_BDCFG_STORE_IN_DRAM_BASE;
+	bd_config_size = orign_head->length;
+	bd_config_size = roundup(bd_config_size,4*1024);
+	//bdcfg addr after reloc
+	gd->start_addr_sp -= bd_config_size;
+	set_script_reloc_buf(BD_SCRIPT,gd->start_addr_sp);
+	set_script_reloc_size(BD_SCRIPT,bd_config_size);
 
-	//syscfg addr after reloc
-	gd->script_reloc_buf  = gd->start_addr_sp;
-	gd->script_reloc_size = sys_config_size;  //align size
-	debug("Reserving %ldk for SYS_CONFIG at: %08lx\n", sys_config_size >> 10,gd->relocaddr);
+	debug("Reserving %ldk for  board config at: %08lx\n", bd_config_size >> 10,get_script_reloc_buf(BD_SCRIPT));
+#endif
 #endif
 	return 0;
 }
@@ -620,7 +649,7 @@ static int reserve_fdt(void)
 		gd->fdt_size = ALIGN(fdt_totalsize(gd->fdt_blob) + 0x1000, 32);
 		fdt_set_totalsize((void*)gd->fdt_blob,gd->fdt_size);
 
-		gd->start_addr_sp -= gd->fdt_size;
+		gd->start_addr_sp -= gd->fdt_size * 2;
 		gd->new_fdt = map_sysmem(gd->start_addr_sp, gd->fdt_size);
 		debug("Reserving %lu Bytes for FDT at: %08lx\n",
 		      gd->fdt_size, gd->start_addr_sp);
@@ -669,6 +698,16 @@ static int reserve_stacks(void)
 	*++s = 0; /* NULL return address */
 # endif /* Architecture specific code */
 
+#ifdef CONFIG_SUNXI_MULITCORE_BOOT
+	/* setup secondary cpu svc stack pointer */
+	gd->secondary_cpu_irq_sp[1] = gd->start_addr_sp;
+	gd->start_addr_sp -= (CONFIG_STACKSIZE_IRQ + CONFIG_STACKSIZE_FIQ);
+	gd->secondary_cpu_svc_sp[1] = gd->start_addr_sp;
+	/* setup secondary cpu irq stack pointer */
+	gd->start_addr_sp -= 4096 * 32;
+	gd->secondary_cpu_svc_sp[2] = gd->start_addr_sp;
+	gd->start_addr_sp -= 4096 * 32;
+#endif
 	return 0;
 #endif
 }
@@ -781,8 +820,10 @@ static int reloc_fdt(void)
 {
 	if (gd->new_fdt) {
 		memcpy(gd->new_fdt, gd->fdt_blob, gd->fdt_size);
+		memcpy(gd->new_fdt + gd->fdt_size, gd->fdt_blob, gd->fdt_size);
 		gd->fdt_blob = gd->new_fdt;
-		printf("fdt addr: 0x%lx\n",(ulong)gd->fdt_blob);
+		pr_msg("fdt addr: 0x%lx\n",(ulong)gd->fdt_blob);
+		pr_msg("gd->fdt_size: 0x%lx\n",(ulong)gd->fdt_size);
 	}
 
 	return 0;
@@ -791,10 +832,14 @@ static int reloc_fdt(void)
 static int reloc_sysconfig(void)
 {
 #ifdef CONFIG_RELOCATE_SYSCONIFG
-	ulong syscfg_offset = uboot_spare_head.boot_head.uboot_length;
-	ulong syscfg_length = uboot_spare_head.boot_head.length - uboot_spare_head.boot_head.uboot_length;
-	//copy sys_config data to reloc address
-	memcpy((void*)(gd->script_reloc_buf),(void*)(CONFIG_SYS_TEXT_BASE+syscfg_offset),syscfg_length );
+	script_head_t *orign_head = (script_head_t *)CONFIG_SOCCFG_STORE_IN_DRAM_BASE;
+	ulong soc_config_size = orign_head->length;
+	memcpy((void*)get_script_reloc_buf(SOC_SCRIPT),(void*)(CONFIG_SOCCFG_STORE_IN_DRAM_BASE),soc_config_size );
+#ifdef USE_BOARD_CONFIG
+	orign_head = (script_head_t *)CONFIG_BDCFG_STORE_IN_DRAM_BASE;
+	ulong bd_config_size = orign_head->length;
+	memcpy((void*)get_script_reloc_buf(BD_SCRIPT),(void*)(CONFIG_BDCFG_STORE_IN_DRAM_BASE),bd_config_size );
+#endif
 #endif
 	return 0;
 }
@@ -850,7 +895,6 @@ static int mark_bootstage(void)
 	return 0;
 }
 extern s32 sunxi_rsb_init(u32 slave_id);
-extern void i2c_init_cpus(int speed, int slaveaddr);
 
 static int init_func_pmubus(void)
 {
@@ -858,12 +902,8 @@ static int init_func_pmubus(void)
 
 #if defined(CONFIG_AXP_USE_RSB)
 	ret = sunxi_rsb_init(0);
-#elif defined (CONFIG_AXP_USE_I2C)
-	#ifdef CONFIG_CPUS_I2C
-		i2c_init_cpus(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
-	#else
-		i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
-	#endif
+#elif defined (CONFIG_AXP_USE_I2C) && !defined(CONFIG_SYS_I2C)
+	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 #else
 
 #endif
@@ -889,6 +929,14 @@ static init_fnc_t init_sequence_f[] = {
 #ifdef CONFIG_SANDBOX
 	setup_ram_buf,
 #endif
+#if defined(CONFIG_ARM) || defined(CONFIG_MIPS)
+	timer_init,		/* initialize timer */
+#endif
+	init_baud_rate,		/* initialze baudrate settings */
+	serial_init,		/* serial communications setup */
+	console_init_f,		/* stage 1 init of console */
+	script_init,
+
 	setup_mon_len,
 	setup_fdt,
 	trace_early_init,
@@ -920,9 +968,6 @@ static init_fnc_t init_sequence_f[] = {
 	/* TODO: can we rename this to timer_init()? */
 	init_timebase,
 #endif
-#if defined(CONFIG_ARM) || defined(CONFIG_MIPS)
-	timer_init,		/* initialize timer */
-#endif
 #ifdef CONFIG_SYS_ALLOC_DPRAM
 #if !defined(CONFIG_CPM2)
 	dpram_init,
@@ -942,17 +987,15 @@ static init_fnc_t init_sequence_f[] = {
 	sdram_adjust_866,
 	init_timebase,
 #endif
-	init_baud_rate,		/* initialze baudrate settings */
-	serial_init,		/* serial communications setup */
-	console_init_f,		/* stage 1 init of console */
-	script_init,
 #ifdef CONFIG_SANDBOX
 	sandbox_early_getopt_check,
 #endif
 #ifdef CONFIG_OF_CONTROL
 	fdtdec_prepare_fdt,
 #endif
+#ifndef CONFIG_SUNXI_MULITCORE_BOOT
 	get_debugmode_flag,
+#endif
 	display_options,	/* say that we are here */
 	display_text_info,	/* show debugging info if required */
 	sunxi_probe_securemode,
@@ -996,7 +1039,7 @@ static init_fnc_t init_sequence_f[] = {
 	bpi_boot_init_gpio,
 #endif
 	check_update_key,
-	check_uart_input,
+
 	announce_dram_init,
 	/* TODO: unify all these dram functions? */
 #ifdef CONFIG_ARM
@@ -1031,8 +1074,12 @@ static init_fnc_t init_sequence_f[] = {
 	 *  - board info struct
 	 */
 	setup_dest_addr,
-#if defined(CONFIG_LOGBUFFER) && !defined(CONFIG_ALT_LB_ADDR)
+
+#if defined(CONFIG_SUNXI_LOGBUFFER)
 	reserve_logbuffer,
+#endif
+#ifdef CONFIG_SUNXI_DEBUG_BUF
+	reserve_debugbuffer,
 #endif
 #ifdef CONFIG_PRAM
 	reserve_pram,
