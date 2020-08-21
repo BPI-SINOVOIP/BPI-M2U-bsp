@@ -23,6 +23,6 @@ Target download packages in SD/bpi-*/ after build. Please check the build.sh and
 
 Get the image from [bpi](http://wiki.banana-pi.org/Banana_Pi_BPI-M2U#Image_Release) and download it to the SD card. After finish, insert the SD card to PC
 
-    # ./build.sh <board> 7
+    # ./build.sh <board> 6
 
 Choose the type, enter the SD dev, and confirm yes, all the build packages will be installed to target SD card.
