@@ -684,6 +684,7 @@
 				#address-cells = <1>;
 				#size-cells = <1>;
 				compatible = "atmel,at25df641";
+				status = "disabled";
 				spi-max-frequency = <50000000>;
 				reg = <0>;	/* Chip select 0 */
 				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
