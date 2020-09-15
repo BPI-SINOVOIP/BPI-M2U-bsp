@@ -53,6 +53,7 @@
 		lcd1 = &lcd1;
 		pwm = &pwm;
 		pwm0 = &pwm0;
+		pwm1 = &pwm1;
 		tv0 = &tv0;
 		tv1 = &tv1;
 		hdmi = &hdmi;
@@ -1300,7 +1301,7 @@
 		pwm: pwm@01c23400 {
 			compatible = "allwinner,sunxi-pwm";
 			reg = <0x0 0x01c23400 0x0 0x154>;
-			pwm-number = <1>;
+			pwm-number = <2>;
 			pwm-base = <0x0>;
 			pwms = <&pwm0>, <&pwm1>;
 		};
