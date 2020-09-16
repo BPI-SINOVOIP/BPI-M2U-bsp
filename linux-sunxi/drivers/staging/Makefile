@@ -63,3 +63,4 @@ obj-$(CONFIG_ZCACHE)		+= zcache/
 obj-$(CONFIG_GOLDFISH)		+= goldfish/
 obj-$(CONFIG_USB_DWC2)		+= dwc2/
 obj-y		+= nanohub/
+obj-$(CONFIG_FB_TFT)            += fbtft/

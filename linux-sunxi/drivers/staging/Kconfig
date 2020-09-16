@@ -141,4 +141,6 @@ source "drivers/staging/netlogic/Kconfig"
 source "drivers/staging/dwc2/Kconfig"
 source "drivers/staging/nanohub/Kconfig"
 
+source "drivers/staging/fbtft/Kconfig"
+
 endif # STAGING
