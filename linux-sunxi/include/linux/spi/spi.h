@@ -74,7 +74,8 @@ struct spi_device {
 	struct spi_master	*master;
 	u32			max_speed_hz;
 	u8			chip_select;
-	u8			mode;
+	u8			bits_per_word;
+	u16			mode;
 #define	SPI_CPHA	0x01			/* clock phase */
 #define	SPI_CPOL	0x02			/* clock polarity */
 #define	SPI_MODE_0	(0|0)			/* (original MicroWire) */
@@ -87,7 +88,10 @@ struct spi_device {
 #define	SPI_LOOP	0x20			/* loopback mode */
 #define	SPI_NO_CS	0x40			/* 1 dev/bus, no chipselect */
 #define	SPI_READY	0x80			/* slave pulls low to pause */
-	u8			bits_per_word;
+#define	SPI_TX_DUAL	0x100			/* transmit with 2 wires */
+#define	SPI_TX_QUAD	0x200			/* transmit with 4 wires */
+#define	SPI_RX_DUAL	0x400			/* receive with 2 wires */
+#define	SPI_RX_QUAD	0x800			/* receive with 4 wires */
 	int			irq;
 	void			*controller_state;
 	void			*controller_data;
