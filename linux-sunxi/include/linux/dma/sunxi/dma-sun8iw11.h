@@ -1,5 +1,5 @@
-#ifndef __DMA_SUN8IW10__
-#define __DMA_SUN8IW10__
+#ifndef __DMA_SUN8IW11__
+#define __DMA_SUN8IW11__
 
 #define DRQSRC_SRAM		0
 #define DRQSRC_SDRAM		0
@@ -36,10 +36,10 @@
 #define DRQSRC_EMAC		22
 #define DRQSRC_TP		23
 #define DRQSRC_TPRX		DRQSRC_TP
-#define DRQSRC_SPI0RX		24
-#define DRQSRC_SPI1RX		25
-#define DRQSRC_SPI2RX		26
-#define DRQSRC_SPI3RX		27
+#define DRQSRC_SPI0_RX		24
+#define DRQSRC_SPI1_RX		25
+#define DRQSRC_SPI2_RX		26
+#define DRQSRC_SPI3_RX		27
 
 #define DRQSRC_OTG_EP2		28
 #define DRQSRC_OTG_EP3		29
@@ -85,10 +85,10 @@
 #define DRQDST_IR1TX		21
 #define DRQDST_EMAC		22
 /* #define DRQDST_RESEVER		23 */
-#define DRQDST_SPI0TX		24
-#define DRQDST_SPI1TX		25
-#define DRQDST_SPI2TX		26
-#define DRQDST_SPI3TX		27
+#define DRQDST_SPI0_TX		24
+#define DRQDST_SPI1_TX		25
+#define DRQDST_SPI2_TX		26
+#define DRQDST_SPI3_TX		27
 
 #define DRQDST_OTG_EP2		28
 #define DRQDST_OTG_EP3		29
